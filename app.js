@@ -1,885 +1,537 @@
-// ===== MCQ App Pro 4.0 =====
-// Single-page + Tabs + Manager + Maintenance + GitHub backup
-// Data key
-const STORAGE_KEY = "mcqdb_v4";
+// MCQ Study App – IndexedDB engine with history, flags, modes + safer backups + token store
 
-let questions = [];
+const DB_NAME = 'mcqdb_v2';
+const DB_VERSION = 1;
+let db = null;
+
 let currentQuestion = null;
-let currentIndex = -1;
+let currentChoices = [];
+let currentMode = 'all';
+let currentChapter = '';
+let lastResult = null;
+let lastSelectedIndex = null;
 
-// stack for Previous (review only)
-let questionStack = [];
-let stackPointer = -1;
-let reviewMode = false;
+// Activity / backup tracking
+const APP_VERSION = '3.1-token-backup';
+const LS_KEYS = {
+  lastActivity: 'mcq_lastActivityAt',
+  lastBackup: 'mcq_lastBackupAt',
+  githubConfig: 'mcq_github_config'
+};
 
-// GitHub settings
-let ghToken = "";
-let ghRepo = "";
+// GitHub config (optional – for future online sync)
+let githubConfig = {
+  token: '',
+  repo: 'Awad1992/mcq-data',
+  filename: 'backup.json'
+};
 
-// DOM
-const questionPanel = document.getElementById("questionPanel");
-const feedbackPanel = document.getElementById("feedbackPanel");
-const practiceMetaEl = document.getElementById("practiceMeta");
-const statsBarEl = document.getElementById("statsBar");
-const lastWrongListEl = document.getElementById("lastWrongList");
-const lastFlagListEl = document.getElementById("lastFlagList");
-const lastMaintListEl = document.getElementById("lastMaintList");
-const manageTableBody = document.getElementById("manageTableBody");
-const maintTableBody = document.getElementById("maintTableBody");
+// DOM elements
+const questionPanel = document.getElementById('questionPanel');
+const feedbackPanel = document.getElementById('feedbackPanel');
+const historyListEl = document.getElementById('historyList');
+const modeSelect = document.getElementById('modeSelect');
+const chapterFilter = document.getElementById('chapterFilter');
+const backupStatusEl = document.getElementById('backupStatus');
+const githubTokenInput = document.getElementById('githubTokenInput');
+const btnSaveToken = document.getElementById('btnSaveToken');
+const btnClearToken = document.getElementById('btnClearToken');
 
-// ---------- INIT ----------
-document.addEventListener("DOMContentLoaded", () => {
-  setupTabs();
-  setupButtons();
-  loadFromStorage();
-  loadSettings();
-  renderStats();
-  if (questions.length > 0) {
-    gotoQuestion(0, false);
-  } else {
-    questionPanel.innerHTML =
-      '<div class="muted">No questions yet. Import JSON from Settings.</div>';
+// ---- Local helpers ----
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function recordActivity() {
+  const t = nowISO();
+  localStorage.setItem(LS_KEYS.lastActivity, t);
+}
+
+function formatNiceTime(iso) {
+  if (!iso) return 'No backup yet.';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Last backup: unknown time';
+  return 'Last backup: ' + d.toLocaleString();
+}
+
+function loadGithubConfig() {
+  try {
+    const raw = localStorage.getItem(LS_KEYS.githubConfig);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      githubConfig = Object.assign({}, githubConfig, obj);
+    }
+  } catch (e) {
+    // ignore
   }
-  refreshSidePanels();
-  renderManageTable();
-  renderMaintTable();
+  if (githubTokenInput) githubTokenInput.value = githubConfig.token || '';
+}
+
+function saveGithubConfig() {
+  try {
+    localStorage.setItem(LS_KEYS.githubConfig, JSON.stringify(githubConfig));
+  } catch (e) {
+    // ignore
+  }
+}
+
+function refreshBackupStatus() {
+  const lastBackup = localStorage.getItem(LS_KEYS.lastBackup);
+  if (!backupStatusEl) return;
+  backupStatusEl.textContent = formatNiceTime(lastBackup);
+}
+
+// ---- Event wiring ----
+
+modeSelect.addEventListener('change', () => {
+  currentMode = modeSelect.value;
+  if (currentMode === 'chapter') {
+    chapterFilter.style.display = 'inline-block';
+  } else {
+    chapterFilter.style.display = 'none';
+    currentChapter = '';
+  }
+  loadNextQuestion();
 });
 
-// ---------- Tabs ----------
-function setupTabs() {
-  const tabButtons = document.querySelectorAll(".tab-btn");
-  const tabs = document.querySelectorAll(".tab");
+chapterFilter.addEventListener('change', () => {
+  currentChapter = chapterFilter.value.trim();
+  loadNextQuestion();
+});
 
-  tabButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      tabButtons.forEach((b) => b.classList.remove("active"));
-      tabs.forEach((t) => t.classList.remove("active"));
+document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
+document.getElementById('btnNext').addEventListener('click', () => {
+  lastResult = null;
+  feedbackPanel.innerHTML = '';
+  loadNextQuestion();
+});
+document.getElementById('btnFlag').addEventListener('click', toggleFlag);
+document.getElementById('btnImport').addEventListener('click', handleImport);
+document.getElementById('btnExport').addEventListener('click', handleExport);
 
-      btn.classList.add("active");
-      const id = btn.getAttribute("data-tab");
-      document.getElementById(id).classList.add("active");
-    });
+if (btnSaveToken) {
+  btnSaveToken.addEventListener('click', () => {
+    githubConfig.token = (githubTokenInput.value || '').trim();
+    saveGithubConfig();
+    alert('Token saved in this browser.\\nYou will not need to re-enter it unless you clear site data or press Clear.');
+  });
+}
+if (btnClearToken) {
+  btnClearToken.addEventListener('click', () => {
+    githubConfig.token = '';
+    saveGithubConfig();
+    if (githubTokenInput) githubTokenInput.value = '';
+    alert('Token cleared from this browser.');
   });
 }
 
-// ---------- Buttons ----------
-function setupButtons() {
-  document.getElementById("btnSubmit").addEventListener("click", submitAnswer);
-  document.getElementById("btnNext").addEventListener("click", () =>
-    nextQuestion(true)
-  );
-  document.getElementById("btnPrev").addEventListener("click", previousQuestion);
-  document.getElementById("btnFlag").addEventListener("click", toggleFlag);
-  document.getElementById("btnMaint").addEventListener("click", toggleMaint);
+// --- IndexedDB init ---
 
-  document
-    .getElementById("btnApplyFilters")
-    .addEventListener("click", renderManageTable);
-  document
-    .getElementById("btnSelectAll")
-    .addEventListener("click", () => setManageSelection(true));
-  document
-    .getElementById("btnClearSelection")
-    .addEventListener("click", () => setManageSelection(false));
-  document
-    .getElementById("btnDeleteSelected")
-    .addEventListener("click", deleteSelectedQuestions);
-
-  // Maintenance tab
-  document
-    .getElementById("btnMaintSelectAll")
-    .addEventListener("click", () => setMaintSelection(true));
-  document
-    .getElementById("btnMaintClear")
-    .addEventListener("click", () => setMaintSelection(false));
-  document
-    .getElementById("btnMaintRemove")
-    .addEventListener("click", removeMaintFromSelected);
-  document
-    .getElementById("btnMaintDelete")
-    .addEventListener("click", deleteMaintSelected);
-
-  // Settings: Import/Export
-  document
-    .getElementById("btnImport")
-    .addEventListener("click", handleImportJSON);
-  document
-    .getElementById("btnExport")
-    .addEventListener("click", handleExportJSON);
-
-  // Settings: GitHub
-  document
-    .getElementById("btnSaveSettings")
-    .addEventListener("click", saveSettings);
-  document
-    .getElementById("btnUploadGitHub")
-    .addEventListener("click", uploadGitHub);
-  document
-    .getElementById("btnDownloadGitHub")
-    .addEventListener("click", downloadGitHub);
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('questions')) {
+        const store = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('by_chapter', 'chapter', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('answers')) {
+        const ans = db.createObjectStore('answers', { keyPath: 'id', autoIncrement: true });
+        ans.createIndex('by_question', 'questionId', { unique: false });
+        ans.createIndex('by_time', 'answeredAt', { unique: false });
+      }
+    };
+    req.onsuccess = e => {
+      db = e.target.result;
+      resolve(db);
+    };
+    req.onerror = e => reject(e.target.error);
+  });
 }
 
-// ---------- Storage ----------
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const arr = JSON.parse(raw);
-    questions = (arr || []).map((q, idx) => normalizeQuestion(q, idx));
-  } catch (e) {
-    console.error("loadFromStorage error", e);
-  }
+function randomChoice(arr) {
+  if (!arr.length) return null;
+  const idx = Math.floor(Math.random() * arr.length);
+  return arr[idx];
 }
 
-function saveToStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+async function getStats() {
+  const tx = db.transaction(['questions','answers'],'readonly');
+  const qStore = tx.objectStore('questions');
+  const stats = { total:0, flagged:0, withWrong:0, answered:0 };
+
+  await new Promise(res=>{
+    const req = qStore.getAll();
+    req.onsuccess = e => {
+      const all = e.target.result || [];
+      stats.total = all.length;
+      stats.flagged = all.filter(q=>q.flagged).length;
+      stats.answered = all.filter(q=>q.timesSeen>0).length;
+      stats.withWrong = all.filter(q=>q.timesWrong>0).length;
+      res();
+    };
+  });
+
+  return stats;
 }
 
-// ---------- Question shape ----------
-function normalizeQuestion(q, idx) {
-  const now = new Date().toISOString();
-  // support older shapes
-  let id = q.id != null ? q.id : idx + 1;
-  let text = q.text || q.question || "";
-  let chapter = q.chapter || "";
-  let explanation = q.explanation || "";
-  let choices = q.choices || [];
+async function pickQuestion() {
+  const tx = db.transaction('questions','readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res=>{
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+  if (!all.length) return null;
 
-  // if choices is string array, convert
-  if (choices.length && typeof choices[0] === "string") {
-    const correctIndex =
-      typeof q.correctIndex === "number" ? q.correctIndex : 0;
-    choices = choices.map((t, i) => ({
-      text: t,
-      isCorrect: i === correctIndex,
-    }));
+  let filtered = all.filter(q=>q.active !== false);
+
+  if (currentMode === 'new') {
+    filtered = filtered.filter(q=>!q.timesSeen);
+  } else if (currentMode === 'wrong') {
+    filtered = filtered.filter(q=>q.timesWrong>0);
+  } else if (currentMode === 'flagged') {
+    filtered = filtered.filter(q=>q.flagged);
+  } else if (currentMode === 'chapter' && currentChapter) {
+    filtered = filtered.filter(q=>(q.chapter||'').toLowerCase() === currentChapter.toLowerCase());
   }
 
-  const correctIndex = (() => {
-    const idx = choices.findIndex((c) => c.isCorrect);
-    return idx >= 0 ? idx : 0;
-  })();
+  if (!filtered.length) filtered = all;
 
-  return {
-    id,
-    text,
-    chapter,
-    source: q.source || "",
-    explanation,
-    choices,
-    correctIndex,
-    flagged: !!q.flagged,
-    maintenance: !!q.maintenance,
-    addedAt: q.addedAt || now,
-    timesSeen: q.timesSeen || 0,
-    timesCorrect: q.timesCorrect || 0,
-    timesWrong: q.timesWrong || 0,
-    lastSeenAt: q.lastSeenAt || null,
-    lastAnsweredAt: q.lastAnsweredAt || null,
-  };
-}
+  // sort: least recently seen, least seen
+  filtered.sort((a,b)=>{
+    const as = a.lastSeenAt || '';
+    const bs = b.lastSeenAt || '';
+    if (as === bs) return (a.timesSeen||0)-(b.timesSeen||0);
+    return as.localeCompare(bs);
+  });
 
-// ---------- Stats ----------
-function renderStats() {
-  const total = questions.length;
-  const answered = questions.filter((q) => q.timesSeen > 0).length;
-  const withWrong = questions.filter((q) => q.timesWrong > 0).length;
-  const flagged = questions.filter((q) => q.flagged).length;
-  const maint = questions.filter((q) => q.maintenance).length;
-
-  statsBarEl.innerHTML = `
-    <div>Total: <strong>${total}</strong></div>
-    <div>Answered: <strong>${answered}</strong></div>
-    <div>Wrong ≥1: <strong>${withWrong}</strong></div>
-    <div>Flagged: <strong>${flagged}</strong></div>
-    <div>Maintenance: <strong>${maint}</strong></div>
-  `;
-}
-
-// ---------- Practice view ----------
-function gotoQuestion(index, pushToStack) {
-  if (questions.length === 0) return;
-  if (index < 0 || index >= questions.length) index = 0;
-
-  if (pushToStack && currentIndex >= 0) {
-    questionStack.push(currentIndex);
-    stackPointer = questionStack.length - 1;
-  }
-
-  currentIndex = index;
-  currentQuestion = questions[currentIndex];
-  reviewMode = false;
-
-  renderQuestion();
-  feedbackPanel.innerHTML = "";
-  renderStats();
-  refreshSidePanels();
+  const slice = filtered.slice(0, Math.min(filtered.length, 50));
+  return randomChoice(slice);
 }
 
 function renderQuestion() {
   if (!currentQuestion) {
-    questionPanel.innerHTML =
-      '<div class="muted">No question loaded.</div>';
-    practiceMetaEl.innerHTML = "";
+    questionPanel.innerHTML = '<div class="muted">No questions in database yet. استخدم Import لإضافة أسئلة JSON.</div>';
     return;
   }
-
   const q = currentQuestion;
-  const letters = ["A", "B", "C", "D", "E", "F"];
+  const letters = ['A','B','C','D','E','F','G'];
+  currentChoices = q.choices || [];
 
-  let metaHtml = "";
-  if (q.chapter) metaHtml += `<span>${q.chapter}</span>`;
-  if (q.source) metaHtml += `<span>${q.source}</span>`;
-  if (q.flagged) metaHtml += `<span class="q-tag">FLAG</span>`;
-  if (q.maintenance) metaHtml += `<span class="q-tag">MAINT</span>`;
-  practiceMetaEl.innerHTML = metaHtml;
+  let html = '';
+  html += `<div class="q-text">Q#${q.id || ''} – ${q.text}</div>`;
+  if (q.chapter || q.source) {
+    html += '<div class="tag-chapter">';
+    if (q.chapter) html += `<span>${q.chapter}</span>`;
+    if (q.source) html += ` · <span>${q.source}</span>`;
+    if (q.flagged) html += ` · <span class="pill pill-flag">FLAG</span>`;
+    html += '</div>';
+  }
 
-  let html = `<div class="q-text">Q#${q.id} – ${q.text}</div>`;
-  html += '<div style="margin-top:0.3rem;">';
-
-  q.choices.forEach((c, idx) => {
-    html += `
-      <label class="choice">
-        <input type="radio" name="choice" value="${idx}">
-        <strong>${letters[idx] || "?"}.</strong> ${c.text}
-      </label>
-    `;
+  html += '<div style="margin-top:0.4rem;">';
+  currentChoices.forEach((c, idx)=>{
+    const letter = letters[idx] || '?';
+    const checked = (idx === lastSelectedIndex) ? 'checked' : '';
+    html += `<label class="choice">
+      <input type="radio" name="choice" value="${idx}" ${checked}>
+      <strong>${letter}.</strong> ${c.text}
+    </label>`;
   });
+  html += '</div>';
 
-  html += "</div>";
   questionPanel.innerHTML = html;
 }
 
-function nextQuestion(pushStack) {
-  if (questions.length === 0) return;
-  let idx = currentIndex + 1;
-  if (idx >= questions.length) idx = 0;
-  gotoQuestion(idx, pushStack);
+async function updateStatsBar() {
+  const stats = await getStats();
+  const el = document.getElementById('statsBar');
+  el.innerHTML = `
+    <div>Total: <strong>${stats.total}</strong></div>
+    <div>Answered: <strong>${stats.answered}</strong></div>
+    <div>Wrong ≥1: <strong>${stats.withWrong}</strong></div>
+    <div>Flagged: <strong>${stats.flagged}</strong></div>
+  `;
 }
 
-function previousQuestion() {
-  if (stackPointer <= 0 || questionStack.length === 0) return;
-  stackPointer--;
-  const prevIndex = questionStack[stackPointer];
-  reviewMode = true;
-  currentIndex = prevIndex;
-  currentQuestion = questions[currentIndex];
+async function loadHistory() {
+  const tx = db.transaction(['answers','questions'],'readonly');
+  const aStore = tx.objectStore('answers');
+  const qStore = tx.objectStore('questions');
+
+  const allAns = await new Promise(res=>{
+    const req = aStore.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+
+  allAns.sort((a,b)=> (b.answeredAt||'').localeCompare(a.answeredAt||''));
+  const recent = allAns.slice(0,40);
+
+  const qMap = {};
+  await Promise.all(recent.map(a=>{
+    return new Promise(r=>{
+      if (qMap[a.questionId]) return r();
+      const req = qStore.get(a.questionId);
+      req.onsuccess = e => { qMap[a.questionId]=e.target.result; r(); };
+      req.onerror = ()=>r();
+    });
+  }));
+
+  let html = '';
+  recent.forEach(a=>{
+    const q = qMap[a.questionId];
+    if (!q) return;
+    const label = (q.chapter || '').slice(0,16);
+    html += `<div class="history-item" data-qid="${q.id}">
+      <div>${(q.text||'').slice(0,80)}${q.text && q.text.length>80 ? '…' : ''}</div>
+      <div class="muted">
+        ${label ? `<span>${label}</span>` : ''}
+        <span class="pill ${a.isCorrect ? 'pill-correct':'pill-wrong'}">${a.isCorrect ? 'Correct' : 'Wrong'}</span>
+        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
+      </div>
+    </div>`;
+  });
+
+  historyListEl.innerHTML = html || '<div class="muted">No history yet.</div>';
+
+  historyListEl.querySelectorAll('.history-item').forEach(item=>{
+    item.addEventListener('click', async () => {
+      const id = parseInt(item.getAttribute('data-qid'));
+      const tx2 = db.transaction('questions','readonly');
+      const store2 = tx2.objectStore('questions');
+      const q = await new Promise(r=>{
+        const rq = store2.get(id);
+        rq.onsuccess = e => r(e.target.result);
+        rq.onerror = ()=>r(null);
+      });
+      if (!q) return;
+      currentQuestion = q;
+      lastResult = null;
+      lastSelectedIndex = null;
+      feedbackPanel.innerHTML = '';
+      renderQuestion();
+    });
+  });
+}
+
+async function loadNextQuestion() {
+  currentQuestion = await pickQuestion();
+  lastResult = null;
+  lastSelectedIndex = null;
+  feedbackPanel.innerHTML = '';
   renderQuestion();
-  lockChoices();
-  showLastAnswerFeedback();
+  updateStatsBar();
+  loadHistory();
 }
 
-function lockChoices() {
-  const labels = document.querySelectorAll(".choice");
-  labels.forEach((el) => {
-    el.style.pointerEvents = "none";
-    el.style.opacity = "0.7";
-  });
-}
+// ---- Answer submission ----
 
-function showLastAnswerFeedback() {
-  const q = currentQuestion;
-  const letters = ["A", "B", "C", "D", "E", "F"];
-  const labels = document.querySelectorAll(".choice");
-  labels.forEach((el, idx) => {
-    el.classList.remove("correct", "wrong", "show");
-    if (idx === q.correctIndex) el.classList.add("correct", "show");
-    if (
-      q.lastSelectedIndex != null &&
-      q.lastSelectedIndex === idx &&
-      idx !== q.correctIndex
-    ) {
-      el.classList.add("wrong", "show");
-    }
-  });
-
-  let html = `<div style="margin-top:0.3rem;">`;
-  if (q.lastSelectedIndex == null) {
-    html += `<div class="muted">Previously viewed. No answer recorded.</div>`;
-  } else {
-    const isCorrect = q.lastSelectedIndex === q.correctIndex;
-    html += `<div style="font-weight:600; color:${
-      isCorrect ? "#16a34a" : "#dc2626"
-    };">${isCorrect ? "Correct ✅" : "Wrong ❌"}</div>`;
-    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${
-      letters[q.correctIndex]
-    }.</strong> ${q.choices[q.correctIndex].text}</div>`;
-    if (q.explanation) {
-      html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${q.explanation}</div>`;
-    }
-  }
-  html += `</div>`;
-  feedbackPanel.innerHTML = html;
-}
-
-function submitAnswer() {
-  if (!currentQuestion || reviewMode) return;
+async function submitAnswer() {
+  if (!currentQuestion) return;
   const radios = document.querySelectorAll('input[name="choice"]');
   let selectedIdx = null;
-  radios.forEach((r) => {
+  radios.forEach(r=>{
     if (r.checked) selectedIdx = parseInt(r.value);
   });
-  if (selectedIdx == null) {
-    alert("اختر إجابة أولاً.");
+  if (selectedIdx === null) {
+    alert('اختر إجابة أولاً.');
     return;
   }
+  lastSelectedIndex = selectedIdx;
+  const correctIdx = (currentQuestion.choices || []).findIndex(c=>c.isCorrect);
+  const isCorrect = (selectedIdx === correctIdx);
 
-  const q = currentQuestion;
-  const correctIdx = q.correctIndex;
-  const isCorrect = selectedIdx === correctIdx;
-  const now = new Date().toISOString();
+  const now = nowISO();
+  recordActivity();
 
+  const tx = db.transaction(['questions','answers'],'readwrite');
+  const qStore = tx.objectStore('questions');
+  const aStore = tx.objectStore('answers');
+
+  const q = Object.assign({}, currentQuestion);
   q.timesSeen = (q.timesSeen || 0) + 1;
-  if (isCorrect) {
-    q.timesCorrect = (q.timesCorrect || 0) + 1;
-  } else {
-    q.timesWrong = (q.timesWrong || 0) + 1;
-  }
+  q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
+  q.timesWrong = (q.timesWrong || 0) + (isCorrect ? 0 : 1);
   q.lastSeenAt = now;
-  q.lastAnsweredAt = now;
-  q.lastSelectedIndex = selectedIdx;
+  qStore.put(q);
 
-  questions[currentIndex] = q;
-  saveToStorage();
-  renderStats();
-
-  const letters = ["A", "B", "C", "D", "E", "F"];
-  const labels = document.querySelectorAll(".choice");
-  labels.forEach((el, idx) => {
-    el.classList.remove("correct", "wrong", "show");
-    if (idx === correctIdx) el.classList.add("correct", "show");
-    if (idx === selectedIdx && idx !== correctIdx)
-      el.classList.add("wrong", "show");
+  aStore.add({
+    questionId: q.id,
+    answeredAt: now,
+    selectedIndex: selectedIdx,
+    isCorrect
   });
 
-  let html = `<div style="margin-top:0.3rem;">`;
-  html += `<div style="font-weight:600; color:${
-    isCorrect ? "#16a34a" : "#dc2626"
-  };">${isCorrect ? "Correct ✅" : "Wrong ❌"}</div>`;
-  html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${
-    letters[correctIdx]
-  }.</strong> ${q.choices[correctIdx].text}</div>`;
-  if (q.explanation) {
-    html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${q.explanation}</div>`;
+  tx.oncomplete = () => {
+    currentQuestion = q;
+    lastResult = isCorrect;
+    showFeedback(correctIdx, selectedIdx, q.explanation);
+    updateStatsBar();
+    loadHistory();
+  };
+}
+
+function showFeedback(correctIdx, selectedIdx, explanation) {
+  const letters = ['A','B','C','D','E','F','G'];
+  const q = currentQuestion;
+  const choices = currentChoices;
+
+  const choiceEls = document.querySelectorAll('.choice');
+  choiceEls.forEach((el, idx)=>{
+    el.classList.remove('correct','wrong','show');
+    if (idx === correctIdx) { el.classList.add('correct','show'); }
+    if (idx === selectedIdx && idx !== correctIdx) { el.classList.add('wrong','show'); }
+  });
+
+  let html = '';
+  html += `<div style="margin-top:0.4rem;">`;
+  if (lastResult) {
+    html += `<div style="color:#2e7d32; font-weight:600;">Correct ✅</div>`;
+  } else {
+    html += `<div style="color:#c62828; font-weight:600;">Wrong ❌</div>`;
+  }
+  if (correctIdx >= 0 && choices[correctIdx]) {
+    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${letters[correctIdx]}.</strong> ${choices[correctIdx].text}</div>`;
+  }
+  if (explanation) {
+    html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${explanation}</div>`;
   }
   html += `</div>`;
   feedbackPanel.innerHTML = html;
-
-  refreshSidePanels();
-  renderManageTable();
-  renderMaintTable();
 }
 
-// ---------- Flag / Maint ----------
-function toggleFlag() {
+// ---- Flagging ----
+
+async function toggleFlag() {
   if (!currentQuestion) return;
-  currentQuestion.flagged = !currentQuestion.flagged;
-  questions[currentIndex] = currentQuestion;
-  saveToStorage();
-  renderStats();
-  renderQuestion();
-  refreshSidePanels();
-  renderManageTable();
-}
-
-function toggleMaint() {
-  if (!currentQuestion) return;
-  currentQuestion.maintenance = !currentQuestion.maintenance;
-  questions[currentIndex] = currentQuestion;
-  saveToStorage();
-  renderStats();
-  renderQuestion();
-  refreshSidePanels();
-  renderManageTable();
-  renderMaintTable();
-}
-
-// ---------- Side panels ----------
-function refreshSidePanels() {
-  const sortedByTime = [...questions].filter((q) => q.lastSeenAt).sort(
-    (a, b) => (b.lastSeenAt || "").localeCompare(a.lastSeenAt || "")
-  );
-
-  const lastWrong = sortedByTime.filter((q) => q.timesWrong > 0).slice(0, 5);
-  const lastFlag = sortedByTime.filter((q) => q.flagged).slice(0, 5);
-  const lastMaint = sortedByTime.filter((q) => q.maintenance).slice(0, 5);
-
-  renderMiniList(lastWrongListEl, lastWrong);
-  renderMiniList(lastFlagListEl, lastFlag);
-  renderMiniList(lastMaintListEl, lastMaint);
-}
-
-function renderMiniList(container, list) {
-  if (!list.length) {
-    container.innerHTML = '<div class="muted">Empty.</div>';
-    return;
-  }
-  container.innerHTML = list
-    .map(
-      (q) => `
-    <div class="mini-item" data-qid="${q.id}">
-      ${(q.text || "").slice(0, 60)}${q.text.length > 60 ? "…" : ""}
-      <span class="tag">${q.chapter || ""}</span>
-    </div>
-  `
-    )
-    .join("");
-
-  container.querySelectorAll(".mini-item").forEach((el) => {
-    el.addEventListener("click", () => {
-      const qid = parseInt(el.getAttribute("data-qid"));
-      const idx = questions.findIndex((q) => q.id === qid);
-      if (idx >= 0) {
-        gotoQuestion(idx, true);
-      }
-    });
-  });
-}
-
-// ---------- Manage tab ----------
-function getManageFiltered() {
-  const textFilter = document
-    .getElementById("filterText")
-    .value.toLowerCase()
-    .trim();
-  const chapterFilter = document
-    .getElementById("filterChapter")
-    .value.toLowerCase()
-    .trim();
-  const flagFilter = document.getElementById("filterFlag").value;
-  const maintFilter = document.getElementById("filterMaint").value;
-  const sortBy = document.getElementById("sortBy").value;
-
-  let arr = [...questions];
-
-  if (textFilter) {
-    arr = arr.filter((q) =>
-      (q.text || "").toLowerCase().includes(textFilter)
-    );
-  }
-  if (chapterFilter) {
-    arr = arr.filter((q) =>
-      (q.chapter || "").toLowerCase().includes(chapterFilter)
-    );
-  }
-  if (flagFilter === "only") {
-    arr = arr.filter((q) => q.flagged);
-  } else if (flagFilter === "none") {
-    arr = arr.filter((q) => !q.flagged);
-  }
-  if (maintFilter === "only") {
-    arr = arr.filter((q) => q.maintenance);
-  } else if (maintFilter === "none") {
-    arr = arr.filter((q) => !q.maintenance);
-  }
-
-  arr.sort((a, b) => {
-    if (sortBy === "addedDesc") {
-      return (b.addedAt || "").localeCompare(a.addedAt || "");
-    }
-    if (sortBy === "addedAsc") {
-      return (a.addedAt || "").localeCompare(b.addedAt || "");
-    }
-    if (sortBy === "chapterAsc") {
-      return (a.chapter || "").localeCompare(b.chapter || "");
-    }
-    if (sortBy === "chapterDesc") {
-      return (b.chapter || "").localeCompare(a.chapter || "");
-    }
-    if (sortBy === "wrongDesc") {
-      return (b.timesWrong || 0) - (a.timesWrong || 0);
-    }
-    return 0;
-  });
-
-  return arr;
-}
-
-function renderManageTable() {
-  const arr = getManageFiltered();
-  if (!arr.length) {
-    manageTableBody.innerHTML =
-      '<tr><td colspan="9" class="muted">No questions.</td></tr>';
-    return;
-  }
-
-  manageTableBody.innerHTML = arr
-    .map(
-      (q) => `
-    <tr data-id="${q.id}">
-      <td><input type="checkbox" class="m-select" /></td>
-      <td>${q.id}</td>
-      <td>${(q.text || "").slice(0, 80)}${
-        q.text.length > 80 ? "…" : ""
-      }</td>
-      <td>${q.chapter || ""}</td>
-      <td>${(q.addedAt || "").slice(0, 10)}</td>
-      <td>${q.timesWrong || 0}</td>
-      <td>${q.flagged ? "✓" : ""}</td>
-      <td>${q.maintenance ? "✓" : ""}</td>
-      <td><button class="ghost btn-open">Open</button></td>
-    </tr>
-  `
-    )
-    .join("");
-
-  manageTableBody.querySelectorAll(".btn-open").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const tr = btn.closest("tr");
-      const id = parseInt(tr.getAttribute("data-id"));
-      const idx = questions.findIndex((q) => q.id === id);
-      if (idx >= 0) {
-        gotoQuestion(idx, true);
-        // switch to Practice tab
-        document
-          .querySelectorAll(".tab-btn")
-          .forEach((b) => b.classList.remove("active"));
-        document
-          .querySelectorAll(".tab")
-          .forEach((t) => t.classList.remove("active"));
-        document
-          .querySelector('[data-tab="tab-practice"]')
-          .classList.add("active");
-        document.getElementById("tab-practice").classList.add("active");
-      }
-    });
-  });
-}
-
-function setManageSelection(val) {
-  manageTableBody
-    .querySelectorAll(".m-select")
-    .forEach((c) => (c.checked = val));
-}
-
-function deleteSelectedQuestions() {
-  const rows = manageTableBody.querySelectorAll("tr[data-id]");
-  const selectedIds = [];
-  rows.forEach((tr) => {
-    const ck = tr.querySelector(".m-select");
-    if (ck && ck.checked) selectedIds.push(parseInt(tr.getAttribute("data-id")));
-  });
-  if (!selectedIds.length) {
-    alert("No questions selected.");
-    return;
-  }
-  if (!confirm("Delete selected questions?")) return;
-
-  questions = questions.filter((q) => !selectedIds.includes(q.id));
-  saveToStorage();
-  renderStats();
-  renderManageTable();
-  renderMaintTable();
-  refreshSidePanels();
-  if (questions.length === 0) {
-    currentQuestion = null;
-    currentIndex = -1;
+  const tx = db.transaction('questions','readwrite');
+  const store = tx.objectStore('questions');
+  const q = Object.assign({}, currentQuestion);
+  q.flagged = !q.flagged;
+  store.put(q);
+  tx.oncomplete = () => {
+    currentQuestion = q;
     renderQuestion();
-  } else {
-    gotoQuestion(0, false);
-  }
+    loadHistory();
+    updateStatsBar();
+  };
 }
 
-// ---------- Maintenance tab ----------
-function getMaintQuestions() {
-  return questions.filter((q) => q.maintenance);
-}
+// ---- Import / Export with safer backup ----
 
-function renderMaintTable() {
-  const arr = getMaintQuestions();
-  if (!arr.length) {
-    maintTableBody.innerHTML =
-      '<tr><td colspan="7" class="muted">No maintenance questions.</td></tr>';
-    return;
-  }
-
-  maintTableBody.innerHTML = arr
-    .map(
-      (q) => `
-    <tr data-id="${q.id}">
-      <td><input type="checkbox" class="mt-select" /></td>
-      <td>${q.id}</td>
-      <td>${(q.text || "").slice(0, 80)}${
-        q.text.length > 80 ? "…" : ""
-      }</td>
-      <td>${q.chapter || ""}</td>
-      <td>${q.timesWrong || 0}</td>
-      <td>${q.flagged ? "✓" : ""}</td>
-      <td><button class="ghost btn-open">Open</button></td>
-    </tr>
-  `
-    )
-    .join("");
-
-  maintTableBody.querySelectorAll(".btn-open").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const tr = btn.closest("tr");
-      const id = parseInt(tr.getAttribute("data-id"));
-      const idx = questions.findIndex((q) => q.id === id);
-      if (idx >= 0) {
-        gotoQuestion(idx, true);
-        document
-          .querySelectorAll(".tab-btn")
-          .forEach((b) => b.classList.remove("active"));
-        document
-          .querySelectorAll(".tab")
-          .forEach((t) => t.classList.remove("active"));
-        document
-          .querySelector('[data-tab="tab-practice"]')
-          .classList.add("active");
-        document.getElementById("tab-practice").classList.add("active");
-      }
-    });
-  });
-}
-
-function setMaintSelection(val) {
-  maintTableBody
-    .querySelectorAll(".mt-select")
-    .forEach((c) => (c.checked = val));
-}
-
-function removeMaintFromSelected() {
-  const rows = maintTableBody.querySelectorAll("tr[data-id]");
-  const ids = [];
-  rows.forEach((tr) => {
-    const ck = tr.querySelector(".mt-select");
-    if (ck && ck.checked) ids.push(parseInt(tr.getAttribute("data-id")));
-  });
-  if (!ids.length) {
-    alert("No questions selected.");
-    return;
-  }
-  questions.forEach((q) => {
-    if (ids.includes(q.id)) q.maintenance = false;
-  });
-  saveToStorage();
-  renderStats();
-  renderMaintTable();
-  refreshSidePanels();
-  renderManageTable();
-}
-
-function deleteMaintSelected() {
-  const rows = maintTableBody.querySelectorAll("tr[data-id]");
-  const ids = [];
-  rows.forEach((tr) => {
-    const ck = tr.querySelector(".mt-select");
-    if (ck && ck.checked) ids.push(parseInt(tr.getAttribute("data-id")));
-  });
-  if (!ids.length) {
-    alert("No questions selected.");
-    return;
-  }
-  if (!confirm("Delete selected maintenance questions?")) return;
-  questions = questions.filter((q) => !ids.includes(q.id));
-  saveToStorage();
-  renderStats();
-  renderMaintTable();
-  renderManageTable();
-  refreshSidePanels();
-  if (questions.length === 0) {
-    currentQuestion = null;
-    currentIndex = -1;
-    renderQuestion();
-  } else {
-    gotoQuestion(0, false);
-  }
-}
-
-// ---------- Import / Export ----------
-function handleImportJSON() {
-  const file = document.getElementById("fileInput").files[0];
+function handleImport() {
+  const file = document.getElementById('fileInput').files[0];
   if (!file) {
-    alert("اختر ملف JSON.");
+    alert('اختر ملف JSON أولاً.');
     return;
   }
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
-      const arr = JSON.parse(e.target.result);
-      if (!Array.isArray(arr)) throw new Error("JSON must be an array");
-      const now = new Date().toISOString();
-      let maxId = questions.reduce((m, q) => Math.max(m, q.id || 0), 0);
-      const newQs = arr.map((raw) => {
-        maxId += 1;
-        const base = normalizeQuestion(raw, maxId);
-        base.id = maxId;
-        base.addedAt = base.addedAt || now;
-        return base;
+      const raw = JSON.parse(e.target.result);
+
+      // Support both old format (array) and new format ({meta, questions})
+      let meta = null;
+      let data = null;
+      if (Array.isArray(raw)) {
+        data = raw;
+      } else if (raw && Array.isArray(raw.questions)) {
+        data = raw.questions;
+        meta = raw.meta || null;
+      } else {
+        throw new Error('Unexpected JSON format.');
+      }
+
+      // Check for "older than current" backup
+      const lastActivity = localStorage.getItem(LS_KEYS.lastActivity);
+      if (meta && meta.exportedAt && lastActivity && meta.exportedAt < lastActivity) {
+        const ok = confirm(
+          '⚠ This backup is older than your latest activity.\\n' +
+          'Importing it may overwrite newer progress.\\n\\n' +
+          'Continue anyway?'
+        );
+        if (!ok) return;
+      }
+
+      const tx = db.transaction('questions','readwrite');
+      const store = tx.objectStore('questions');
+      data.forEach(q => {
+        const obj = {
+          text: q.text,
+          chapter: q.chapter || '',
+          source: q.source || '',
+          explanation: q.explanation || '',
+          choices: q.choices || [],
+          timesSeen: q.timesSeen || 0,
+          timesCorrect: q.timesCorrect || 0,
+          timesWrong: q.timesWrong || 0,
+          lastSeenAt: q.lastSeenAt || null,
+          flagged: !!q.flagged,
+          active: q.active !== false
+        };
+        if (q.id) obj.id = q.id; // keep IDs if present
+        store.put(obj);
       });
-      questions = questions.concat(newQs);
-      saveToStorage();
-      renderStats();
-      if (!currentQuestion && questions.length > 0) gotoQuestion(0, false);
-      renderManageTable();
-      renderMaintTable();
-      refreshSidePanels();
-      alert("Imported " + newQs.length + " questions.");
+      tx.oncomplete = () => {
+        alert('Imported ' + data.length + ' questions.');
+        loadNextQuestion();
+      };
     } catch (err) {
-      alert("Import error: " + err.message);
+      alert('Error reading JSON: ' + err.message);
     }
   };
   reader.readAsText(file);
 }
 
-function handleExportJSON() {
-  const data = questions.map((q) => ({
-    id: q.id,
-    chapter: q.chapter,
-    text: q.text,
-    source: q.source,
-    explanation: q.explanation,
-    choices: q.choices,
-    flagged: q.flagged,
-    maintenance: q.maintenance,
-    addedAt: q.addedAt,
-  }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
+async function handleExport() {
+  const tx = db.transaction('questions','readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res=>{
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
   });
-  const a = document.createElement("a");
+
+  const exportTime = nowISO();
+  const payload = {
+    meta: {
+      exportedAt: exportTime,
+      appVersion: APP_VERSION,
+      totalQuestions: all.length
+    },
+    questions: all.map(q => ({
+      id: q.id,
+      text: q.text,
+      chapter: q.chapter,
+      source: q.source,
+      explanation: q.explanation,
+      choices: q.choices,
+      flagged: !!q.flagged,
+      active: q.active !== false,
+      timesSeen: q.timesSeen || 0,
+      timesCorrect: q.timesCorrect || 0,
+      timesWrong: q.timesWrong || 0,
+      lastSeenAt: q.lastSeenAt || null
+    }))
+  };
+
+  const blob = new Blob([JSON.stringify(payload,null,2)], { type:'application/json' });
+
+  const stamp = exportTime.replace(/[:.]/g,'-');
+  const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = "mcq_backup.json";
+  a.download = 'mcq_backup_' + stamp + '.json';
   a.click();
+
+  localStorage.setItem(LS_KEYS.lastBackup, exportTime);
+  refreshBackupStatus();
 }
 
-// ---------- Settings + GitHub ----------
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem("mcq_github_cfg");
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    ghToken = cfg.token || "";
-    ghRepo = cfg.repo || "";
-    document.getElementById("ghToken").value = ghToken;
-    document.getElementById("ghRepo").value = ghRepo;
-  } catch (e) {
-    console.error(e);
-  }
-}
+// Init
+loadGithubConfig();
+refreshBackupStatus();
 
-function saveSettings() {
-  ghToken = document.getElementById("ghToken").value.trim();
-  ghRepo = document.getElementById("ghRepo").value.trim();
-  localStorage.setItem(
-    "mcq_github_cfg",
-    JSON.stringify({ token: ghToken, repo: ghRepo })
-  );
-  setSyncStatus("Settings saved locally.");
-}
-
-function setSyncStatus(msg) {
-  const el = document.getElementById("syncStatus");
-  if (el) el.textContent = msg || "";
-}
-
-async function uploadGitHub() {
-  if (!ghToken || !ghRepo) {
-    alert("Set GitHub token and repo first.");
-    return;
-  }
-  try {
-    setSyncStatus("Uploading to GitHub...");
-    const [owner, repo] = ghRepo.split("/");
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/backup.json`;
-
-    const contentStr = JSON.stringify(
-      questions.map((q) => ({
-        id: q.id,
-        chapter: q.chapter,
-        text: q.text,
-        source: q.source,
-        explanation: q.explanation,
-        choices: q.choices,
-        flagged: q.flagged,
-        maintenance: q.maintenance,
-        addedAt: q.addedAt,
-        timesSeen: q.timesSeen,
-        timesCorrect: q.timesCorrect,
-        timesWrong: q.timesWrong,
-        lastSeenAt: q.lastSeenAt,
-        lastAnsweredAt: q.lastAnsweredAt,
-      })),
-      null,
-      2
-    );
-    const contentBase64 = btoa(unescape(encodeURIComponent(contentStr)));
-
-    // check existing
-    let sha = null;
-    const getResp = await fetch(apiUrl, {
-      headers: { Authorization: `Bearer ${ghToken}` },
-    });
-    if (getResp.ok) {
-      const j = await getResp.json();
-      sha = j.sha;
-    }
-
-    const body = {
-      message: "MCQ backup from app",
-      content: contentBase64,
-    };
-    if (sha) body.sha = sha;
-
-    const putResp = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${ghToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!putResp.ok) {
-      const txt = await putResp.text();
-      throw new Error("GitHub error: " + txt);
-    }
-    setSyncStatus("Upload OK.");
-  } catch (err) {
-    console.error(err);
-    setSyncStatus("Upload failed: " + err.message);
-  }
-}
-
-async function downloadGitHub() {
-  if (!ghToken || !ghRepo) {
-    alert("Set GitHub token and repo first.");
-    return;
-  }
-  try {
-    setSyncStatus("Downloading from GitHub...");
-    const [owner, repo] = ghRepo.split("/");
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/backup.json`;
-
-    const resp = await fetch(apiUrl, {
-      headers: { Authorization: `Bearer ${ghToken}` },
-    });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      throw new Error("GitHub error: " + txt);
-    }
-    const data = await resp.json();
-    const decoded = decodeURIComponent(escape(atob(data.content)));
-    const arr = JSON.parse(decoded);
-    if (!Array.isArray(arr)) throw new Error("backup.json not array");
-
-    questions = arr.map((q, idx) => normalizeQuestion(q, idx));
-    saveToStorage();
-    setSyncStatus("Download OK. Local DB updated.");
-    renderStats();
-    if (questions.length > 0) {
-      gotoQuestion(0, false);
-    } else {
-      currentQuestion = null;
-      currentIndex = -1;
-      renderQuestion();
-    }
-    refreshSidePanels();
-    renderManageTable();
-    renderMaintTable();
-  } catch (err) {
-    console.error(err);
-    setSyncStatus("Download failed: " + err.message);
-  }
-}
+openDB().then(()=>{
+  loadNextQuestion();
+});
