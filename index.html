@@ -2,116 +2,279 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App</title>
+  <title>MCQ Study App Pro 3.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json?v=3.4.0">
+  <link rel="stylesheet" href="style.css?v=3.4.0">
 </head>
 <body>
 <div class="app">
-  <div class="top-bar">
-    <h1>MCQ Study App</h1>
+  <header class="top-bar">
     <div>
-      <span class="chip">Local · Offline</span>
-      <span class="chip chip-wrong">Track wrong</span>
-      <span class="chip chip-flag">Flag key Qs</span>
+      <h1>MCQ Study App Pro <span class="ver">v3.4</span></h1>
+      <div class="subtitle">Local bank + history + flags + maintenance + GitHub sync</div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="stats-row" id="statsBar">
-      <!-- filled by JS -->
+    <div class="chips">
+      <span class="chip">Offline</span>
+      <span class="chip chip-ok">Tracks wrong</span>
+      <span class="chip chip-flag">Flags</span>
+      <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
     </div>
-  </div>
+  </header>
 
-  <div class="card">
-    <div class="row">
-      <div class="col-main">
-        <div style="margin-bottom:0.5rem;">
-          <label class="small-label">Practice mode</label><br>
-          <select id="modeSelect">
-            <option value="all">All active questions</option>
-            <option value="new">New (never answered)</option>
-            <option value="wrong">Focus: previously wrong</option>
-            <option value="flagged">Flagged only</option>
-            <option value="chapter">By chapter</option>
-          </select>
-          <input id="chapterFilter" placeholder="Chapter filter (e.g. Ch45 Burns)" style="display:none; margin-left:0.3rem; max-width:180px;">
-        </div>
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="home">Home</button>
+    <button class="tab-button" data-tab="all">All Questions</button>
+    <button class="tab-button" data-tab="maintenance">Maintenance</button>
+    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
+    <button class="tab-button" data-tab="settings">Settings</button>
+  </nav>
 
-        <div id="questionPanel">
-          <!-- current question -->
-        </div>
+  <main class="tab-container">
 
-        <div id="feedbackPanel">
-          <!-- correctness + explanation -->
-        </div>
-
-        <div style="margin-top:0.5rem;">
-          <button class="primary" id="btnSubmit">Submit</button>
-          <button id="btnNext">Next</button>
-          <button class="ghost" id="btnFlag">Flag</button>
-        </div>
+    <!-- HOME TAB -->
+    <section class="tab-content active" id="tab-home">
+      <div class="card">
+        <div class="stats-row" id="statsBar"></div>
       </div>
 
-      <div class="col-side">
-        <div style="margin-bottom:0.5rem;">
-          <div class="small-label">Import / Export</div>
-          <input type="file" id="fileInput" accept=".json" style="margin-top:0.2rem;">
-          <div style="margin-top:0.3rem;">
-            <button id="btnImport">Import</button>
-            <button id="btnExport">Export backup</button>
-          </div>
-          <div class="muted" style="margin-top:0.25rem;">
-            JSON format: questions with options, correct answer, explanation, chapter.
-          </div>
-        </div>
+      <div class="card">
+        <div class="row">
+          <div class="col-main">
+            <div class="row-controls">
+              <div>
+                <label class="small-label">Practice mode</label><br>
+                <select id="modeSelect">
+                  <option value="all">All active questions</option>
+                  <option value="new">New (never answered)</option>
+                  <option value="wrong">Previously wrong</option>
+                  <option value="flagged">Flagged</option>
+                  <option value="chapter">By chapter</option>
+                </select>
+                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
+              </div>
+              <div>
+                <label class="small-label">Quick filters</label><br>
+                <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
+                <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
+              </div>
+            </div>
 
-        <div class="card side-card" style="margin-bottom:0.5rem;">
-          <div class="small-label" style="margin-bottom:0.25rem;">Backup status</div>
-          <div id="backupStatus" class="muted">No backup yet.</div>
-        </div>
+            <div id="questionPanel" class="question-panel"></div>
+            <div id="feedbackPanel" class="feedback-panel"></div>
 
-        <div class="card side-card">
-          <div class="small-label" style="margin-bottom:0.25rem;">GitHub token (optional)</div>
-          <input id="githubTokenInput" type="password" placeholder="Token is stored only on this device" style="width:100%;">
-          <div class="muted tiny" style="margin-top:0.2rem;">
-            Saved in this browser (localStorage). Not sent anywhere until you use online sync.
+            <div class="btn-row-main">
+              <button class="primary" id="btnSubmit">Submit</button>
+              <button id="btnPrev">Previous</button>
+              <button id="btnNext">Next</button>
+              <button class="ghost" id="btnFlag">Flag</button>
+              <button class="ghost" id="btnMaint">Maintenance</button>
+            </div>
           </div>
-          <div style="margin-top:0.3rem;">
-            <button id="btnSaveToken">Save token</button>
-            <button id="btnClearToken">Clear</button>
-          </div>
-          <div style="margin-top:0.3rem;">
-            <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener" class="muted">
-              ▶ Open GitHub token page
-            </a>
-          </div>
-        </div>
 
-        <div class="card side-card" style="margin-top:0.5rem;">
-          <div class="small-label" style="margin-bottom:0.25rem;">Recent history</div>
-          <div class="history-list" id="historyList">
-            <!-- filled by JS -->
+          <div class="col-side">
+            <div class="side-block">
+              <div class="small-label">Import / Export (local file)</div>
+              <input type="file" id="fileInput" accept=".json">
+              <div class="btn-row-tight">
+                <button id="btnImport">Import</button>
+                <button id="btnExport">Export</button>
+              </div>
+              <div class="muted tiny">
+                JSON file with questions, choices, correct answer, explanation, chapter.
+              </div>
+            </div>
+
+            <div class="card side-card">
+              <div class="small-label">Recent history</div>
+              <div class="history-list" id="historyList"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <div class="card">
-    <div class="small-label">Tip</div>
-    <div class="muted">
-      Build chapter MCQs as JSON with ChatGPT and import them here. لاحقاً يمكن إضافة توليد مباشر من PDF، لكن المحرك الحالي جاهز لبنك كبير من الأسئلة.
-    </div>
-  </div>
+    <!-- ALL QUESTIONS TAB -->
+    <section class="tab-content" id="tab-all">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Search</label><br>
+            <input id="allSearch" placeholder="Text / chapter / source" style="min-width:220px;">
+          </div>
+          <div>
+            <label class="small-label">Filter</label><br>
+            <select id="allFilter">
+              <option value="all">All</option>
+              <option value="flagged">Flagged only</option>
+              <option value="wrong">Wrong ≥ 1</option>
+              <option value="maintenance">Maintenance only</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Sort</label><br>
+            <select id="allSort">
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="chapter">By chapter</option>
+              <option value="wrong_desc">Most wrong</option>
+            </select>
+          </div>
+          <div class="all-actions">
+            <button id="btnAllReload">Reload</button>
+            <button id="btnAllDelete" class="danger">Delete selected</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="allSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Flags</th>
+                <th>Seen</th>
+                <th>Wrong</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody id="allTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE TAB -->
+    <section class="tab-content" id="tab-maintenance">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Show</label><br>
+            <select id="maintFilter">
+              <option value="maintenance">Maintenance only</option>
+              <option value="flagged">Flagged + Maintenance</option>
+              <option value="all">All needing review</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Chapter filter</label><br>
+            <input id="maintChapterFilter" placeholder="Chapter (e.g. Ch45)">
+          </div>
+          <div class="all-actions">
+            <button id="btnMaintReload">Reload</button>
+            <button id="btnMaintDelete" class="danger">Delete selected</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="maintSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Flags</th>
+                <th>Wrong</th>
+              </tr>
+            </thead>
+            <tbody id="maintTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- BACKUP & CLOUD TAB -->
+    <section class="tab-content" id="tab-backup">
+      <div class="card">
+        <h2>Local backup</h2>
+        <p class="muted tiny">
+          Export creates a JSON file with all questions + stats. Import can merge or restore from that file.
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnBackupExport" class="primary">Export full backup</button>
+            <input type="file" id="backupFileInput" accept=".json">
+            <button id="btnBackupImport">Import backup</button>
+          </div>
+          <div class="backup-status">
+            <div>Last activity: <span id="lastActivityLabel">–</span></div>
+            <div>Last local backup: <span id="lastBackupLabel">–</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cloud sync (GitHub)</h2>
+        <p class="muted tiny">
+          Uses your GitHub token to save / load one JSON file in a private repo (e.g. <code>Awad1992/mcq-data</code>).
+          Token stays only on this device (localStorage).
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnCloudUpload">Upload → GitHub</button>
+            <button id="btnCloudDownload">Download ← GitHub</button>
+          </div>
+          <div class="muted tiny" id="cloudInfo"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h2>GitHub settings</h2>
+        <div class="settings-grid">
+          <label>
+            <span class="small-label">Personal access token</span>
+            <input type="password" id="ghTokenInput" placeholder="ghp_xxx..." autocomplete="off">
+          </label>
+          <label>
+            <span class="small-label">Repo (owner/name)</span>
+            <input id="ghRepoInput" value="Awad1992/mcq-data">
+          </label>
+          <label>
+            <span class="small-label">Backup filename</span>
+            <input id="ghFileInput" value="mcq_backup.json">
+          </label>
+        </div>
+        <div class="btn-row-main">
+          <button id="btnSaveGitHub" class="primary">Save settings</button>
+          <button id="btnClearGitHub" class="ghost">Clear</button>
+          <a class="link-btn" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+            Open GitHub token page
+          </a>
+        </div>
+        <p class="muted tiny">
+          Token is stored only in this browser (localStorage). Changing token or repo does not affect your questions.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>App info</h2>
+        <p class="muted tiny">
+          Version: <strong>3.4.0</strong><br>
+          Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
+          Safe backup: Importing an older backup will warn you if it is older than your last activity.
+        </p>
+      </div>
+    </section>
+
+  </main>
 </div>
 
-<script src="app.js"></script>
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
-}
+  window.APP_VERSION = "3.4.0";
+</script>
+<script src="app.js?v=3.4.0"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js?v=3.4.0').catch(()=>{});
+  }
 </script>
 </body>
 </html>
