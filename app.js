@@ -1,4 +1,4 @@
-// ==== MCQ App Pro 3.0 ====
+// ==== MCQ App Pro 3.0 (Light) ====
 
 // ---------- IndexedDB ----------
 const DB_NAME = "mcqdb_v3";
@@ -71,6 +71,7 @@ document.getElementById("btnImport").addEventListener("click", handleImport);
 document.getElementById("btnExport").addEventListener("click", handleExport);
 
 document.getElementById("btnSaveSettings").addEventListener("click", saveSettings);
+document.getElementById("btnClearToken").addEventListener("click", clearTokenOnDevice);
 document.getElementById("btnUploadBackup").addEventListener("click", uploadBackupToGitHub);
 document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackupFromGitHub);
 
@@ -131,6 +132,14 @@ function saveSettings() {
   alert("Settings saved locally.");
 }
 
+function clearTokenOnDevice() {
+  const s = getSettingsFromUI();
+  s.githubToken = "";
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  document.getElementById("githubToken").value = "";
+  alert("Token removed from this device. يمكنك لصق Token جديد ثم Save Settings.");
+}
+
 // debounced autosync
 let autoSyncTimer = null;
 function scheduleAutoSync() {
@@ -161,13 +170,12 @@ async function getAllQuestions() {
 
 async function getStats() {
   const all = await getAllQuestions();
-  const stats = {
+  return {
     total: all.length,
     answered: all.filter((q) => q.timesSeen > 0).length,
     withWrong: all.filter((q) => q.timesWrong > 0).length,
     flagged: all.filter((q) => q.flagged).length
   };
-  return stats;
 }
 
 async function pickQuestion() {
@@ -200,7 +208,6 @@ async function pickQuestion() {
 
   if (!filtered.length) filtered = all;
 
-  // sort by lastSeen, least seen first
   filtered.sort((a, b) => {
     const as = a.lastSeenAt || "";
     const bs = b.lastSeenAt || "";
@@ -402,7 +409,7 @@ function showFeedback(correctIdx, selectedIdx, q) {
   let html = "";
   html += `<div>`;
   html += `<div style="margin-bottom:0.25rem; font-weight:600; ${
-    lastResult ? "color:#a5d6a7" : "color:#ff8a80"
+    lastResult ? "color:#2e7d32" : "color:#c62828"
   }">${lastResult ? "Correct ✅" : "Wrong ❌"}</div>`;
   if (correctIdx >= 0 && choices[correctIdx]) {
     html += `<div class="small muted">Correct answer: <strong>${letters[correctIdx]}.</strong> ${
@@ -438,7 +445,7 @@ async function deleteCurrentQuestion() {
   if (!currentQuestion) return;
   if (!confirm("هل أنت متأكد من حذف هذا السؤال بالكامل؟")) return;
   const id = currentQuestion.id;
-  const tx = db.transaction(["questions"], "readwrite");
+  const tx = db.transaction("questions", "readwrite");
   tx.objectStore("questions").delete(id);
   tx.oncomplete = () => {
     currentQuestion = null;
@@ -527,7 +534,6 @@ async function handleExport() {
 async function collectBackupPayload() {
   const questions = await getAllQuestions();
 
-  // Also export answers to preserve performance curve
   const tx = db.transaction("answers", "readonly");
   const aStore = tx.objectStore("answers");
   const answers = await new Promise((resolve) => {
@@ -551,14 +557,13 @@ async function uploadBackupToGitHub(silent = false) {
   const payload = await collectBackupPayload();
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
 
-  // get existing SHA
-  let sha = null;
   const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
   const headers = {
     Authorization: `Bearer ${settings.githubToken}`,
     "Content-Type": "application/json"
   };
 
+  let sha = null;
   try {
     const resGet = await fetch(baseUrl, { headers });
     if (resGet.ok) {
@@ -584,7 +589,6 @@ async function uploadBackupToGitHub(silent = false) {
     return;
   }
 
-  const info = await resPut.json();
   lastSyncInfo.textContent = `Last upload: ${new Date().toLocaleString()}`;
   if (!silent) alert("Backup uploaded to GitHub.");
 }
@@ -612,7 +616,6 @@ async function downloadBackupFromGitHub() {
   const decoded = decodeURIComponent(escape(atob(data.content)));
   const payload = JSON.parse(decoded);
 
-  // Replace DB content
   const tx1 = db.transaction(["questions", "answers"], "readwrite");
   tx1.objectStore("questions").clear();
   tx1.objectStore("answers").clear();
@@ -719,41 +722,15 @@ async function extractPdfText() {
     }
   }
 
-  // keep a trimmed preview
   const preview = pdfExtractedText.slice(0, 1500);
   log.value += "\n=== Preview (first ~1500 chars) ===\n" + preview;
 }
 
 function pickKeyWord(words) {
   const stop = new Set([
-    "the",
-    "and",
-    "for",
-    "with",
-    "that",
-    "from",
-    "this",
-    "these",
-    "those",
-    "which",
-    "were",
-    "been",
-    "their",
-    "there",
-    "when",
-    "where",
-    "into",
-    "without",
-    "within",
-    "such",
-    "than",
-    "then",
-    "over",
-    "under",
-    "between",
-    "because",
-    "while",
-    "although"
+    "the","and","for","with","that","from","this","these","those","which",
+    "were","been","their","there","when","where","into","without","within",
+    "such","than","then","over","under","between","because","while","although"
   ]);
   let best = null;
   words.forEach((w) => {
@@ -795,7 +772,6 @@ async function generateQuestionsFromPdf() {
 
   log.value += "\n\nGenerating MCQs...\n";
 
-  // split to sentences
   let sentences = pdfExtractedText
     .replace(/\s+/g, " ")
     .split(/(?<=[.!?])\s+/)
@@ -807,7 +783,6 @@ async function generateQuestionsFromPdf() {
     return;
   }
 
-  // bias: sentences containing numbers / vs / increase / decrease / mortality...
   if (preferHighYield) {
     const high = sentences.filter((s) =>
       /(vs\.?| versus |increase|decrease|higher|lower|mortality|incidence|pressure|volume|ml\/kg|mmhg|%)/i.test(
@@ -832,7 +807,6 @@ async function generateQuestionsFromPdf() {
     const correct = key;
     const distractors = buildDistractors(correct, poolWords);
 
-    // Explanation: short – why correct / others wrong
     const explanation =
       `Correct: "${correct}" fits the context of this statement. ` +
       `Other options either refer to different values/conditions or contradict the core concept in this sentence.`;
@@ -885,7 +859,6 @@ function updateOfflineChip() {
 }
 
 // ---------- Init ----------
-
 (async function init() {
   updateOfflineChip();
   loadSettings();
