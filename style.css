@@ -1,241 +1,344 @@
-/* ============================
-   MCQ App Pro 2.0 — Global Styles
-   ============================ */
-
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111;
+  color: #f5f5f5;
 }
 
 body {
-  margin: 0;
-  background: #f1f3f6;
-  padding: 0 0 2rem 0;
+  min-height: 100vh;
 }
 
 .app {
-  max-width: 1050px;
-  margin: auto;
-  padding: 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 0.75rem 2.5rem;
 }
 
-/* ============================
-   HEADER
-   ============================ */
 .top-bar {
-  background: white;
-  padding: 1rem;
-  border-radius: 12px;
-  margin-bottom: 1rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .top-bar h1 {
-  margin: 0;
-  font-size: 1.6rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
 }
 
-.badges {
-  margin-top: 0.6rem;
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .chip {
-  display: inline-block;
-  background: #e0e0e0;
-  padding: 2px 8px;
-  border-radius: 10px;
-  margin-right: 5px;
-  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.chip-blue { background: #bbdefb; }
-.chip-wrong { background: #ffcccb; }
-.chip-flag { background: #ffe082; }
+.chip-offline {
+  background: #263238;
+}
 
-/* ============================
-   CARDS
-   ============================ */
+.chip-cloud {
+  background: #1a237e;
+}
+
+.chip-flag {
+  background: #b71c1c;
+}
+
+.chip-wrong {
+  background: #004d40;
+}
+
 .card {
-  background: white;
-  border-radius: 12px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  background: #181818;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #242424;
 }
 
 .section-title {
-  font-weight: 600;
-  margin-bottom: 0.4rem;
-}
-
-.lbl {
-  display: block;
-  font-size: 0.85rem;
-  margin-top: 0.6rem;
-  margin-bottom: 0.15rem;
-}
-
-input {
-  width: 100%;
-  padding: 0.45rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  outline: none;
-}
-
-button {
-  padding: 0.5rem 0.9rem;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
+  margin: 0 0 0.5rem;
   font-size: 0.95rem;
 }
 
+.settings-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-grid input[type="text"],
+.settings-grid input[type="password"] {
+  width: 100%;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.1fr);
+  gap: 0.75rem;
+}
+
+.col-main,
+.col-side {
+  min-width: 0;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.label {
+  font-size: 0.78rem;
+  color: #cfd8dc;
+}
+
+.label.small {
+  font-size: 0.72rem;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+input,
+select,
+textarea {
+  padding: 0.3rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background: #101010;
+  color: #f5f5f5;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #777;
+}
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+button {
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #262626;
+  color: #f5f5f5;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
 button.primary {
-  background: #1976d2;
-  color: white;
+  background: #1e88e5;
+  border-color: #1e88e5;
 }
 
 button.ghost {
-  background: #eeeeee;
+  background: transparent;
 }
 
-button:hover {
-  opacity: 0.92;
+button.danger {
+  border-color: #e53935;
+  color: #ef9a9a;
 }
 
-/* ============================
-   GRID LAYOUT
-   ============================ */
-.row {
+button.small {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-row {
   display: flex;
-  gap: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
 }
 
-.col-main {
-  flex: 3;
+.btn-row.small-gap {
+  gap: 0.25rem;
 }
 
-.col-side {
-  flex: 1.6;
+.stats-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
 }
 
-/* ============================
-   QUESTION AREA
-   ============================ */
+.stats-row > div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.question-panel {
+  min-height: 140px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #101010;
+}
+
 .q-text {
-  font-size: 1.05rem;
   margin-bottom: 0.4rem;
-  font-weight: 600;
+}
+
+.tag-row {
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  color: #b0bec5;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-right: 0.25rem;
+}
+
+.pill-flag {
+  border-color: #ef5350;
+  color: #ef9a9a;
+}
+
+.pill-correct {
+  border-color: #66bb6a;
+  color: #c5e1a5;
+}
+
+.pill-wrong {
+  border-color: #ef6c00;
+  color: #ffcc80;
 }
 
 .choice {
   display: flex;
-  align-items: center;
-  margin: 0.3rem 0;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  cursor: pointer;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.18rem 0.25rem;
+  border-radius: 4px;
+  margin-bottom: 0.15rem;
 }
 
-.choice input {
-  margin-right: 0.5rem;
+.choice input[type="radio"] {
+  margin-top: 0.15rem;
 }
 
-.choice.correct {
-  background: #c8e6c9;
-  border-color: #81c784;
+.choice.correct.show {
+  background: #1b5e20;
 }
 
-.choice.wrong {
-  background: #ffcdd2;
-  border-color: #e57373;
+.choice.wrong.show {
+  background: #b71c1c;
 }
 
-.choice.show {
-  border-width: 2px;
+.feedback-panel {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: #cfd8dc;
 }
 
-/* ============================
-   TAGS
-   ============================ */
-.tag-chapter span {
-  background: #e3e3e3;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  margin-right: 5px;
-}
-
-.pill {
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  margin-left: 4px;
-}
-
-.pill-correct { background: #c8e6c9; }
-.pill-wrong   { background: #ffcdd2; }
-.pill-flag    { background: #ffe082; }
-
-/* ============================
-   FEEDBACK
-   ============================ */
-#feedbackPanel {
-  margin-top: 0.6rem;
-  font-size: 0.9rem;
-}
-
-/* ============================
-   HISTORY LIST
-   ============================ */
 .history-list {
-  max-height: 350px;
+  max-height: 260px;
   overflow-y: auto;
-  padding-right: 5px;
-}
-
-.history-item {
-  padding: 0.4rem;
-  margin-bottom: 0.45rem;
-  border-radius: 6px;
-  background: #fafafa;
-  cursor: pointer;
-  border: 1px solid #e0e0e0;
-}
-
-.history-item:hover {
-  background: #eeeeee;
-}
-
-/* ============================
-   STATS BAR
-   ============================ */
-.stats-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-}
-
-/* ============================
-   SMALL TEXT
-   ============================ */
-.muted {
-  color: #666;
-}
-
-.small {
+  padding-right: 0.15rem;
   font-size: 0.78rem;
 }
 
-/* ============================
-   RESPONSIVE
-   ============================ */
-@media (max-width: 800px) {
-  .row {
-    flex-direction: column;
-  }
+.history-item {
+  border-bottom: 1px dashed #333;
+  padding: 0.25rem 0;
+  cursor: pointer;
 }
 
+.history-item:last-child {
+  border-bottom: none;
+}
 
+.history-item:hover {
+  background: #202020;
+}
+
+.side-card {
+  margin-top: 0.5rem;
+}
+
+.muted {
+  color: #90a4ae;
+}
+
+.small {
+  font-size: 0.75rem;
+}
+
+.pdf-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.8fr);
+  gap: 0.75rem;
+}
+
+#pdfLog {
+  min-height: 150px;
+  font-size: 0.75rem;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* responsive */
+@media (max-width: 820px) {
+  .row,
+  .pdf-grid {
+    grid-template-columns: 1fr;
+  }
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
