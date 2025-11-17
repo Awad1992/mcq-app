@@ -2,94 +2,133 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App</title>
+  <title>MCQ App Pro 2.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+
 <div class="app">
+
+  <!-- ==== HEADER ==== -->
   <div class="top-bar">
-    <h1>MCQ Study App</h1>
-    <div>
-      <span class="chip">Local · Offline</span>
-      <span class="chip chip-wrong">Track wrong</span>
-      <span class="chip chip-flag">Flag key Qs</span>
+    <h1>MCQ App Pro 2.0</h1>
+    <div class="badges">
+      <span class="chip">Offline First</span>
+      <span class="chip chip-blue">Cloud Sync</span>
+      <span class="chip chip-flag">Flag System</span>
+      <span class="chip chip-wrong">Track Wrong</span>
     </div>
   </div>
 
-  <div class="card">
-    <div class="stats-row" id="statsBar">
-      <!-- filled by JS -->
+  <!-- ==== SETTINGS CARD ==== -->
+  <div class="card settings-card">
+    <div class="section-title">Cloud Sync Settings</div>
+
+    <label class="lbl">GitHub Token</label>
+    <input id="tokenInput" placeholder="ghp_XXXXXX">
+
+    <label class="lbl">Data Repository</label>
+    <input id="repoInput" placeholder="username/mcq-data">
+
+    <button id="btnSaveSettings">Save Settings</button>
+
+    <div class="muted small" style="margin-top:0.4rem;">
+      • يتم حفظ الإعدادات محلياً في الجهاز  
+      • لا يتم إرسال التوكن لأي سيرفر خارجي  
+      • فقط GitHub API
     </div>
   </div>
 
+  <!-- ==== STATS ==== -->
   <div class="card">
+    <div class="stats-row" id="statsBar"></div>
+  </div>
+
+  <!-- ==== MAIN AREA ==== -->
+  <div class="card main-area">
     <div class="row">
+
+      <!-- ==== MAIN COLUMN ==== -->
       <div class="col-main">
-        <div style="margin-bottom:0.5rem;">
-          <label class="small-label">Practice mode</label><br>
-          <select id="modeSelect">
-            <option value="all">All active questions</option>
-            <option value="new">New (never answered)</option>
-            <option value="wrong">Focus: previously wrong</option>
-            <option value="flagged">Flagged only</option>
-            <option value="chapter">By chapter</option>
-          </select>
-          <input id="chapterFilter" placeholder="Chapter filter (e.g. Ch45 Burns)" style="display:none; margin-left:0.3rem; max-width:180px;">
-        </div>
 
-        <div id="questionPanel">
-          <!-- current question -->
-        </div>
+        <label class="small-label">Practice Mode</label>
+        <select id="modeSelect">
+          <option value="all">All active</option>
+          <option value="new">New only</option>
+          <option value="wrong">Previously wrong</option>
+          <option value="flagged">Flagged</option>
+          <option value="chapter">By chapter</option>
+        </select>
 
-        <div id="feedbackPanel">
-          <!-- correctness + explanation -->
-        </div>
+        <input id="chapterFilter" placeholder="Chapter name" style="display:none; margin-top:0.3rem;">
 
-        <div style="margin-top:0.5rem;">
+        <div id="questionPanel" class="q-panel"></div>
+        <div id="feedbackPanel"></div>
+
+        <div class="btn-row">
           <button class="primary" id="btnSubmit">Submit</button>
           <button id="btnNext">Next</button>
           <button class="ghost" id="btnFlag">Flag</button>
         </div>
+
       </div>
 
+      <!-- ==== SIDE COLUMN ==== -->
       <div class="col-side">
-        <div style="margin-bottom:0.5rem;">
+
+        <!-- IMPORT/EXPORT -->
+        <div class="side-card">
           <div class="small-label">Import / Export</div>
-          <input type="file" id="fileInput" accept=".json" style="margin-top:0.2rem;">
-          <div style="margin-top:0.3rem;">
-            <button id="btnImport">Import</button>
-            <button id="btnExport">Export</button>
-          </div>
-          <div class="muted" style="margin-top:0.25rem;">
-            JSON format: questions with options, correct answer, explanation, chapter.
+          <input type="file" id="fileInput" accept=".json" style="margin-top:0.3rem;">
+
+          <button id="btnImport" style="margin-top:0.3rem;">Import</button>
+          <button id="btnExport">Export</button>
+
+          <div class="muted small">Format: JSON array</div>
+        </div>
+
+        <!-- CLOUD SYNC -->
+        <div class="side-card">
+          <div class="small-label">Cloud Sync</div>
+
+          <button id="btnSyncUpload">Upload Backup → GitHub</button>
+          <button id="btnSyncDownload">Download Backup ← GitHub</button>
+
+          <div class="muted small">
+            آخر تحديث: <span id="lastSyncLabel">–</span>
           </div>
         </div>
 
-        <div class="card side-card">
-          <div class="small-label" style="margin-bottom:0.25rem;">Recent history</div>
-          <div class="history-list" id="historyList">
-            <!-- filled by JS -->
-          </div>
+        <!-- HISTORY -->
+        <div class="side-card">
+          <div class="small-label">History</div>
+          <div class="history-list" id="historyList"></div>
         </div>
+
       </div>
     </div>
   </div>
 
+  <!-- FOOTER -->
   <div class="card">
-    <div class="small-label">Tip</div>
     <div class="muted">
-      Build chapter MCQs as JSON with ChatGPT and import them here. لاحقاً يمكن إضافة توليد مباشر من PDF، لكن المحرك الحالي جاهز لبنك كبير من الأسئلة.
+      Tip: Import MCQs generated by ChatGPT or allow automated generation from chapters (coming soon).
     </div>
   </div>
+
 </div>
 
 <script src="app.js"></script>
+
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js').catch(() => {});
 }
 </script>
+
 </body>
 </html>
