@@ -1,33 +1,52 @@
-const CACHE_NAME = 'mcq-app-cache-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json'
+/* ==========================================
+   MCQ App Pro 2.0 — Service Worker (PWA)
+   ========================================== */
+
+const CACHE_NAME = "mcq-app-pro-v1";
+const FILES_TO_CACHE = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./app.js",
+  "./manifest.json",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
-self.addEventListener('install', (event) => {
+/* Install Event — Cache all app files */
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => {
+      console.log("Caching app shell files...");
+      return cache.addAll(FILES_TO_CACHE);
+    })
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+/* Activate Event — Clean old caches */
+self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.map(k => {
-          if (k !== CACHE_NAME) return caches.delete(k);
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            console.log("Deleting old cache:", key);
+            return caches.delete(key);
+          }
         })
       )
     )
   );
+  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
+/* Fetch Event — Serve from cache first */
+self.addEventListener("fetch", event => {
   event.respondWith(
-    caches.match(req).then(cacheRes => cacheRes || fetch(req))
+    caches.match(event.request).then(response => {
+      // Serve from cache OR fetch from network
+      return response || fetch(event.request);
+    })
   );
 });
