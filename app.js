@@ -1,7 +1,9 @@
-// MCQ Study App – IndexedDB engine with history, flags, modes + safer backups + token store
+// MCQ Study App Pro v3.4
+// DB + UI + backup + GitHub sync + maintenance
 
-const DB_NAME = 'mcqdb_v2';
-const DB_VERSION = 1;
+const DB_NAME = 'mcqdb_pro_v34';
+const DB_VERSION = 2;
+
 let db = null;
 
 let currentQuestion = null;
@@ -10,124 +12,124 @@ let currentMode = 'all';
 let currentChapter = '';
 let lastResult = null;
 let lastSelectedIndex = null;
+let historyStack = [];
+let lastActivityAt = null;
 
-// Activity / backup tracking
-const APP_VERSION = '3.1-token-backup';
-const LS_KEYS = {
-  lastActivity: 'mcq_lastActivityAt',
-  lastBackup: 'mcq_lastBackupAt',
-  githubConfig: 'mcq_github_config'
-};
-
-// GitHub config (optional – for future online sync)
-let githubConfig = {
-  token: '',
-  repo: 'Awad1992/mcq-data',
-  filename: 'backup.json'
-};
-
-// DOM elements
 const questionPanel = document.getElementById('questionPanel');
 const feedbackPanel = document.getElementById('feedbackPanel');
 const historyListEl = document.getElementById('historyList');
 const modeSelect = document.getElementById('modeSelect');
-const chapterFilter = document.getElementById('chapterFilter');
-const backupStatusEl = document.getElementById('backupStatus');
-const githubTokenInput = document.getElementById('githubTokenInput');
-const btnSaveToken = document.getElementById('btnSaveToken');
-const btnClearToken = document.getElementById('btnClearToken');
+const chapterFilterEl = document.getElementById('chapterFilter');
 
-// ---- Local helpers ----
+// Tabs
+document.querySelectorAll('.tab-button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.getAttribute('data-tab');
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(sec => sec.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
 
-function nowISO() {
-  return new Date().toISOString();
-}
-
-function recordActivity() {
-  const t = nowISO();
-  localStorage.setItem(LS_KEYS.lastActivity, t);
-}
-
-function formatNiceTime(iso) {
-  if (!iso) return 'No backup yet.';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Last backup: unknown time';
-  return 'Last backup: ' + d.toLocaleString();
-}
-
-function loadGithubConfig() {
-  try {
-    const raw = localStorage.getItem(LS_KEYS.githubConfig);
-    if (raw) {
-      const obj = JSON.parse(raw);
-      githubConfig = Object.assign({}, githubConfig, obj);
+    if (tab === 'all') {
+      reloadAllQuestionsTable();
+    } else if (tab === 'maintenance') {
+      reloadMaintenanceTable();
+    } else if (tab === 'backup') {
+      refreshBackupLabels();
+      refreshCloudInfo();
+    } else if (tab === 'settings') {
+      loadGitHubConfigIntoUI();
     }
-  } catch (e) {
-    // ignore
-  }
-  if (githubTokenInput) githubTokenInput.value = githubConfig.token || '';
-}
+  });
+});
 
-function saveGithubConfig() {
-  try {
-    localStorage.setItem(LS_KEYS.githubConfig, JSON.stringify(githubConfig));
-  } catch (e) {
-    // ignore
-  }
-}
-
-function refreshBackupStatus() {
-  const lastBackup = localStorage.getItem(LS_KEYS.lastBackup);
-  if (!backupStatusEl) return;
-  backupStatusEl.textContent = formatNiceTime(lastBackup);
-}
-
-// ---- Event wiring ----
-
+// Mode select
 modeSelect.addEventListener('change', () => {
   currentMode = modeSelect.value;
   if (currentMode === 'chapter') {
-    chapterFilter.style.display = 'inline-block';
+    chapterFilterEl.style.display = 'inline-block';
   } else {
-    chapterFilter.style.display = 'none';
+    chapterFilterEl.style.display = 'none';
     currentChapter = '';
   }
-  loadNextQuestion();
+  loadNextQuestion(true);
 });
 
-chapterFilter.addEventListener('change', () => {
-  currentChapter = chapterFilter.value.trim();
-  loadNextQuestion();
+chapterFilterEl.addEventListener('change', () => {
+  currentChapter = chapterFilterEl.value.trim();
+  loadNextQuestion(true);
 });
 
+// Quick filter buttons
+document.getElementById('btnQuickWrong').addEventListener('click', () => {
+  currentMode = 'wrong';
+  modeSelect.value = 'wrong';
+  chapterFilterEl.style.display = 'none';
+  loadNextQuestion(true);
+});
+
+document.getElementById('btnQuickFlagged').addEventListener('click', () => {
+  currentMode = 'flagged';
+  modeSelect.value = 'flagged';
+  chapterFilterEl.style.display = 'none';
+  loadNextQuestion(true);
+});
+
+// Buttons Home
 document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
 document.getElementById('btnNext').addEventListener('click', () => {
   lastResult = null;
   feedbackPanel.innerHTML = '';
-  loadNextQuestion();
+  loadNextQuestion(false);
 });
+document.getElementById('btnPrev').addEventListener('click', goPreviousQuestion);
 document.getElementById('btnFlag').addEventListener('click', toggleFlag);
-document.getElementById('btnImport').addEventListener('click', handleImport);
-document.getElementById('btnExport').addEventListener('click', handleExport);
+document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceFlag);
 
-if (btnSaveToken) {
-  btnSaveToken.addEventListener('click', () => {
-    githubConfig.token = (githubTokenInput.value || '').trim();
-    saveGithubConfig();
-    alert('Token saved in this browser.\\nYou will not need to re-enter it unless you clear site data or press Clear.');
+// Import / Export (home)
+document.getElementById('btnImport').addEventListener('click', handleImportSimple);
+document.getElementById('btnExport').addEventListener('click', exportQuestionsOnly);
+
+// All questions tab controls
+document.getElementById('btnAllReload').addEventListener('click', reloadAllQuestionsTable);
+document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
+document.getElementById('allSelectAll').addEventListener('change', e => {
+  document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
+    ch.checked = e.target.checked;
   });
-}
-if (btnClearToken) {
-  btnClearToken.addEventListener('click', () => {
-    githubConfig.token = '';
-    saveGithubConfig();
-    if (githubTokenInput) githubTokenInput.value = '';
-    alert('Token cleared from this browser.');
+});
+document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+document.getElementById('allFilter').addEventListener('change', reloadAllQuestionsTable);
+document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
+
+// Maintenance tab controls
+document.getElementById('btnMaintReload').addEventListener('click', reloadMaintenanceTable);
+document.getElementById('btnMaintDelete').addEventListener('click', deleteSelectedMaint);
+document.getElementById('maintSelectAll').addEventListener('change', e => {
+  document.querySelectorAll('#maintTableBody input[type="checkbox"]').forEach(ch => {
+    ch.checked = e.target.checked;
   });
-}
+});
+document.getElementById('maintFilter').addEventListener('change', reloadMaintenanceTable);
+document.getElementById('maintChapterFilter').addEventListener('input', debounce(reloadMaintenanceTable, 300));
 
-// --- IndexedDB init ---
+// Backup tab controls
+document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
+document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
 
+// Cloud sync controls
+document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
+document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
+
+// Settings tab – GitHub
+document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
+document.getElementById('btnClearGitHub').addEventListener('click', () => {
+  localStorage.removeItem('mcq_github_config');
+  loadGitHubConfigIntoUI();
+  refreshCloudInfo();
+});
+
+// --- IndexedDB setup ---
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -142,69 +144,103 @@ function openDB() {
         ans.createIndex('by_question', 'questionId', { unique: false });
         ans.createIndex('by_time', 'answeredAt', { unique: false });
       }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
     };
-    req.onsuccess = e => {
+    req.onsuccess = (e) => {
       db = e.target.result;
+      loadMeta();
       resolve(db);
     };
-    req.onerror = e => reject(e.target.error);
+    req.onerror = (e) => reject(e.target.error);
   });
 }
 
+function loadMeta() {
+  const tx = db.transaction('meta', 'readonly');
+  const store = tx.objectStore('meta');
+  const req = store.get('lastActivityAt');
+  req.onsuccess = () => {
+    lastActivityAt = req.result ? req.result.value : null;
+    refreshBackupLabels();
+  };
+}
+
+// Helpers
 function randomChoice(arr) {
   if (!arr.length) return null;
   const idx = Math.floor(Math.random() * arr.length);
   return arr[idx];
 }
 
+function debounce(fn, ms) {
+  let t = null;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
+}
+
+// --- Stats ---
 async function getStats() {
-  const tx = db.transaction(['questions','answers'],'readonly');
-  const qStore = tx.objectStore('questions');
-  const stats = { total:0, flagged:0, withWrong:0, answered:0 };
-
-  await new Promise(res=>{
-    const req = qStore.getAll();
-    req.onsuccess = e => {
-      const all = e.target.result || [];
-      stats.total = all.length;
-      stats.flagged = all.filter(q=>q.flagged).length;
-      stats.answered = all.filter(q=>q.timesSeen>0).length;
-      stats.withWrong = all.filter(q=>q.timesWrong>0).length;
-      res();
-    };
+  const tx = db.transaction('questions', 'readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res => {
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
   });
-
+  const stats = {
+    total: all.length,
+    flagged: all.filter(q => q.flagged).length,
+    answered: all.filter(q => q.timesSeen > 0).length,
+    withWrong: all.filter(q => q.timesWrong > 0).length,
+    maintenance: all.filter(q => q.maintenance).length
+  };
   return stats;
 }
 
+async function updateStatsBar() {
+  const el = document.getElementById('statsBar');
+  const s = await getStats();
+  el.innerHTML = `
+    <div>Total: <strong>${s.total}</strong></div>
+    <div>Answered: <strong>${s.answered}</strong></div>
+    <div>Wrong ≥1: <strong>${s.withWrong}</strong></div>
+    <div>Flagged: <strong>${s.flagged}</strong></div>
+    <div>Maintenance: <strong>${s.maintenance}</strong></div>
+  `;
+}
+
+// --- Pick question ---
 async function pickQuestion() {
-  const tx = db.transaction('questions','readonly');
+  const tx = db.transaction('questions', 'readonly');
   const store = tx.objectStore('questions');
-  const all = await new Promise(res=>{
+  const all = await new Promise(res => {
     const req = store.getAll();
     req.onsuccess = e => res(e.target.result || []);
   });
   if (!all.length) return null;
 
-  let filtered = all.filter(q=>q.active !== false);
+  let filtered = all.filter(q => q.active !== false);
 
   if (currentMode === 'new') {
-    filtered = filtered.filter(q=>!q.timesSeen);
+    filtered = filtered.filter(q => !q.timesSeen);
   } else if (currentMode === 'wrong') {
-    filtered = filtered.filter(q=>q.timesWrong>0);
+    filtered = filtered.filter(q => q.timesWrong > 0);
   } else if (currentMode === 'flagged') {
-    filtered = filtered.filter(q=>q.flagged);
+    filtered = filtered.filter(q => q.flagged);
   } else if (currentMode === 'chapter' && currentChapter) {
-    filtered = filtered.filter(q=>(q.chapter||'').toLowerCase() === currentChapter.toLowerCase());
+    const chap = currentChapter.toLowerCase();
+    filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
   }
 
   if (!filtered.length) filtered = all;
 
-  // sort: least recently seen, least seen
-  filtered.sort((a,b)=>{
+  filtered.sort((a, b) => {
     const as = a.lastSeenAt || '';
     const bs = b.lastSeenAt || '';
-    if (as === bs) return (a.timesSeen||0)-(b.timesSeen||0);
+    if (as === bs) return (a.timesSeen || 0) - (b.timesSeen || 0);
     return as.localeCompare(bs);
   });
 
@@ -214,7 +250,7 @@ async function pickQuestion() {
 
 function renderQuestion() {
   if (!currentQuestion) {
-    questionPanel.innerHTML = '<div class="muted">No questions in database yet. استخدم Import لإضافة أسئلة JSON.</div>';
+    questionPanel.innerHTML = '<div class="muted">No questions yet. Import JSON to start.</div>';
     return;
   }
   const q = currentQuestion;
@@ -222,22 +258,23 @@ function renderQuestion() {
   currentChoices = q.choices || [];
 
   let html = '';
-  html += `<div class="q-text">Q#${q.id || ''} – ${q.text}</div>`;
-  if (q.chapter || q.source) {
+  html += `<div class="q-text">Q#${q.id ?? ''} – ${q.text || ''}</div>`;
+  if (q.chapter || q.source || q.maintenance || q.flagged) {
     html += '<div class="tag-chapter">';
     if (q.chapter) html += `<span>${q.chapter}</span>`;
     if (q.source) html += ` · <span>${q.source}</span>`;
-    if (q.flagged) html += ` · <span class="pill pill-flag">FLAG</span>`;
+    if (q.flagged) html += ` · <span class="pill pill-flag">Flag</span>`;
+    if (q.maintenance) html += ` · <span class="pill pill-maint">Maint</span>`;
     html += '</div>';
   }
 
   html += '<div style="margin-top:0.4rem;">';
-  currentChoices.forEach((c, idx)=>{
+  currentChoices.forEach((c, idx) => {
     const letter = letters[idx] || '?';
     const checked = (idx === lastSelectedIndex) ? 'checked' : '';
     html += `<label class="choice">
       <input type="radio" name="choice" value="${idx}" ${checked}>
-      <strong>${letter}.</strong> ${c.text}
+      <strong>${letter}.</strong> ${c.text || ''}
     </label>`;
   });
   html += '</div>';
@@ -245,66 +282,54 @@ function renderQuestion() {
   questionPanel.innerHTML = html;
 }
 
-async function updateStatsBar() {
-  const stats = await getStats();
-  const el = document.getElementById('statsBar');
-  el.innerHTML = `
-    <div>Total: <strong>${stats.total}</strong></div>
-    <div>Answered: <strong>${stats.answered}</strong></div>
-    <div>Wrong ≥1: <strong>${stats.withWrong}</strong></div>
-    <div>Flagged: <strong>${stats.flagged}</strong></div>
-  `;
-}
-
-async function loadHistory() {
-  const tx = db.transaction(['answers','questions'],'readonly');
+async function updateHistoryList() {
+  const tx = db.transaction(['answers','questions'], 'readonly');
   const aStore = tx.objectStore('answers');
   const qStore = tx.objectStore('questions');
 
-  const allAns = await new Promise(res=>{
+  const allAns = await new Promise(res => {
     const req = aStore.getAll();
     req.onsuccess = e => res(e.target.result || []);
   });
 
-  allAns.sort((a,b)=> (b.answeredAt||'').localeCompare(a.answeredAt||''));
-  const recent = allAns.slice(0,40);
+  allAns.sort((a, b) => (b.answeredAt || '').localeCompare(a.answeredAt || ''));
+  const recent = allAns.slice(0, 50);
 
   const qMap = {};
-  await Promise.all(recent.map(a=>{
-    return new Promise(r=>{
-      if (qMap[a.questionId]) return r();
-      const req = qStore.get(a.questionId);
-      req.onsuccess = e => { qMap[a.questionId]=e.target.result; r(); };
-      req.onerror = ()=>r();
-    });
-  }));
+  await Promise.all(recent.map(a => new Promise(r => {
+    if (qMap[a.questionId]) return r();
+    const rq = qStore.get(a.questionId);
+    rq.onsuccess = e => { qMap[a.questionId] = e.target.result; r(); };
+    rq.onerror = () => r();
+  })));
 
   let html = '';
-  recent.forEach(a=>{
+  recent.forEach(a => {
     const q = qMap[a.questionId];
     if (!q) return;
-    const label = (q.chapter || '').slice(0,16);
+    const label = (q.chapter || '').slice(0, 16);
     html += `<div class="history-item" data-qid="${q.id}">
-      <div>${(q.text||'').slice(0,80)}${q.text && q.text.length>80 ? '…' : ''}</div>
+      <div>${(q.text || '').slice(0, 80)}${q.text && q.text.length > 80 ? '…' : ''}</div>
       <div class="muted">
         ${label ? `<span>${label}</span>` : ''}
-        <span class="pill ${a.isCorrect ? 'pill-correct':'pill-wrong'}">${a.isCorrect ? 'Correct' : 'Wrong'}</span>
+        <span class="pill ${a.isCorrect ? 'pill-correct' : 'pill-wrong'}">${a.isCorrect ? 'Correct' : 'Wrong'}</span>
         ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
+        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
       </div>
     </div>`;
   });
 
-  historyListEl.innerHTML = html || '<div class="muted">No history yet.</div>';
+  historyListEl.innerHTML = html || '<div class="muted tiny">No history yet.</div>';
 
-  historyListEl.querySelectorAll('.history-item').forEach(item=>{
+  historyListEl.querySelectorAll('.history-item').forEach(item => {
     item.addEventListener('click', async () => {
-      const id = parseInt(item.getAttribute('data-qid'));
-      const tx2 = db.transaction('questions','readonly');
+      const id = parseInt(item.getAttribute('data-qid'), 10);
+      const tx2 = db.transaction('questions', 'readonly');
       const store2 = tx2.objectStore('questions');
-      const q = await new Promise(r=>{
+      const q = await new Promise(r => {
         const rq = store2.get(id);
         rq.onsuccess = e => r(e.target.result);
-        rq.onerror = ()=>r(null);
+        rq.onerror = () => r(null);
       });
       if (!q) return;
       currentQuestion = q;
@@ -316,44 +341,68 @@ async function loadHistory() {
   });
 }
 
-async function loadNextQuestion() {
+async function loadNextQuestion(resetHistory) {
+  if (resetHistory) {
+    historyStack = [];
+  } else if (currentQuestion && currentQuestion.id != null) {
+    historyStack.push(currentQuestion.id);
+  }
   currentQuestion = await pickQuestion();
   lastResult = null;
   lastSelectedIndex = null;
   feedbackPanel.innerHTML = '';
   renderQuestion();
   updateStatsBar();
-  loadHistory();
+  updateHistoryList();
 }
 
-// ---- Answer submission ----
+// Previous question
+async function goPreviousQuestion() {
+  if (!historyStack.length) return;
+  const prevId = historyStack.pop();
+  const tx = db.transaction('questions', 'readonly');
+  const store = tx.objectStore('questions');
+  const q = await new Promise(res => {
+    const req = store.get(prevId);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = () => res(null);
+  });
+  if (!q) return;
+  currentQuestion = q;
+  lastResult = null;
+  lastSelectedIndex = null;
+  feedbackPanel.innerHTML = '';
+  renderQuestion();
+}
 
+// Submit answer
 async function submitAnswer() {
   if (!currentQuestion) return;
   const radios = document.querySelectorAll('input[name="choice"]');
   let selectedIdx = null;
-  radios.forEach(r=>{
-    if (r.checked) selectedIdx = parseInt(r.value);
+  radios.forEach(r => {
+    if (r.checked) selectedIdx = parseInt(r.value, 10);
   });
   if (selectedIdx === null) {
     alert('اختر إجابة أولاً.');
     return;
   }
   lastSelectedIndex = selectedIdx;
-  const correctIdx = (currentQuestion.choices || []).findIndex(c=>c.isCorrect);
+  const correctIdx = (currentQuestion.choices || []).findIndex(c => c.isCorrect);
   const isCorrect = (selectedIdx === correctIdx);
 
-  const now = nowISO();
-  recordActivity();
+  const now = new Date().toISOString();
+  lastActivityAt = now;
+  saveMeta('lastActivityAt', now);
 
-  const tx = db.transaction(['questions','answers'],'readwrite');
+  const tx = db.transaction(['questions','answers'], 'readwrite');
   const qStore = tx.objectStore('questions');
   const aStore = tx.objectStore('answers');
 
   const q = Object.assign({}, currentQuestion);
   q.timesSeen = (q.timesSeen || 0) + 1;
   q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
-  q.timesWrong = (q.timesWrong || 0) + (isCorrect ? 0 : 1);
+  q.timesWrong = (q.timesWrong || 0) + (!isCorrect ? 1 : 0);
   q.lastSeenAt = now;
   qStore.put(q);
 
@@ -369,44 +418,42 @@ async function submitAnswer() {
     lastResult = isCorrect;
     showFeedback(correctIdx, selectedIdx, q.explanation);
     updateStatsBar();
-    loadHistory();
+    updateHistoryList();
+    refreshBackupLabels();
   };
 }
 
 function showFeedback(correctIdx, selectedIdx, explanation) {
   const letters = ['A','B','C','D','E','F','G'];
-  const q = currentQuestion;
   const choices = currentChoices;
 
   const choiceEls = document.querySelectorAll('.choice');
-  choiceEls.forEach((el, idx)=>{
+  choiceEls.forEach((el, idx) => {
     el.classList.remove('correct','wrong','show');
-    if (idx === correctIdx) { el.classList.add('correct','show'); }
-    if (idx === selectedIdx && idx !== correctIdx) { el.classList.add('wrong','show'); }
+    if (idx === correctIdx) el.classList.add('correct','show');
+    if (idx === selectedIdx && idx !== correctIdx) el.classList.add('wrong','show');
   });
 
-  let html = '';
-  html += `<div style="margin-top:0.4rem;">`;
+  let html = '<div style="margin-top:0.3rem;">';
   if (lastResult) {
-    html += `<div style="color:#2e7d32; font-weight:600;">Correct ✅</div>`;
+    html += '<div style="color:#2e7d32; font-weight:600;">Correct ✅</div>';
   } else {
-    html += `<div style="color:#c62828; font-weight:600;">Wrong ❌</div>`;
+    html += '<div style="color:#c62828; font-weight:600;">Wrong ❌</div>';
   }
   if (correctIdx >= 0 && choices[correctIdx]) {
-    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${letters[correctIdx]}.</strong> ${choices[correctIdx].text}</div>`;
+    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${letters[correctIdx]}.</strong> ${choices[correctIdx].text || ''}</div>`;
   }
   if (explanation) {
     html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${explanation}</div>`;
   }
-  html += `</div>`;
+  html += '</div>';
   feedbackPanel.innerHTML = html;
 }
 
-// ---- Flagging ----
-
+// Flags
 async function toggleFlag() {
   if (!currentQuestion) return;
-  const tx = db.transaction('questions','readwrite');
+  const tx = db.transaction('questions', 'readwrite');
   const store = tx.objectStore('questions');
   const q = Object.assign({}, currentQuestion);
   q.flagged = !q.flagged;
@@ -414,50 +461,45 @@ async function toggleFlag() {
   tx.oncomplete = () => {
     currentQuestion = q;
     renderQuestion();
-    loadHistory();
     updateStatsBar();
+    updateHistoryList();
   };
 }
 
-// ---- Import / Export with safer backup ----
+async function toggleMaintenanceFlag() {
+  if (!currentQuestion) return;
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  const q = Object.assign({}, currentQuestion);
+  q.maintenance = !q.maintenance;
+  store.put(q);
+  tx.oncomplete = () => {
+    currentQuestion = q;
+    renderQuestion();
+    updateStatsBar();
+    updateHistoryList();
+  };
+}
 
-function handleImport() {
+// Simple import (questions only)
+function handleImportSimple() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) {
     alert('اختر ملف JSON أولاً.');
     return;
   }
   const reader = new FileReader();
-  reader.onload = async (e) => {
+  reader.onload = async e => {
     try {
-      const raw = JSON.parse(e.target.result);
-
-      // Support both old format (array) and new format ({meta, questions})
-      let meta = null;
-      let data = null;
-      if (Array.isArray(raw)) {
-        data = raw;
-      } else if (raw && Array.isArray(raw.questions)) {
-        data = raw.questions;
-        meta = raw.meta || null;
-      } else {
-        throw new Error('Unexpected JSON format.');
+      const data = JSON.parse(e.target.result);
+      let arr = data;
+      if (!Array.isArray(arr) && data.questions) {
+        arr = data.questions;
       }
-
-      // Check for "older than current" backup
-      const lastActivity = localStorage.getItem(LS_KEYS.lastActivity);
-      if (meta && meta.exportedAt && lastActivity && meta.exportedAt < lastActivity) {
-        const ok = confirm(
-          '⚠ This backup is older than your latest activity.\\n' +
-          'Importing it may overwrite newer progress.\\n\\n' +
-          'Continue anyway?'
-        );
-        if (!ok) return;
-      }
-
-      const tx = db.transaction('questions','readwrite');
+      if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
+      const tx = db.transaction('questions', 'readwrite');
       const store = tx.objectStore('questions');
-      data.forEach(q => {
+      arr.forEach(q => {
         const obj = {
           text: q.text,
           chapter: q.chapter || '',
@@ -468,70 +510,585 @@ function handleImport() {
           timesCorrect: q.timesCorrect || 0,
           timesWrong: q.timesWrong || 0,
           lastSeenAt: q.lastSeenAt || null,
+          createdAt: q.createdAt || new Date().toISOString(),
           flagged: !!q.flagged,
+          maintenance: !!q.maintenance,
           active: q.active !== false
         };
-        if (q.id) obj.id = q.id; // keep IDs if present
+        if (q.id != null) obj.id = q.id;
         store.put(obj);
       });
       tx.oncomplete = () => {
-        alert('Imported ' + data.length + ' questions.');
-        loadNextQuestion();
+        alert('Imported ' + arr.length + ' questions.');
+        loadNextQuestion(true);
       };
     } catch (err) {
-      alert('Error reading JSON: ' + err.message);
+      alert('Error: ' + err.message);
     }
   };
   reader.readAsText(file);
 }
 
-async function handleExport() {
-  const tx = db.transaction('questions','readonly');
+// Export questions only
+async function exportQuestionsOnly() {
+  const tx = db.transaction('questions', 'readonly');
   const store = tx.objectStore('questions');
-  const all = await new Promise(res=>{
+  const all = await new Promise(res => {
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+  const data = all.map(q => ({
+    id: q.id,
+    text: q.text,
+    chapter: q.chapter,
+    source: q.source,
+    explanation: q.explanation,
+    choices: q.choices,
+    flagged: !!q.flagged,
+    maintenance: !!q.maintenance,
+    active: q.active !== false,
+    timesSeen: q.timesSeen || 0,
+    timesCorrect: q.timesCorrect || 0,
+    timesWrong: q.timesWrong || 0,
+    lastSeenAt: q.lastSeenAt || null,
+    createdAt: q.createdAt || null
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mcq_questions.json';
+  a.click();
+}
+
+// Meta helpers
+function saveMeta(key, value) {
+  const tx = db.transaction('meta', 'readwrite');
+  const store = tx.objectStore('meta');
+  store.put({ key, value });
+}
+
+// Format time
+function fmtTime(iso) {
+  if (!iso) return '–';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+// --- Backup full (questions + answers + meta) ---
+async function buildBackupObject() {
+  const qtx = db.transaction('questions', 'readonly');
+  const qs = qtx.objectStore('questions');
+  const questions = await new Promise(res => {
+    const req = qs.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+
+  const atx = db.transaction('answers', 'readonly');
+  const as = atx.objectStore('answers');
+  const answers = await new Promise(res => {
+    const req = as.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+
+  const metaTx = db.transaction('meta', 'readonly');
+  const ms = metaTx.objectStore('meta');
+  const metaAll = await new Promise(res => {
+    const req = ms.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+  const metaObj = {};
+  metaAll.forEach(m => { metaObj[m.key] = m.value; });
+
+  const exportedAt = new Date().toISOString();
+  const backup = {
+    meta: {
+      exportedAt,
+      appVersion: window.APP_VERSION || '3.4.0',
+      totalQuestions: questions.length,
+      totalAnswers: answers.length,
+      lastActivityAt: metaObj.lastActivityAt || null
+    },
+    questions,
+    answers
+  };
+  return backup;
+}
+
+async function exportFullBackup() {
+  const backup = await buildBackupObject();
+  const exportedAt = backup.meta.exportedAt;
+  saveMeta('lastBackupAt', exportedAt);
+  refreshBackupLabels();
+
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
+  const safeTs = exportedAt.replace(/[:]/g, '-');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'mcq_backup_' + safeTs + '.json';
+  a.click();
+}
+
+// Import backup
+async function handleBackupImport() {
+  const file = document.getElementById('backupFileInput').files[0];
+  if (!file) {
+    alert('اختر ملف backup JSON أولاً.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      await importBackupObject(data);
+      alert('Backup import completed.');
+      loadNextQuestion(true);
+      refreshBackupLabels();
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function importBackupObject(backup) {
+  let questions = [];
+  let answers = [];
+  let meta = {};
+  if (Array.isArray(backup)) {
+    questions = backup;
+  } else if (backup && backup.questions) {
+    questions = backup.questions;
+    answers = backup.answers || [];
+    meta = backup.meta || {};
+  } else {
+    throw new Error('Invalid backup format');
+  }
+
+  const backupExportedAt = meta.exportedAt || null;
+
+  const metaTx = db.transaction('meta', 'readonly');
+  const ms = metaTx.objectStore('meta');
+  const lastActivityRec = await new Promise(res => {
+    const req = ms.get('lastActivityAt');
+    req.onsuccess = e => res(req.result?.value || null);
+    req.onerror = () => res(null);
+  });
+  const localLastActivity = lastActivityRec || null;
+
+  if (backupExportedAt && localLastActivity && backupExportedAt < localLastActivity) {
+    const proceed = confirm(
+      '⚠ Backup file seems older than your last activity.\n' +
+      'Import may overwrite some older stats.\n\nContinue anyway?'
+    );
+    if (!proceed) return;
+  }
+
+  // Merge questions: keep local if same id; add new ones
+  const qtx = db.transaction('questions', 'readwrite');
+  const qs = qtx.objectStore('questions');
+  const existing = await new Promise(res => {
+    const req = qs.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+  const byId = new Map();
+  existing.forEach(q => byId.set(q.id, q));
+
+  questions.forEach(q => {
+    const id = q.id;
+    if (id != null && byId.has(id)) {
+      // Merge: prefer local stats
+      const local = byId.get(id);
+      const merged = Object.assign({}, q, {
+        timesSeen: local.timesSeen || q.timesSeen || 0,
+        timesCorrect: local.timesCorrect || q.timesCorrect || 0,
+        timesWrong: local.timesWrong || q.timesWrong || 0,
+        lastSeenAt: local.lastSeenAt || q.lastSeenAt || null,
+        flagged: local.flagged || q.flagged || false,
+        maintenance: local.maintenance || q.maintenance || false,
+        active: local.active !== false
+      });
+      qs.put(merged);
+    } else {
+      const obj = {
+        id: id,
+        text: q.text,
+        chapter: q.chapter || '',
+        source: q.source || '',
+        explanation: q.explanation || '',
+        choices: q.choices || [],
+        timesSeen: q.timesSeen || 0,
+        timesCorrect: q.timesCorrect || 0,
+        timesWrong: q.timesWrong || 0,
+        lastSeenAt: q.lastSeenAt || null,
+        createdAt: q.createdAt || new Date().toISOString(),
+        flagged: !!q.flagged,
+        maintenance: !!q.maintenance,
+        active: q.active !== false
+      };
+      qs.put(obj);
+    }
+  });
+
+  // Merge answers: just append
+  if (answers.length) {
+    const atx = db.transaction('answers', 'readwrite');
+    const as = atx.objectStore('answers');
+    answers.forEach(a => {
+      const obj = {
+        questionId: a.questionId,
+        answeredAt: a.answeredAt || null,
+        selectedIndex: a.selectedIndex,
+        isCorrect: !!a.isCorrect
+      };
+      as.add(obj);
+    });
+  }
+
+  // Update meta if backup is newer
+  if (backupExportedAt && (!localLastActivity || backupExportedAt > localLastActivity)) {
+    saveMeta('lastActivityAt', backupExportedAt);
+    lastActivityAt = backupExportedAt;
+  }
+  if (backupExportedAt) {
+    saveMeta('lastBackupAt', backupExportedAt);
+  }
+}
+
+// Backup labels
+function refreshBackupLabels() {
+  const lastActEl = document.getElementById('lastActivityLabel');
+  const lastBackupEl = document.getElementById('lastBackupLabel');
+  const tx = db.transaction('meta', 'readonly');
+  const store = tx.objectStore('meta');
+  const req1 = store.get('lastActivityAt');
+  const req2 = store.get('lastBackupAt');
+  req1.onsuccess = () => {
+    lastActEl.textContent = fmtTime(req1.result ? req1.result.value : null);
+  };
+  req2.onsuccess = () => {
+    lastBackupEl.textContent = fmtTime(req2.result ? req2.result.value : null);
+  };
+}
+
+// --- All Questions table ---
+async function reloadAllQuestionsTable() {
+  const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
+  const filter = document.getElementById('allFilter').value;
+  const sortVal = document.getElementById('allSort').value;
+  const tbody = document.getElementById('allTableBody');
+  tbody.innerHTML = '';
+
+  const tx = db.transaction('questions', 'readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res => {
     const req = store.getAll();
     req.onsuccess = e => res(e.target.result || []);
   });
 
-  const exportTime = nowISO();
-  const payload = {
-    meta: {
-      exportedAt: exportTime,
-      appVersion: APP_VERSION,
-      totalQuestions: all.length
-    },
-    questions: all.map(q => ({
-      id: q.id,
-      text: q.text,
-      chapter: q.chapter,
-      source: q.source,
-      explanation: q.explanation,
-      choices: q.choices,
-      flagged: !!q.flagged,
-      active: q.active !== false,
-      timesSeen: q.timesSeen || 0,
-      timesCorrect: q.timesCorrect || 0,
-      timesWrong: q.timesWrong || 0,
-      lastSeenAt: q.lastSeenAt || null
-    }))
-  };
+  let arr = all;
 
-  const blob = new Blob([JSON.stringify(payload,null,2)], { type:'application/json' });
+  if (searchVal) {
+    arr = arr.filter(q => {
+      const s = (q.text || '') + ' ' + (q.chapter || '') + ' ' + (q.source || '');
+      return s.toLowerCase().includes(searchVal);
+    });
+  }
 
-  const stamp = exportTime.replace(/[:.]/g,'-');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mcq_backup_' + stamp + '.json';
-  a.click();
+  if (filter === 'flagged') {
+    arr = arr.filter(q => q.flagged);
+  } else if (filter === 'wrong') {
+    arr = arr.filter(q => q.timesWrong > 0);
+  } else if (filter === 'maintenance') {
+    arr = arr.filter(q => q.maintenance);
+  } else if (filter === 'inactive') {
+    arr = arr.filter(q => q.active === false);
+  }
 
-  localStorage.setItem(LS_KEYS.lastBackup, exportTime);
-  refreshBackupStatus();
+  if (sortVal === 'created_desc') {
+    arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  } else if (sortVal === 'created_asc') {
+    arr.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  } else if (sortVal === 'chapter') {
+    arr.sort((a, b) => (a.chapter || '').localeCompare(b.chapter || ''));
+  } else if (sortVal === 'wrong_desc') {
+    arr.sort((a, b) => (b.timesWrong || 0) - (a.timesWrong || 0));
+  }
+
+  arr.forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="checkbox" data-id="${q.id}"></td>
+      <td>${q.id}</td>
+      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
+      <td>${q.chapter || ''}</td>
+      <td>
+        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
+        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
+        ${q.active === false ? '<span class="pill pill-wrong">Inactive</span>' : ''}
+      </td>
+      <td>${q.timesSeen || 0}</td>
+      <td>${q.timesWrong || 0}</td>
+      <td>${q.lastSeenAt ? fmtTime(q.lastSeenAt) : ''}</td>
+    `;
+    tr.addEventListener('click', (e) => {
+      if (e.target.tagName.toLowerCase() === 'input') return;
+      currentQuestion = q;
+      lastResult = null;
+      lastSelectedIndex = null;
+      feedbackPanel.innerHTML = '';
+      renderQuestion();
+      document.querySelector('.tab-button[data-tab="home"]').click();
+    });
+    tbody.appendChild(tr);
+  });
 }
 
-// Init
-loadGithubConfig();
-refreshBackupStatus();
+async function deleteSelectedAll() {
+  const checked = Array.from(document.querySelectorAll('#allTableBody input[type="checkbox"]:checked'));
+  if (!checked.length) return;
+  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
+  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  ids.forEach(id => store.delete(id));
+  tx.oncomplete = () => {
+    reloadAllQuestionsTable();
+    loadNextQuestion(true);
+  };
+}
 
-openDB().then(()=>{
-  loadNextQuestion();
+// --- Maintenance table ---
+async function reloadMaintenanceTable() {
+  const filter = document.getElementById('maintFilter').value;
+  const chapVal = document.getElementById('maintChapterFilter').value.toLowerCase().trim();
+  const tbody = document.getElementById('maintTableBody');
+  tbody.innerHTML = '';
+
+  const tx = db.transaction('questions', 'readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res => {
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
+  });
+
+  let arr = all.filter(q => q.maintenance || q.flagged);
+  if (filter === 'maintenance') {
+    arr = arr.filter(q => q.maintenance);
+  } else if (filter === 'flagged') {
+    arr = arr.filter(q => q.flagged || q.maintenance);
+  }
+
+  if (chapVal) {
+    arr = arr.filter(q => (q.chapter || '').toLowerCase().includes(chapVal));
+  }
+
+  arr.sort((a, b) => (b.timesWrong || 0) - (a.timesWrong || 0));
+
+  arr.forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="checkbox" data-id="${q.id}"></td>
+      <td>${q.id}</td>
+      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
+      <td>${q.chapter || ''}</td>
+      <td>
+        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
+        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
+      </td>
+      <td>${q.timesWrong || 0}</td>
+    `;
+    tr.addEventListener('click', (e) => {
+      if (e.target.tagName.toLowerCase() === 'input') return;
+      currentQuestion = q;
+      lastResult = null;
+      lastSelectedIndex = null;
+      feedbackPanel.innerHTML = '';
+      renderQuestion();
+      document.querySelector('.tab-button[data-tab="home"]').click();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteSelectedMaint() {
+  const checked = Array.from(document.querySelectorAll('#maintTableBody input[type="checkbox"]:checked'));
+  if (!checked.length) return;
+  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
+  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  ids.forEach(id => store.delete(id));
+  tx.oncomplete = () => {
+    reloadMaintenanceTable();
+    reloadAllQuestionsTable();
+    loadNextQuestion(true);
+  };
+}
+
+// --- GitHub config + cloud sync ---
+function loadGitHubConfig() {
+  try {
+    const raw = localStorage.getItem('mcq_github_config');
+    if (!raw) return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
+    const obj = JSON.parse(raw);
+    return {
+      token: obj.token || '',
+      repo: obj.repo || 'Awad1992/mcq-data',
+      filename: obj.filename || 'mcq_backup.json'
+    };
+  } catch {
+    return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
+  }
+}
+
+function saveGitHubConfig(cfg) {
+  localStorage.setItem('mcq_github_config', JSON.stringify(cfg));
+}
+
+function loadGitHubConfigIntoUI() {
+  const cfg = loadGitHubConfig();
+  document.getElementById('ghTokenInput').value = cfg.token;
+  document.getElementById('ghRepoInput').value = cfg.repo;
+  document.getElementById('ghFileInput').value = cfg.filename;
+}
+
+function saveGitHubConfigFromUI() {
+  const token = document.getElementById('ghTokenInput').value.trim();
+  const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
+  const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
+  const cfg = { token, repo, filename };
+  saveGitHubConfig(cfg);
+  refreshCloudInfo();
+  alert('GitHub settings saved.');
+}
+
+function refreshCloudInfo() {
+  const cfg = loadGitHubConfig();
+  const el = document.getElementById('cloudInfo');
+  const syncStatus = document.getElementById('syncStatus');
+  if (!cfg.token || !cfg.repo) {
+    el.textContent = 'Cloud sync disabled. Add token + repo in Settings.';
+    syncStatus.textContent = 'No cloud sync';
+    return;
+  }
+  el.textContent = 'Cloud ready → Repo: ' + cfg.repo + ' · File: ' + cfg.filename;
+  syncStatus.textContent = 'Cloud: ready';
+}
+
+// GitHub helper: base64
+function encodeBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function decodeBase64(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
+
+// Cloud upload
+async function cloudUpload() {
+  const cfg = loadGitHubConfig();
+  if (!cfg.token || !cfg.repo) {
+    alert('Set GitHub token + repo in Settings first.');
+    return;
+  }
+  const backup = await buildBackupObject();
+  const contentStr = JSON.stringify(backup, null, 2);
+  const contentB64 = encodeBase64(contentStr);
+
+  const [owner, repoName] = cfg.repo.split('/');
+  if (!owner || !repoName) {
+    alert('Repo format must be owner/name.');
+    return;
+  }
+  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+
+  let existingSha = null;
+  try {
+    const getRes = await fetch(url, {
+      headers: { Authorization: `token ${cfg.token}` }
+    });
+    if (getRes.status === 200) {
+      const info = await getRes.json();
+      existingSha = info.sha;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  const body = {
+    message: 'MCQ backup ' + new Date().toISOString(),
+    content: contentB64
+  };
+  if (existingSha) body.sha = existingSha;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `token ${cfg.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    alert('Upload failed: ' + res.status + ' ' + txt);
+    return;
+  }
+  alert('Backup uploaded to GitHub.');
+}
+
+// Cloud download
+async function cloudDownload() {
+  const cfg = loadGitHubConfig();
+  if (!cfg.token || !cfg.repo) {
+    alert('Set GitHub token + repo in Settings first.');
+    return;
+  }
+  const [owner, repoName] = cfg.repo.split('/');
+  if (!owner || !repoName) {
+    alert('Repo format must be owner/name.');
+    return;
+  }
+  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `token ${cfg.token}` }
+  });
+  if (res.status === 404) {
+    alert('No backup file found in GitHub repo.');
+    return;
+  }
+  if (!res.ok) {
+    const txt = await res.text();
+    alert('Download failed: ' + res.status + ' ' + txt);
+    return;
+  }
+  const info = await res.json();
+  const contentStr = decodeBase64(info.content);
+  let data = null;
+  try {
+    data = JSON.parse(contentStr);
+  } catch (err) {
+    alert('Invalid JSON in backup file.');
+    return;
+  }
+  await importBackupObject(data);
+  alert('Cloud backup downloaded and merged.');
+  loadNextQuestion(true);
+  refreshBackupLabels();
+}
+
+// Initial DB open
+openDB().then(() => {
+  refreshBackupLabels();
+  refreshCloudInfo();
+  loadGitHubConfigIntoUI();
+  loadNextQuestion(true);
+}).catch(err => {
+  console.error(err);
+  alert('Failed to open local database.');
 });
