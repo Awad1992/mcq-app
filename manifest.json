@@ -1,9 +1,24 @@
 {
-  "name": "MCQ Study App",
-  "short_name": "MCQ",
+  "name": "MCQ App Pro 2.0",
+  "short_name": "MCQ Pro",
+  "description": "Advanced MCQ Study App with Offline Mode + Cloud Sync (GitHub) + Flags + Wrong Tracker.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#111111",
-  "icons": []
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1976d2",
+
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
 }
