@@ -1,867 +1,885 @@
-// ==== MCQ App Pro 3.0 (Light) ====
+// ===== MCQ App Pro 4.0 =====
+// Single-page + Tabs + Manager + Maintenance + GitHub backup
+// Data key
+const STORAGE_KEY = "mcqdb_v4";
 
-// ---------- IndexedDB ----------
-const DB_NAME = "mcqdb_v3";
-const DB_VERSION = 1;
-let db = null;
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains("questions")) {
-        const qs = db.createObjectStore("questions", {
-          keyPath: "id",
-          autoIncrement: true
-        });
-        qs.createIndex("by_chapter", "chapter", { unique: false });
-        qs.createIndex("by_tags", "tags", { unique: false, multiEntry: true });
-      }
-      if (!db.objectStoreNames.contains("answers")) {
-        const ans = db.createObjectStore("answers", {
-          keyPath: "id",
-          autoIncrement: true
-        });
-        ans.createIndex("by_question", "questionId", { unique: false });
-        ans.createIndex("by_time", "answeredAt", { unique: false });
-      }
-    };
-    req.onsuccess = (e) => {
-      db = e.target.result;
-      resolve(db);
-    };
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
-// ---------- Global UI state ----------
+let questions = [];
 let currentQuestion = null;
-let currentChoices = [];
-let lastSelectedIndex = null;
-let lastResult = null;
-let currentMode = "all";
-let currentChapterFilter = "";
-let currentTagFilter = "";
-let pdfExtractedText = "";
-let perfChart = null;
+let currentIndex = -1;
 
-// DOM refs
+// stack for Previous (review only)
+let questionStack = [];
+let stackPointer = -1;
+let reviewMode = false;
+
+// GitHub settings
+let ghToken = "";
+let ghRepo = "";
+
+// DOM
 const questionPanel = document.getElementById("questionPanel");
 const feedbackPanel = document.getElementById("feedbackPanel");
-const historyListEl = document.getElementById("historyList");
-const modeSelect = document.getElementById("modeSelect");
-const chapterFilterInput = document.getElementById("chapterFilter");
-const tagFilterInput = document.getElementById("tagFilter");
-const statsBar = document.getElementById("statsBar");
-const lastSyncInfo = document.getElementById("lastSyncInfo");
-const offlineStatus = document.getElementById("offlineStatus");
+const practiceMetaEl = document.getElementById("practiceMeta");
+const statsBarEl = document.getElementById("statsBar");
+const lastWrongListEl = document.getElementById("lastWrongList");
+const lastFlagListEl = document.getElementById("lastFlagList");
+const lastMaintListEl = document.getElementById("lastMaintList");
+const manageTableBody = document.getElementById("manageTableBody");
+const maintTableBody = document.getElementById("maintTableBody");
 
-// buttons
-document.getElementById("btnSubmit").addEventListener("click", submitAnswer);
-document.getElementById("btnNext").addEventListener("click", () => {
-  lastResult = null;
+// ---------- INIT ----------
+document.addEventListener("DOMContentLoaded", () => {
+  setupTabs();
+  setupButtons();
+  loadFromStorage();
+  loadSettings();
+  renderStats();
+  if (questions.length > 0) {
+    gotoQuestion(0, false);
+  } else {
+    questionPanel.innerHTML =
+      '<div class="muted">No questions yet. Import JSON from Settings.</div>';
+  }
+  refreshSidePanels();
+  renderManageTable();
+  renderMaintTable();
+});
+
+// ---------- Tabs ----------
+function setupTabs() {
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabs = document.querySelectorAll(".tab");
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabs.forEach((t) => t.classList.remove("active"));
+
+      btn.classList.add("active");
+      const id = btn.getAttribute("data-tab");
+      document.getElementById(id).classList.add("active");
+    });
+  });
+}
+
+// ---------- Buttons ----------
+function setupButtons() {
+  document.getElementById("btnSubmit").addEventListener("click", submitAnswer);
+  document.getElementById("btnNext").addEventListener("click", () =>
+    nextQuestion(true)
+  );
+  document.getElementById("btnPrev").addEventListener("click", previousQuestion);
+  document.getElementById("btnFlag").addEventListener("click", toggleFlag);
+  document.getElementById("btnMaint").addEventListener("click", toggleMaint);
+
+  document
+    .getElementById("btnApplyFilters")
+    .addEventListener("click", renderManageTable);
+  document
+    .getElementById("btnSelectAll")
+    .addEventListener("click", () => setManageSelection(true));
+  document
+    .getElementById("btnClearSelection")
+    .addEventListener("click", () => setManageSelection(false));
+  document
+    .getElementById("btnDeleteSelected")
+    .addEventListener("click", deleteSelectedQuestions);
+
+  // Maintenance tab
+  document
+    .getElementById("btnMaintSelectAll")
+    .addEventListener("click", () => setMaintSelection(true));
+  document
+    .getElementById("btnMaintClear")
+    .addEventListener("click", () => setMaintSelection(false));
+  document
+    .getElementById("btnMaintRemove")
+    .addEventListener("click", removeMaintFromSelected);
+  document
+    .getElementById("btnMaintDelete")
+    .addEventListener("click", deleteMaintSelected);
+
+  // Settings: Import/Export
+  document
+    .getElementById("btnImport")
+    .addEventListener("click", handleImportJSON);
+  document
+    .getElementById("btnExport")
+    .addEventListener("click", handleExportJSON);
+
+  // Settings: GitHub
+  document
+    .getElementById("btnSaveSettings")
+    .addEventListener("click", saveSettings);
+  document
+    .getElementById("btnUploadGitHub")
+    .addEventListener("click", uploadGitHub);
+  document
+    .getElementById("btnDownloadGitHub")
+    .addEventListener("click", downloadGitHub);
+}
+
+// ---------- Storage ----------
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const arr = JSON.parse(raw);
+    questions = (arr || []).map((q, idx) => normalizeQuestion(q, idx));
+  } catch (e) {
+    console.error("loadFromStorage error", e);
+  }
+}
+
+function saveToStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+}
+
+// ---------- Question shape ----------
+function normalizeQuestion(q, idx) {
+  const now = new Date().toISOString();
+  // support older shapes
+  let id = q.id != null ? q.id : idx + 1;
+  let text = q.text || q.question || "";
+  let chapter = q.chapter || "";
+  let explanation = q.explanation || "";
+  let choices = q.choices || [];
+
+  // if choices is string array, convert
+  if (choices.length && typeof choices[0] === "string") {
+    const correctIndex =
+      typeof q.correctIndex === "number" ? q.correctIndex : 0;
+    choices = choices.map((t, i) => ({
+      text: t,
+      isCorrect: i === correctIndex,
+    }));
+  }
+
+  const correctIndex = (() => {
+    const idx = choices.findIndex((c) => c.isCorrect);
+    return idx >= 0 ? idx : 0;
+  })();
+
+  return {
+    id,
+    text,
+    chapter,
+    source: q.source || "",
+    explanation,
+    choices,
+    correctIndex,
+    flagged: !!q.flagged,
+    maintenance: !!q.maintenance,
+    addedAt: q.addedAt || now,
+    timesSeen: q.timesSeen || 0,
+    timesCorrect: q.timesCorrect || 0,
+    timesWrong: q.timesWrong || 0,
+    lastSeenAt: q.lastSeenAt || null,
+    lastAnsweredAt: q.lastAnsweredAt || null,
+  };
+}
+
+// ---------- Stats ----------
+function renderStats() {
+  const total = questions.length;
+  const answered = questions.filter((q) => q.timesSeen > 0).length;
+  const withWrong = questions.filter((q) => q.timesWrong > 0).length;
+  const flagged = questions.filter((q) => q.flagged).length;
+  const maint = questions.filter((q) => q.maintenance).length;
+
+  statsBarEl.innerHTML = `
+    <div>Total: <strong>${total}</strong></div>
+    <div>Answered: <strong>${answered}</strong></div>
+    <div>Wrong ≥1: <strong>${withWrong}</strong></div>
+    <div>Flagged: <strong>${flagged}</strong></div>
+    <div>Maintenance: <strong>${maint}</strong></div>
+  `;
+}
+
+// ---------- Practice view ----------
+function gotoQuestion(index, pushToStack) {
+  if (questions.length === 0) return;
+  if (index < 0 || index >= questions.length) index = 0;
+
+  if (pushToStack && currentIndex >= 0) {
+    questionStack.push(currentIndex);
+    stackPointer = questionStack.length - 1;
+  }
+
+  currentIndex = index;
+  currentQuestion = questions[currentIndex];
+  reviewMode = false;
+
+  renderQuestion();
   feedbackPanel.innerHTML = "";
-  loadNextQuestion();
-});
-document.getElementById("btnFlag").addEventListener("click", toggleFlag);
-document.getElementById("btnDeleteQuestion").addEventListener("click", deleteCurrentQuestion);
-
-document.getElementById("btnImport").addEventListener("click", handleImport);
-document.getElementById("btnExport").addEventListener("click", handleExport);
-
-document.getElementById("btnSaveSettings").addEventListener("click", saveSettings);
-document.getElementById("btnClearToken").addEventListener("click", clearTokenOnDevice);
-document.getElementById("btnUploadBackup").addEventListener("click", uploadBackupToGitHub);
-document.getElementById("btnDownloadBackup").addEventListener("click", downloadBackupFromGitHub);
-
-// mode / filters
-modeSelect.addEventListener("change", () => {
-  currentMode = modeSelect.value;
-  loadNextQuestion();
-});
-chapterFilterInput.addEventListener("input", () => {
-  currentChapterFilter = chapterFilterInput.value.trim();
-  loadNextQuestion();
-});
-tagFilterInput.addEventListener("input", () => {
-  currentTagFilter = tagFilterInput.value.trim();
-  loadNextQuestion();
-});
-
-// PDF handlers
-document.getElementById("btnExtractPdf").addEventListener("click", extractPdfText);
-document.getElementById("btnGenerateFromPdf").addEventListener("click", generateQuestionsFromPdf);
-
-// network indicator
-window.addEventListener("online", updateOfflineChip);
-window.addEventListener("offline", updateOfflineChip);
-
-// ---------- Settings (localStorage only) ----------
-const SETTINGS_KEY = "mcqapp_settings_v3";
-
-function loadSettings() {
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  let s = {
-    githubToken: "",
-    githubRepo: "Awad1992/mcq-data",
-    autoSync: false
-  };
-  if (raw) {
-    try {
-      s = Object.assign(s, JSON.parse(raw));
-    } catch (_) {}
-  }
-  document.getElementById("githubToken").value = s.githubToken || "";
-  document.getElementById("githubRepo").value = s.githubRepo || "Awad1992/mcq-data";
-  document.getElementById("autoSync").checked = !!s.autoSync;
-  return s;
-}
-
-function getSettingsFromUI() {
-  return {
-    githubToken: document.getElementById("githubToken").value.trim(),
-    githubRepo: document.getElementById("githubRepo").value.trim(),
-    autoSync: document.getElementById("autoSync").checked
-  };
-}
-
-function saveSettings() {
-  const s = getSettingsFromUI();
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  alert("Settings saved locally.");
-}
-
-function clearTokenOnDevice() {
-  const s = getSettingsFromUI();
-  s.githubToken = "";
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  document.getElementById("githubToken").value = "";
-  alert("Token removed from this device. يمكنك لصق Token جديد ثم Save Settings.");
-}
-
-// debounced autosync
-let autoSyncTimer = null;
-function scheduleAutoSync() {
-  const s = getSettingsFromUI();
-  if (!s.autoSync || !s.githubToken || !s.githubRepo) return;
-  if (autoSyncTimer) clearTimeout(autoSyncTimer);
-  autoSyncTimer = setTimeout(() => {
-    uploadBackupToGitHub(true).catch(() => {});
-  }, 2500);
-}
-
-// ---------- Question helpers ----------
-function randomChoice(arr) {
-  if (!arr || !arr.length) return null;
-  const idx = Math.floor(Math.random() * arr.length);
-  return arr[idx];
-}
-
-async function getAllQuestions() {
-  const tx = db.transaction("questions", "readonly");
-  const store = tx.objectStore("questions");
-  return new Promise((resolve) => {
-    const req = store.getAll();
-    req.onsuccess = (e) => resolve(e.target.result || []);
-    req.onerror = () => resolve([]);
-  });
-}
-
-async function getStats() {
-  const all = await getAllQuestions();
-  return {
-    total: all.length,
-    answered: all.filter((q) => q.timesSeen > 0).length,
-    withWrong: all.filter((q) => q.timesWrong > 0).length,
-    flagged: all.filter((q) => q.flagged).length
-  };
-}
-
-async function pickQuestion() {
-  const all = await getAllQuestions();
-  if (!all.length) return null;
-
-  let filtered = all.filter((q) => q.active !== false);
-
-  if (currentMode === "new") {
-    filtered = filtered.filter((q) => !q.timesSeen);
-  } else if (currentMode === "wrong") {
-    filtered = filtered.filter((q) => q.timesWrong > 0);
-  } else if (currentMode === "flagged") {
-    filtered = filtered.filter((q) => q.flagged);
-  }
-
-  if (currentChapterFilter) {
-    const c = currentChapterFilter.toLowerCase();
-    filtered = filtered.filter((q) => (q.chapter || "").toLowerCase().includes(c));
-  }
-
-  if (currentMode === "tag" || currentTagFilter) {
-    const t = currentTagFilter.toLowerCase();
-    if (t) {
-      filtered = filtered.filter((q) =>
-        (q.tags || []).some((tag) => (tag || "").toLowerCase().includes(t))
-      );
-    }
-  }
-
-  if (!filtered.length) filtered = all;
-
-  filtered.sort((a, b) => {
-    const as = a.lastSeenAt || "";
-    const bs = b.lastSeenAt || "";
-    if (as === bs) return (a.timesSeen || 0) - (b.timesSeen || 0);
-    return as.localeCompare(bs);
-  });
-
-  const slice = filtered.slice(0, Math.min(filtered.length, 60));
-  return randomChoice(slice);
+  renderStats();
+  refreshSidePanels();
 }
 
 function renderQuestion() {
   if (!currentQuestion) {
     questionPanel.innerHTML =
-      '<div class="muted small">No questions available. استخدم Import أو مولّد الـ PDF لإضافة أسئلة.</div>';
+      '<div class="muted">No question loaded.</div>';
+    practiceMetaEl.innerHTML = "";
     return;
   }
+
   const q = currentQuestion;
-  currentChoices = q.choices || [];
-  const letters = "ABCDEFG".split("");
+  const letters = ["A", "B", "C", "D", "E", "F"];
 
-  let html = "";
-  html += `<div class="q-text"><strong>Q#${q.id || ""}</strong> – ${q.text}</div>`;
+  let metaHtml = "";
+  if (q.chapter) metaHtml += `<span>${q.chapter}</span>`;
+  if (q.source) metaHtml += `<span>${q.source}</span>`;
+  if (q.flagged) metaHtml += `<span class="q-tag">FLAG</span>`;
+  if (q.maintenance) metaHtml += `<span class="q-tag">MAINT</span>`;
+  practiceMetaEl.innerHTML = metaHtml;
 
-  html += `<div class="tag-row">`;
-  if (q.chapter) html += `<span class="pill">${q.chapter}</span>`;
-  if (q.source) html += `<span class="pill">${q.source}</span>`;
-  if (q.tags && q.tags.length) {
-    q.tags.slice(0, 4).forEach((t) => {
-      html += `<span class="pill">${t}</span>`;
-    });
-  }
-  if (q.flagged) html += `<span class="pill pill-flag">FLAG</span>`;
-  html += `</div>`;
+  let html = `<div class="q-text">Q#${q.id} – ${q.text}</div>`;
+  html += '<div style="margin-top:0.3rem;">';
 
-  html += `<div>`;
-  currentChoices.forEach((c, idx) => {
-    const letter = letters[idx] || "?";
-    const checked = idx === lastSelectedIndex ? "checked" : "";
-    html += `<label class="choice">
-      <input type="radio" name="choice" value="${idx}" ${checked} />
-      <strong>${letter}.</strong> <span>${c.text}</span>
-    </label>`;
+  q.choices.forEach((c, idx) => {
+    html += `
+      <label class="choice">
+        <input type="radio" name="choice" value="${idx}">
+        <strong>${letters[idx] || "?"}.</strong> ${c.text}
+      </label>
+    `;
   });
-  html += `</div>`;
 
+  html += "</div>";
   questionPanel.innerHTML = html;
 }
 
-async function updateStatsBar() {
-  const s = await getStats();
-  statsBar.innerHTML = `
-    <div>Total: <strong>${s.total}</strong></div>
-    <div>Answered: <strong>${s.answered}</strong></div>
-    <div>Wrong ≥1: <strong>${s.withWrong}</strong></div>
-    <div>Flagged: <strong>${s.flagged}</strong></div>
-  `;
+function nextQuestion(pushStack) {
+  if (questions.length === 0) return;
+  let idx = currentIndex + 1;
+  if (idx >= questions.length) idx = 0;
+  gotoQuestion(idx, pushStack);
 }
 
-async function loadHistory() {
-  const tx = db.transaction(["answers", "questions"], "readonly");
-  const aStore = tx.objectStore("answers");
-  const qStore = tx.objectStore("questions");
-
-  const answers = await new Promise((resolve) => {
-    const req = aStore.getAll();
-    req.onsuccess = (e) => resolve(e.target.result || []);
-    req.onerror = () => resolve([]);
-  });
-
-  answers.sort((a, b) => (b.answeredAt || "").localeCompare(a.answeredAt || ""));
-  const recent = answers.slice(0, 60);
-
-  const qCache = {};
-  await Promise.all(
-    recent.map(
-      (a) =>
-        new Promise((res) => {
-          if (qCache[a.questionId]) return res();
-          const r = qStore.get(a.questionId);
-          r.onsuccess = (e) => {
-            qCache[a.questionId] = e.target.result;
-            res();
-          };
-          r.onerror = () => res();
-        })
-    )
-  );
-
-  let html = "";
-  recent.forEach((a) => {
-    const q = qCache[a.questionId];
-    if (!q) return;
-    html += `<div class="history-item" data-qid="${q.id}">
-      <div>${(q.text || "").slice(0, 90)}${q.text && q.text.length > 90 ? "…" : ""}</div>
-      <div class="muted small">
-        ${(q.chapter || "").slice(0, 22)}
-        <span class="pill ${a.isCorrect ? "pill-correct" : "pill-wrong"}">${
-      a.isCorrect ? "Correct" : "Wrong"
-    }</span>
-        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ""}
-      </div>
-    </div>`;
-  });
-
-  historyListEl.innerHTML = html || '<div class="muted small">No history yet.</div>';
-
-  historyListEl.querySelectorAll(".history-item").forEach((item) => {
-    item.addEventListener("click", async () => {
-      const id = parseInt(item.getAttribute("data-qid"), 10);
-      const tx2 = db.transaction("questions", "readonly");
-      const store2 = tx2.objectStore("questions");
-      const q = await new Promise((res) => {
-        const r = store2.get(id);
-        r.onsuccess = (e) => res(e.target.result);
-        r.onerror = () => res(null);
-      });
-      if (!q) return;
-      currentQuestion = q;
-      lastResult = null;
-      lastSelectedIndex = null;
-      feedbackPanel.innerHTML = "";
-      renderQuestion();
-    });
-  });
-
-  updatePerformanceChart(answers);
-}
-
-async function loadNextQuestion() {
-  currentQuestion = await pickQuestion();
-  lastSelectedIndex = null;
-  lastResult = null;
-  feedbackPanel.innerHTML = "";
+function previousQuestion() {
+  if (stackPointer <= 0 || questionStack.length === 0) return;
+  stackPointer--;
+  const prevIndex = questionStack[stackPointer];
+  reviewMode = true;
+  currentIndex = prevIndex;
+  currentQuestion = questions[currentIndex];
   renderQuestion();
-  updateStatsBar();
-  loadHistory();
+  lockChoices();
+  showLastAnswerFeedback();
 }
 
-// ---------- Answering ----------
-
-async function submitAnswer() {
-  if (!currentQuestion) return;
-
-  const radios = document.querySelectorAll('input[name="choice"]');
-  let selectedIdx = null;
-  radios.forEach((r) => {
-    if (r.checked) selectedIdx = parseInt(r.value, 10);
+function lockChoices() {
+  const labels = document.querySelectorAll(".choice");
+  labels.forEach((el) => {
+    el.style.pointerEvents = "none";
+    el.style.opacity = "0.7";
   });
-  if (selectedIdx === null) {
-    alert("اختر إجابة أولاً.");
-    return;
-  }
-  lastSelectedIndex = selectedIdx;
-
-  const correctIdx = (currentQuestion.choices || []).findIndex((c) => c.isCorrect);
-  const isCorrect = selectedIdx === correctIdx;
-  lastResult = isCorrect;
-
-  const now = new Date().toISOString();
-
-  const tx = db.transaction(["questions", "answers"], "readwrite");
-  const qStore = tx.objectStore("questions");
-  const aStore = tx.objectStore("answers");
-
-  const q = Object.assign({}, currentQuestion);
-  q.timesSeen = (q.timesSeen || 0) + 1;
-  q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
-  q.timesWrong = (q.timesWrong || 0) + (!isCorrect ? 1 : 0);
-  q.lastSeenAt = now;
-  qStore.put(q);
-
-  aStore.add({
-    questionId: q.id,
-    answeredAt: now,
-    selectedIndex: selectedIdx,
-    isCorrect
-  });
-
-  tx.oncomplete = () => {
-    currentQuestion = q;
-    showFeedback(correctIdx, selectedIdx, q);
-    updateStatsBar();
-    loadHistory();
-    scheduleAutoSync();
-  };
 }
 
-function showFeedback(correctIdx, selectedIdx, q) {
-  const letters = "ABCDEFG".split("");
-  const choices = currentChoices || [];
-
-  document.querySelectorAll(".choice").forEach((el, idx) => {
+function showLastAnswerFeedback() {
+  const q = currentQuestion;
+  const letters = ["A", "B", "C", "D", "E", "F"];
+  const labels = document.querySelectorAll(".choice");
+  labels.forEach((el, idx) => {
     el.classList.remove("correct", "wrong", "show");
-    if (idx === correctIdx) el.classList.add("correct", "show");
-    if (idx === selectedIdx && idx !== correctIdx) el.classList.add("wrong", "show");
+    if (idx === q.correctIndex) el.classList.add("correct", "show");
+    if (
+      q.lastSelectedIndex != null &&
+      q.lastSelectedIndex === idx &&
+      idx !== q.correctIndex
+    ) {
+      el.classList.add("wrong", "show");
+    }
   });
 
-  let html = "";
-  html += `<div>`;
-  html += `<div style="margin-bottom:0.25rem; font-weight:600; ${
-    lastResult ? "color:#2e7d32" : "color:#c62828"
-  }">${lastResult ? "Correct ✅" : "Wrong ❌"}</div>`;
-  if (correctIdx >= 0 && choices[correctIdx]) {
-    html += `<div class="small muted">Correct answer: <strong>${letters[correctIdx]}.</strong> ${
-      choices[correctIdx].text
-    }</div>`;
-  }
-  if (q.explanation) {
-    html += `<div class="small muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${
-      q.explanation
-    }</div>`;
+  let html = `<div style="margin-top:0.3rem;">`;
+  if (q.lastSelectedIndex == null) {
+    html += `<div class="muted">Previously viewed. No answer recorded.</div>`;
+  } else {
+    const isCorrect = q.lastSelectedIndex === q.correctIndex;
+    html += `<div style="font-weight:600; color:${
+      isCorrect ? "#16a34a" : "#dc2626"
+    };">${isCorrect ? "Correct ✅" : "Wrong ❌"}</div>`;
+    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${
+      letters[q.correctIndex]
+    }.</strong> ${q.choices[q.correctIndex].text}</div>`;
+    if (q.explanation) {
+      html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${q.explanation}</div>`;
+    }
   }
   html += `</div>`;
   feedbackPanel.innerHTML = html;
 }
 
-async function toggleFlag() {
-  if (!currentQuestion) return;
-  const tx = db.transaction("questions", "readwrite");
-  const store = tx.objectStore("questions");
-  const q = Object.assign({}, currentQuestion);
-  q.flagged = !q.flagged;
-  store.put(q);
-  tx.oncomplete = () => {
-    currentQuestion = q;
-    renderQuestion();
-    loadHistory();
-    updateStatsBar();
-    scheduleAutoSync();
-  };
+function submitAnswer() {
+  if (!currentQuestion || reviewMode) return;
+  const radios = document.querySelectorAll('input[name="choice"]');
+  let selectedIdx = null;
+  radios.forEach((r) => {
+    if (r.checked) selectedIdx = parseInt(r.value);
+  });
+  if (selectedIdx == null) {
+    alert("اختر إجابة أولاً.");
+    return;
+  }
+
+  const q = currentQuestion;
+  const correctIdx = q.correctIndex;
+  const isCorrect = selectedIdx === correctIdx;
+  const now = new Date().toISOString();
+
+  q.timesSeen = (q.timesSeen || 0) + 1;
+  if (isCorrect) {
+    q.timesCorrect = (q.timesCorrect || 0) + 1;
+  } else {
+    q.timesWrong = (q.timesWrong || 0) + 1;
+  }
+  q.lastSeenAt = now;
+  q.lastAnsweredAt = now;
+  q.lastSelectedIndex = selectedIdx;
+
+  questions[currentIndex] = q;
+  saveToStorage();
+  renderStats();
+
+  const letters = ["A", "B", "C", "D", "E", "F"];
+  const labels = document.querySelectorAll(".choice");
+  labels.forEach((el, idx) => {
+    el.classList.remove("correct", "wrong", "show");
+    if (idx === correctIdx) el.classList.add("correct", "show");
+    if (idx === selectedIdx && idx !== correctIdx)
+      el.classList.add("wrong", "show");
+  });
+
+  let html = `<div style="margin-top:0.3rem;">`;
+  html += `<div style="font-weight:600; color:${
+    isCorrect ? "#16a34a" : "#dc2626"
+  };">${isCorrect ? "Correct ✅" : "Wrong ❌"}</div>`;
+  html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${
+    letters[correctIdx]
+  }.</strong> ${q.choices[correctIdx].text}</div>`;
+  if (q.explanation) {
+    html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${q.explanation}</div>`;
+  }
+  html += `</div>`;
+  feedbackPanel.innerHTML = html;
+
+  refreshSidePanels();
+  renderManageTable();
+  renderMaintTable();
 }
 
-async function deleteCurrentQuestion() {
+// ---------- Flag / Maint ----------
+function toggleFlag() {
   if (!currentQuestion) return;
-  if (!confirm("هل أنت متأكد من حذف هذا السؤال بالكامل؟")) return;
-  const id = currentQuestion.id;
-  const tx = db.transaction("questions", "readwrite");
-  tx.objectStore("questions").delete(id);
-  tx.oncomplete = () => {
+  currentQuestion.flagged = !currentQuestion.flagged;
+  questions[currentIndex] = currentQuestion;
+  saveToStorage();
+  renderStats();
+  renderQuestion();
+  refreshSidePanels();
+  renderManageTable();
+}
+
+function toggleMaint() {
+  if (!currentQuestion) return;
+  currentQuestion.maintenance = !currentQuestion.maintenance;
+  questions[currentIndex] = currentQuestion;
+  saveToStorage();
+  renderStats();
+  renderQuestion();
+  refreshSidePanels();
+  renderManageTable();
+  renderMaintTable();
+}
+
+// ---------- Side panels ----------
+function refreshSidePanels() {
+  const sortedByTime = [...questions].filter((q) => q.lastSeenAt).sort(
+    (a, b) => (b.lastSeenAt || "").localeCompare(a.lastSeenAt || "")
+  );
+
+  const lastWrong = sortedByTime.filter((q) => q.timesWrong > 0).slice(0, 5);
+  const lastFlag = sortedByTime.filter((q) => q.flagged).slice(0, 5);
+  const lastMaint = sortedByTime.filter((q) => q.maintenance).slice(0, 5);
+
+  renderMiniList(lastWrongListEl, lastWrong);
+  renderMiniList(lastFlagListEl, lastFlag);
+  renderMiniList(lastMaintListEl, lastMaint);
+}
+
+function renderMiniList(container, list) {
+  if (!list.length) {
+    container.innerHTML = '<div class="muted">Empty.</div>';
+    return;
+  }
+  container.innerHTML = list
+    .map(
+      (q) => `
+    <div class="mini-item" data-qid="${q.id}">
+      ${(q.text || "").slice(0, 60)}${q.text.length > 60 ? "…" : ""}
+      <span class="tag">${q.chapter || ""}</span>
+    </div>
+  `
+    )
+    .join("");
+
+  container.querySelectorAll(".mini-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const qid = parseInt(el.getAttribute("data-qid"));
+      const idx = questions.findIndex((q) => q.id === qid);
+      if (idx >= 0) {
+        gotoQuestion(idx, true);
+      }
+    });
+  });
+}
+
+// ---------- Manage tab ----------
+function getManageFiltered() {
+  const textFilter = document
+    .getElementById("filterText")
+    .value.toLowerCase()
+    .trim();
+  const chapterFilter = document
+    .getElementById("filterChapter")
+    .value.toLowerCase()
+    .trim();
+  const flagFilter = document.getElementById("filterFlag").value;
+  const maintFilter = document.getElementById("filterMaint").value;
+  const sortBy = document.getElementById("sortBy").value;
+
+  let arr = [...questions];
+
+  if (textFilter) {
+    arr = arr.filter((q) =>
+      (q.text || "").toLowerCase().includes(textFilter)
+    );
+  }
+  if (chapterFilter) {
+    arr = arr.filter((q) =>
+      (q.chapter || "").toLowerCase().includes(chapterFilter)
+    );
+  }
+  if (flagFilter === "only") {
+    arr = arr.filter((q) => q.flagged);
+  } else if (flagFilter === "none") {
+    arr = arr.filter((q) => !q.flagged);
+  }
+  if (maintFilter === "only") {
+    arr = arr.filter((q) => q.maintenance);
+  } else if (maintFilter === "none") {
+    arr = arr.filter((q) => !q.maintenance);
+  }
+
+  arr.sort((a, b) => {
+    if (sortBy === "addedDesc") {
+      return (b.addedAt || "").localeCompare(a.addedAt || "");
+    }
+    if (sortBy === "addedAsc") {
+      return (a.addedAt || "").localeCompare(b.addedAt || "");
+    }
+    if (sortBy === "chapterAsc") {
+      return (a.chapter || "").localeCompare(b.chapter || "");
+    }
+    if (sortBy === "chapterDesc") {
+      return (b.chapter || "").localeCompare(a.chapter || "");
+    }
+    if (sortBy === "wrongDesc") {
+      return (b.timesWrong || 0) - (a.timesWrong || 0);
+    }
+    return 0;
+  });
+
+  return arr;
+}
+
+function renderManageTable() {
+  const arr = getManageFiltered();
+  if (!arr.length) {
+    manageTableBody.innerHTML =
+      '<tr><td colspan="9" class="muted">No questions.</td></tr>';
+    return;
+  }
+
+  manageTableBody.innerHTML = arr
+    .map(
+      (q) => `
+    <tr data-id="${q.id}">
+      <td><input type="checkbox" class="m-select" /></td>
+      <td>${q.id}</td>
+      <td>${(q.text || "").slice(0, 80)}${
+        q.text.length > 80 ? "…" : ""
+      }</td>
+      <td>${q.chapter || ""}</td>
+      <td>${(q.addedAt || "").slice(0, 10)}</td>
+      <td>${q.timesWrong || 0}</td>
+      <td>${q.flagged ? "✓" : ""}</td>
+      <td>${q.maintenance ? "✓" : ""}</td>
+      <td><button class="ghost btn-open">Open</button></td>
+    </tr>
+  `
+    )
+    .join("");
+
+  manageTableBody.querySelectorAll(".btn-open").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tr = btn.closest("tr");
+      const id = parseInt(tr.getAttribute("data-id"));
+      const idx = questions.findIndex((q) => q.id === id);
+      if (idx >= 0) {
+        gotoQuestion(idx, true);
+        // switch to Practice tab
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelector('[data-tab="tab-practice"]')
+          .classList.add("active");
+        document.getElementById("tab-practice").classList.add("active");
+      }
+    });
+  });
+}
+
+function setManageSelection(val) {
+  manageTableBody
+    .querySelectorAll(".m-select")
+    .forEach((c) => (c.checked = val));
+}
+
+function deleteSelectedQuestions() {
+  const rows = manageTableBody.querySelectorAll("tr[data-id]");
+  const selectedIds = [];
+  rows.forEach((tr) => {
+    const ck = tr.querySelector(".m-select");
+    if (ck && ck.checked) selectedIds.push(parseInt(tr.getAttribute("data-id")));
+  });
+  if (!selectedIds.length) {
+    alert("No questions selected.");
+    return;
+  }
+  if (!confirm("Delete selected questions?")) return;
+
+  questions = questions.filter((q) => !selectedIds.includes(q.id));
+  saveToStorage();
+  renderStats();
+  renderManageTable();
+  renderMaintTable();
+  refreshSidePanels();
+  if (questions.length === 0) {
     currentQuestion = null;
+    currentIndex = -1;
     renderQuestion();
-    updateStatsBar();
-    loadHistory();
-    scheduleAutoSync();
-  };
+  } else {
+    gotoQuestion(0, false);
+  }
 }
 
-// ---------- Import / Export JSON ----------
+// ---------- Maintenance tab ----------
+function getMaintQuestions() {
+  return questions.filter((q) => q.maintenance);
+}
 
-function handleImport() {
+function renderMaintTable() {
+  const arr = getMaintQuestions();
+  if (!arr.length) {
+    maintTableBody.innerHTML =
+      '<tr><td colspan="7" class="muted">No maintenance questions.</td></tr>';
+    return;
+  }
+
+  maintTableBody.innerHTML = arr
+    .map(
+      (q) => `
+    <tr data-id="${q.id}">
+      <td><input type="checkbox" class="mt-select" /></td>
+      <td>${q.id}</td>
+      <td>${(q.text || "").slice(0, 80)}${
+        q.text.length > 80 ? "…" : ""
+      }</td>
+      <td>${q.chapter || ""}</td>
+      <td>${q.timesWrong || 0}</td>
+      <td>${q.flagged ? "✓" : ""}</td>
+      <td><button class="ghost btn-open">Open</button></td>
+    </tr>
+  `
+    )
+    .join("");
+
+  maintTableBody.querySelectorAll(".btn-open").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tr = btn.closest("tr");
+      const id = parseInt(tr.getAttribute("data-id"));
+      const idx = questions.findIndex((q) => q.id === id);
+      if (idx >= 0) {
+        gotoQuestion(idx, true);
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelector('[data-tab="tab-practice"]')
+          .classList.add("active");
+        document.getElementById("tab-practice").classList.add("active");
+      }
+    });
+  });
+}
+
+function setMaintSelection(val) {
+  maintTableBody
+    .querySelectorAll(".mt-select")
+    .forEach((c) => (c.checked = val));
+}
+
+function removeMaintFromSelected() {
+  const rows = maintTableBody.querySelectorAll("tr[data-id]");
+  const ids = [];
+  rows.forEach((tr) => {
+    const ck = tr.querySelector(".mt-select");
+    if (ck && ck.checked) ids.push(parseInt(tr.getAttribute("data-id")));
+  });
+  if (!ids.length) {
+    alert("No questions selected.");
+    return;
+  }
+  questions.forEach((q) => {
+    if (ids.includes(q.id)) q.maintenance = false;
+  });
+  saveToStorage();
+  renderStats();
+  renderMaintTable();
+  refreshSidePanels();
+  renderManageTable();
+}
+
+function deleteMaintSelected() {
+  const rows = maintTableBody.querySelectorAll("tr[data-id]");
+  const ids = [];
+  rows.forEach((tr) => {
+    const ck = tr.querySelector(".mt-select");
+    if (ck && ck.checked) ids.push(parseInt(tr.getAttribute("data-id")));
+  });
+  if (!ids.length) {
+    alert("No questions selected.");
+    return;
+  }
+  if (!confirm("Delete selected maintenance questions?")) return;
+  questions = questions.filter((q) => !ids.includes(q.id));
+  saveToStorage();
+  renderStats();
+  renderMaintTable();
+  renderManageTable();
+  refreshSidePanels();
+  if (questions.length === 0) {
+    currentQuestion = null;
+    currentIndex = -1;
+    renderQuestion();
+  } else {
+    gotoQuestion(0, false);
+  }
+}
+
+// ---------- Import / Export ----------
+function handleImportJSON() {
   const file = document.getElementById("fileInput").files[0];
   if (!file) {
-    alert("اختر ملف JSON أولاً.");
+    alert("اختر ملف JSON.");
     return;
   }
   const reader = new FileReader();
-  reader.onload = async (e) => {
+  reader.onload = (e) => {
     try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error("JSON should be an array of questions");
-
-      const tx = db.transaction("questions", "readwrite");
-      const store = tx.objectStore("questions");
-
-      data.forEach((q) => {
-        const obj = {
-          text: q.text,
-          chapter: q.chapter || "",
-          source: q.source || "",
-          explanation: q.explanation || "",
-          choices: q.choices || [],
-          tags: q.tags || [],
-          timesSeen: q.timesSeen || 0,
-          timesCorrect: q.timesCorrect || 0,
-          timesWrong: q.timesWrong || 0,
-          lastSeenAt: q.lastSeenAt || null,
-          flagged: !!q.flagged,
-          active: q.active !== false
-        };
-        if (q.id) obj.id = q.id;
-        store.put(obj);
+      const arr = JSON.parse(e.target.result);
+      if (!Array.isArray(arr)) throw new Error("JSON must be an array");
+      const now = new Date().toISOString();
+      let maxId = questions.reduce((m, q) => Math.max(m, q.id || 0), 0);
+      const newQs = arr.map((raw) => {
+        maxId += 1;
+        const base = normalizeQuestion(raw, maxId);
+        base.id = maxId;
+        base.addedAt = base.addedAt || now;
+        return base;
       });
-
-      tx.oncomplete = () => {
-        alert(`Imported ${data.length} questions.`);
-        loadNextQuestion();
-        scheduleAutoSync();
-      };
+      questions = questions.concat(newQs);
+      saveToStorage();
+      renderStats();
+      if (!currentQuestion && questions.length > 0) gotoQuestion(0, false);
+      renderManageTable();
+      renderMaintTable();
+      refreshSidePanels();
+      alert("Imported " + newQs.length + " questions.");
     } catch (err) {
-      alert("Error reading JSON: " + err.message);
+      alert("Import error: " + err.message);
     }
   };
   reader.readAsText(file);
 }
 
-async function handleExport() {
-  const all = await getAllQuestions();
-  const data = all.map((q) => ({
+function handleExportJSON() {
+  const data = questions.map((q) => ({
     id: q.id,
-    text: q.text,
     chapter: q.chapter,
+    text: q.text,
     source: q.source,
     explanation: q.explanation,
     choices: q.choices,
-    tags: q.tags || [],
-    flagged: !!q.flagged,
-    active: q.active !== false,
-    timesSeen: q.timesSeen || 0,
-    timesCorrect: q.timesCorrect || 0,
-    timesWrong: q.timesWrong || 0,
-    lastSeenAt: q.lastSeenAt || null
+    flagged: q.flagged,
+    maintenance: q.maintenance,
+    addedAt: q.addedAt,
   }));
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "mcq_backup.json";
   a.click();
 }
 
-// ---------- GitHub sync (manual + auto) ----------
-
-async function collectBackupPayload() {
-  const questions = await getAllQuestions();
-
-  const tx = db.transaction("answers", "readonly");
-  const aStore = tx.objectStore("answers");
-  const answers = await new Promise((resolve) => {
-    const r = aStore.getAll();
-    r.onsuccess = (e) => resolve(e.target.result || []);
-    r.onerror = () => resolve([]);
-  });
-
-  return { version: 3, exportedAt: new Date().toISOString(), questions, answers };
-}
-
-async function uploadBackupToGitHub(silent = false) {
-  const settings = getSettingsFromUI();
-  if (!settings.githubToken || !settings.githubRepo) {
-    if (!silent) alert("Token و Repository مطلوبان.");
-    return;
-  }
-  const [owner, repo] = settings.githubRepo.split("/");
-  const path = "backup.json";
-
-  const payload = await collectBackupPayload();
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
-
-  const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-  const headers = {
-    Authorization: `Bearer ${settings.githubToken}`,
-    "Content-Type": "application/json"
-  };
-
-  let sha = null;
+// ---------- Settings + GitHub ----------
+function loadSettings() {
   try {
-    const resGet = await fetch(baseUrl, { headers });
-    if (resGet.ok) {
-      const cur = await resGet.json();
-      sha = cur.sha;
-    }
-  } catch (_) {}
-
-  const body = {
-    message: "MCQ backup update",
-    content,
-    sha
-  };
-
-  const resPut = await fetch(baseUrl, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify(body)
-  });
-
-  if (!resPut.ok) {
-    if (!silent) alert("GitHub upload failed. Check token / repo / permissions.");
-    return;
+    const raw = localStorage.getItem("mcq_github_cfg");
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    ghToken = cfg.token || "";
+    ghRepo = cfg.repo || "";
+    document.getElementById("ghToken").value = ghToken;
+    document.getElementById("ghRepo").value = ghRepo;
+  } catch (e) {
+    console.error(e);
   }
-
-  lastSyncInfo.textContent = `Last upload: ${new Date().toLocaleString()}`;
-  if (!silent) alert("Backup uploaded to GitHub.");
 }
 
-async function downloadBackupFromGitHub() {
-  const settings = getSettingsFromUI();
-  if (!settings.githubToken || !settings.githubRepo) {
-    alert("Token و Repository مطلوبان.");
-    return;
-  }
-  const [owner, repo] = settings.githubRepo.split("/");
-  const path = "backup.json";
-  const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-  const headers = {
-    Authorization: `Bearer ${settings.githubToken}`,
-    "Content-Type": "application/json"
-  };
-
-  const res = await fetch(baseUrl, { headers });
-  if (!res.ok) {
-    alert("Download failed. تأكد أن الملف backup.json موجود في الريبو.");
-    return;
-  }
-  const data = await res.json();
-  const decoded = decodeURIComponent(escape(atob(data.content)));
-  const payload = JSON.parse(decoded);
-
-  const tx1 = db.transaction(["questions", "answers"], "readwrite");
-  tx1.objectStore("questions").clear();
-  tx1.objectStore("answers").clear();
-  await new Promise((res2) => {
-    tx1.oncomplete = res2;
-  });
-
-  const tx2 = db.transaction(["questions", "answers"], "readwrite");
-  const qStore = tx2.objectStore("questions");
-  (payload.questions || []).forEach((q) => qStore.put(q));
-  const aStore = tx2.objectStore("answers");
-  (payload.answers || []).forEach((a) => aStore.put(a));
-
-  await new Promise((res3) => {
-    tx2.oncomplete = res3;
-  });
-
-  lastSyncInfo.textContent = `Last download: ${new Date().toLocaleString()}`;
-  alert("Backup downloaded and applied.");
-  loadNextQuestion();
-}
-
-// ---------- Performance chart ----------
-
-function updatePerformanceChart(answers) {
-  const ctx = document.getElementById("perfChart").getContext("2d");
-  if (!answers || !answers.length) {
-    if (perfChart) {
-      perfChart.destroy();
-      perfChart = null;
-    }
-    return;
-  }
-
-  const byDay = {};
-  answers.forEach((a) => {
-    if (!a.answeredAt) return;
-    const d = a.answeredAt.slice(0, 10);
-    if (!byDay[d]) byDay[d] = { total: 0, correct: 0 };
-    byDay[d].total += 1;
-    if (a.isCorrect) byDay[d].correct += 1;
-  });
-
-  const days = Object.keys(byDay).sort();
-  const ratios = days.map((d) =>
-    byDay[d].total ? Math.round((byDay[d].correct / byDay[d].total) * 100) : 0
+function saveSettings() {
+  ghToken = document.getElementById("ghToken").value.trim();
+  ghRepo = document.getElementById("ghRepo").value.trim();
+  localStorage.setItem(
+    "mcq_github_cfg",
+    JSON.stringify({ token: ghToken, repo: ghRepo })
   );
-
-  if (perfChart) perfChart.destroy();
-  perfChart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: days,
-      datasets: [
-        {
-          label: "% correct per day",
-          data: ratios,
-          tension: 0.25
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: {
-          min: 0,
-          max: 100,
-          ticks: { stepSize: 20 }
-        }
-      }
-    }
-  });
+  setSyncStatus("Settings saved locally.");
 }
 
-// ---------- PDF → MCQ generator (Mode C) ----------
-
-async function extractPdfText() {
-  const file = document.getElementById("pdfInput").files[0];
-  const log = document.getElementById("pdfLog");
-  if (!file) {
-    alert("اختر ملف PDF أولاً.");
-    return;
-  }
-  if (!window["pdfjsLib"]) {
-    alert("pdf.js library not loaded.");
-    return;
-  }
-
-  log.value = "Reading PDF...\n";
-  pdfExtractedText = "";
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const strings = content.items.map((it) => it.str);
-    const text = strings.join(" ");
-    pdfExtractedText += text + "\n";
-    if (pageNum % 3 === 0 || pageNum === pdf.numPages) {
-      log.value += `Page ${pageNum}/${pdf.numPages} processed.\n`;
-    }
-  }
-
-  const preview = pdfExtractedText.slice(0, 1500);
-  log.value += "\n=== Preview (first ~1500 chars) ===\n" + preview;
+function setSyncStatus(msg) {
+  const el = document.getElementById("syncStatus");
+  if (el) el.textContent = msg || "";
 }
 
-function pickKeyWord(words) {
-  const stop = new Set([
-    "the","and","for","with","that","from","this","these","those","which",
-    "were","been","their","there","when","where","into","without","within",
-    "such","than","then","over","under","between","because","while","although"
-  ]);
-  let best = null;
-  words.forEach((w) => {
-    const clean = w.replace(/[^A-Za-z0-9%]/g, "");
-    if (!clean || clean.length < 3) return;
-    if (stop.has(clean.toLowerCase())) return;
-    if (!best || clean.length > best.length) best = clean;
-  });
-  return best;
-}
-
-function buildDistractors(correct, poolWords) {
-  const uniq = Array.from(
-    new Set(
-      poolWords
-        .map((w) => w.replace(/[^A-Za-z0-9%]/g, ""))
-        .filter((w) => w && w.toLowerCase() !== correct.toLowerCase())
-    )
-  );
-  const shuffled = uniq.sort(() => Math.random() - 0.5);
-  const distractors = shuffled.slice(0, 3);
-  while (distractors.length < 3) {
-    distractors.push("None of the above");
-  }
-  return distractors;
-}
-
-async function generateQuestionsFromPdf() {
-  const log = document.getElementById("pdfLog");
-  if (!pdfExtractedText) {
-    alert("إعمل Extract text أولاً.");
+async function uploadGitHub() {
+  if (!ghToken || !ghRepo) {
+    alert("Set GitHub token and repo first.");
     return;
   }
-  const chapterLabel = document.getElementById("pdfChapter").value.trim() || "PDF Chapter";
-  const tagsRaw = document.getElementById("pdfTags").value.trim();
-  const tagList = tagsRaw ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
-  const count = parseInt(document.getElementById("pdfQuestionCount").value, 10) || 15;
-  const preferHighYield = document.getElementById("pdfPreferHighYield").checked;
+  try {
+    setSyncStatus("Uploading to GitHub...");
+    const [owner, repo] = ghRepo.split("/");
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/backup.json`;
 
-  log.value += "\n\nGenerating MCQs...\n";
-
-  let sentences = pdfExtractedText
-    .replace(/\s+/g, " ")
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 25 && s.length < 260);
-
-  if (!sentences.length) {
-    alert("لم أستطع استخراج جمل مناسبة من الـ PDF.");
-    return;
-  }
-
-  if (preferHighYield) {
-    const high = sentences.filter((s) =>
-      /(vs\.?| versus |increase|decrease|higher|lower|mortality|incidence|pressure|volume|ml\/kg|mmhg|%)/i.test(
-        s
-      )
+    const contentStr = JSON.stringify(
+      questions.map((q) => ({
+        id: q.id,
+        chapter: q.chapter,
+        text: q.text,
+        source: q.source,
+        explanation: q.explanation,
+        choices: q.choices,
+        flagged: q.flagged,
+        maintenance: q.maintenance,
+        addedAt: q.addedAt,
+        timesSeen: q.timesSeen,
+        timesCorrect: q.timesCorrect,
+        timesWrong: q.timesWrong,
+        lastSeenAt: q.lastSeenAt,
+        lastAnsweredAt: q.lastAnsweredAt,
+      })),
+      null,
+      2
     );
-    if (high.length >= 5) sentences = high;
-  }
+    const contentBase64 = btoa(unescape(encodeURIComponent(contentStr)));
 
-  const poolWords = pdfExtractedText.split(/\s+/);
-
-  const questions = [];
-  sentences.sort(() => Math.random() - 0.5);
-
-  for (let i = 0; i < sentences.length && questions.length < count; i++) {
-    const s = sentences[i];
-    const words = s.split(/\s+/);
-    const key = pickKeyWord(words);
-    if (!key) continue;
-
-    const stem = s.replace(key, "_____");
-    const correct = key;
-    const distractors = buildDistractors(correct, poolWords);
-
-    const explanation =
-      `Correct: "${correct}" fits the context of this statement. ` +
-      `Other options either refer to different values/conditions or contradict the core concept in this sentence.`;
-
-    const choices = [
-      { text: correct, isCorrect: true },
-      ...distractors.map((d) => ({ text: d, isCorrect: false }))
-    ].sort(() => Math.random() - 0.5);
-
-    questions.push({
-      text: `In the context of the chapter, which word best completes: "${stem}"?`,
-      chapter: chapterLabel,
-      source: "PDF auto-generated",
-      explanation,
-      choices,
-      tags: tagList.slice(),
-      timesSeen: 0,
-      timesCorrect: 0,
-      timesWrong: 0,
-      lastSeenAt: null,
-      flagged: false,
-      active: true
+    // check existing
+    let sha = null;
+    const getResp = await fetch(apiUrl, {
+      headers: { Authorization: `Bearer ${ghToken}` },
     });
-  }
+    if (getResp.ok) {
+      const j = await getResp.json();
+      sha = j.sha;
+    }
 
-  if (!questions.length) {
-    alert("لم يتم توليد أي سؤال، جرّب تقليل عدد الأسئلة أو اختيار PDF آخر.");
+    const body = {
+      message: "MCQ backup from app",
+      content: contentBase64,
+    };
+    if (sha) body.sha = sha;
+
+    const putResp = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${ghToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!putResp.ok) {
+      const txt = await putResp.text();
+      throw new Error("GitHub error: " + txt);
+    }
+    setSyncStatus("Upload OK.");
+  } catch (err) {
+    console.error(err);
+    setSyncStatus("Upload failed: " + err.message);
+  }
+}
+
+async function downloadGitHub() {
+  if (!ghToken || !ghRepo) {
+    alert("Set GitHub token and repo first.");
     return;
   }
+  try {
+    setSyncStatus("Downloading from GitHub...");
+    const [owner, repo] = ghRepo.split("/");
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/backup.json`;
 
-  const tx = db.transaction("questions", "readwrite");
-  const store = tx.objectStore("questions");
-  questions.forEach((q) => store.add(q));
-  tx.oncomplete = () => {
-    log.value += `Generated and stored ${questions.length} MCQs.\n`;
-    alert(`Generated ${questions.length} questions from PDF.`);
-    loadNextQuestion();
-    scheduleAutoSync();
-  };
-}
+    const resp = await fetch(apiUrl, {
+      headers: { Authorization: `Bearer ${ghToken}` },
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error("GitHub error: " + txt);
+    }
+    const data = await resp.json();
+    const decoded = decodeURIComponent(escape(atob(data.content)));
+    const arr = JSON.parse(decoded);
+    if (!Array.isArray(arr)) throw new Error("backup.json not array");
 
-// ---------- Misc ----------
-
-function updateOfflineChip() {
-  if (navigator.onLine) {
-    offlineStatus.textContent = "Online (cached)";
-  } else {
-    offlineStatus.textContent = "Offline";
+    questions = arr.map((q, idx) => normalizeQuestion(q, idx));
+    saveToStorage();
+    setSyncStatus("Download OK. Local DB updated.");
+    renderStats();
+    if (questions.length > 0) {
+      gotoQuestion(0, false);
+    } else {
+      currentQuestion = null;
+      currentIndex = -1;
+      renderQuestion();
+    }
+    refreshSidePanels();
+    renderManageTable();
+    renderMaintTable();
+  } catch (err) {
+    console.error(err);
+    setSyncStatus("Download failed: " + err.message);
   }
 }
-
-// ---------- Init ----------
-(async function init() {
-  updateOfflineChip();
-  loadSettings();
-  await openDB();
-  await loadNextQuestion();
-})();
