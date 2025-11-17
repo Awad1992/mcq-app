@@ -1,9 +1,9 @@
 {
-  "name": "MCQ Study App",
-  "short_name": "MCQ",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#111111",
-  "icons": []
+"name": "MCQ App Pro",
+"short_name": "MCQPro",
+"start_url": ".",
+"display": "standalone",
+"background_color": "#ffffff",
+"theme_color": "#000000",
+"icons": []
 }
