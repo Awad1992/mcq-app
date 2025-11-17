@@ -1,932 +1,280 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>MCQ Study App v3.4</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root {
-      --bg: #fafafa;
-      --card: #ffffff;
-      --border: #dddddd;
-      --accent: #1976d2;
-      --accent-soft: #e3f2fd;
-      --danger: #d32f2f;
-      --muted: #666666;
-      --radius: 8px;
-      --shadow: 0 1px 4px rgba(0,0,0,0.08);
-      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: var(--font);
-      background: var(--bg);
-      color: #111;
-    }
-    header {
-      padding: 12px 16px;
-      background: #ffffff;
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-    .pill-row {
-      margin-top: 8px;
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      font-size: 11px;
-    }
-    .pill {
-      padding: 3px 7px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
-    }
-    .pill.green { border-color:#2e7d32; color:#2e7d32; }
-    .pill.red { border-color:#c62828; color:#c62828; }
-    .pill.blue { border-color:#1565c0; color:#1565c0; }
-    main {
-      max-width: 960px;
-      margin: 12px auto 40px;
-      padding: 0 10px;
-    }
-    .tabs {
-      display: flex;
-      gap: 4px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 10px;
-      overflow-x: auto;
-    }
-    .tab-btn {
-      padding: 8px 10px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      font-size: 13px;
-      border-bottom: 2px solid transparent;
-      white-space: nowrap;
-    }
-    .tab-btn.active {
-      border-color: var(--accent);
-      color: var(--accent);
-      font-weight: 600;
-      background: var(--accent-soft);
-    }
-    .stats-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      font-size: 12px;
-      margin-bottom: 10px;
-    }
-    .stats-row span {
-      background: #fff;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      padding: 4px 9px;
-    }
-    .card {
-      background: var(--card);
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      padding: 10px 12px;
-      margin-bottom: 12px;
-    }
-    .card h2, .card h3 {
-      margin-top: 0;
-      font-size: 15px;
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    label {
-      font-size: 12px;
-    }
-    select, input[type="text"], input[type="number"], textarea {
-      padding: 5px 7px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      font-size: 13px;
-      min-width: 0;
-    }
-    textarea { width: 100%; min-height: 80px; resize: vertical; }
-    button {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #f5f5f5;
-      padding: 6px 10px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    button.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-    button.danger {
-      background: var(--danger);
-      color:#fff;
-      border-color: var(--danger);
-    }
-    button[disabled] { opacity:0.6; cursor: default; }
-    .question-text {
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .choices { list-style:none; padding:0; margin:0 0 8px; }
-    .choices li {
-      margin-bottom: 4px;
-    }
-    .choices label {
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .badge {
-      display:inline-block;
-      border-radius:999px;
-      padding:2px 7px;
-      font-size:11px;
-      border:1px solid var(--border);
-      background:#fff;
-      margin-left:4px;
-    }
-    .badge.flag { border-color:#f57c00; color:#e65100; }
-    .badge.maint { border-color:#7b1fa2; color:#6a1b9a; }
-    .small { font-size:11px; color:var(--muted); }
-    .mt8 { margin-top:8px; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th, td {
-      border-bottom: 1px solid #eee;
-      padding: 4px 6px;
-      text-align: left;
-    }
-    tr:hover td { background:#fafafa; }
-    .nowrap { white-space:nowrap; }
-    .chips { display:flex; flex-wrap:wrap; gap:6px; font-size:11px; }
-    .chip {
-      padding:2px 6px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background:#fff;
-    }
-    @media (max-width: 640px) {
-      .row { flex-direction: column; align-items:flex-start; }
-      .stats-row { flex-direction: column; }
-    }
-  </style>
+  <meta charset="utf-8">
+  <title>MCQ Study App Pro 3.4</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json?v=3.4.0">
+  <link rel="stylesheet" href="style.css?v=3.4.0">
 </head>
 <body>
-  <header>
-    <h1>MCQ Study App</h1>
-    <div class="pill-row">
-      <span class="pill">Offline</span>
-      <span class="pill green">Tracks wrong</span>
-      <span class="pill red">Flags</span>
-      <span class="pill blue" id="cloud-pill">Cloud: idle</span>
+<div class="app">
+  <header class="top-bar">
+    <div>
+      <h1>MCQ Study App Pro <span class="ver">v3.4</span></h1>
+      <div class="subtitle">Local bank + history + flags + maintenance + GitHub sync</div>
+    </div>
+    <div class="chips">
+      <span class="chip">Offline</span>
+      <span class="chip chip-ok">Tracks wrong</span>
+      <span class="chip chip-flag">Flags</span>
+      <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
     </div>
   </header>
-  <main>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="home">Home</button>
-      <button class="tab-btn" data-tab="all">All Questions</button>
-      <button class="tab-btn" data-tab="maint">Maintenance</button>
-      <button class="tab-btn" data-tab="backup">Backup &amp; Cloud</button>
-    </div>
 
-    <div class="stats-row" id="statsRow"></div>
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="home">Home</button>
+    <button class="tab-button" data-tab="all">All Questions</button>
+    <button class="tab-button" data-tab="maintenance">Maintenance</button>
+    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
+    <button class="tab-button" data-tab="settings">Settings</button>
+  </nav>
+
+  <main class="tab-container">
 
     <!-- HOME TAB -->
-    <section id="tab-home" class="tab card">
-      <div class="row">
-        <div>
-          <label>Practice mode</label><br>
-          <select id="practiceMode">
-            <option value="all">All active questions</option>
-            <option value="new">New (never answered)</option>
-            <option value="wrong">Questions answered wrong ≥1</option>
-            <option value="flagged">Flagged questions</option>
-          </select>
-        </div>
-        <div>
-          <label>Quick filters</label><br>
-          <button type="button" id="btnLastWrong">Last wrong</button>
-          <button type="button" id="btnLastFlagged">Flagged</button>
-        </div>
+    <section class="tab-content active" id="tab-home">
+      <div class="card">
+        <div class="stats-row" id="statsBar"></div>
       </div>
 
-      <div id="homeQuestionArea">
-        <div class="question-text" id="qText">No questions yet. Import JSON to start.</div>
-        <ul class="choices" id="qChoices"></ul>
-        <div class="small" id="qMeta"></div>
-        <div class="mt8">
-          <button class="primary" id="btnSubmit">Submit</button>
-          <button id="btnPrev">Previous</button>
-          <button id="btnNext">Next</button>
-          <button id="btnFlag">Flag</button>
-          <button id="btnMaint">Maintenance</button>
+      <div class="card">
+        <div class="row">
+          <div class="col-main">
+            <div class="row-controls">
+              <div>
+                <label class="small-label">Practice mode</label><br>
+                <select id="modeSelect">
+                  <option value="all">All active questions</option>
+                  <option value="new">New (never answered)</option>
+                  <option value="wrong">Previously wrong</option>
+                  <option value="flagged">Flagged</option>
+                  <option value="chapter">By chapter</option>
+                </select>
+                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
+              </div>
+              <div>
+                <label class="small-label">Quick filters</label><br>
+                <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
+                <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
+              </div>
+            </div>
+
+            <div id="questionPanel" class="question-panel"></div>
+            <div id="feedbackPanel" class="feedback-panel"></div>
+
+            <div class="btn-row-main">
+              <button class="primary" id="btnSubmit">Submit</button>
+              <button id="btnPrev">Previous</button>
+              <button id="btnNext">Next</button>
+              <button class="ghost" id="btnFlag">Flag</button>
+              <button class="ghost" id="btnMaint">Maintenance</button>
+            </div>
+          </div>
+
+          <div class="col-side">
+            <div class="side-block">
+              <div class="small-label">Import / Export (local file)</div>
+              <input type="file" id="fileInput" accept=".json">
+              <div class="btn-row-tight">
+                <button id="btnImport">Import</button>
+                <button id="btnExport">Export</button>
+              </div>
+              <div class="muted tiny">
+                JSON file with questions, choices, correct answer, explanation, chapter.
+              </div>
+            </div>
+
+            <div class="card side-card">
+              <div class="small-label">Recent history</div>
+              <div class="history-list" id="historyList"></div>
+            </div>
+          </div>
         </div>
-        <div class="mt8 small" id="qExplanation"></div>
       </div>
     </section>
 
     <!-- ALL QUESTIONS TAB -->
-    <section id="tab-all" class="tab card" style="display:none">
-      <h2>All Questions</h2>
-      <div class="row">
-        <div>
-          <label>Search text</label><br>
-          <input type="text" id="allSearchText" placeholder="In question / explanation / chapter">
+    <section class="tab-content" id="tab-all">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Search</label><br>
+            <input id="allSearch" placeholder="Text / chapter / source" style="min-width:220px;">
+          </div>
+          <div>
+            <label class="small-label">Filter</label><br>
+            <select id="allFilter">
+              <option value="all">All</option>
+              <option value="flagged">Flagged only</option>
+              <option value="wrong">Wrong ≥ 1</option>
+              <option value="maintenance">Maintenance only</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Sort</label><br>
+            <select id="allSort">
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="chapter">By chapter</option>
+              <option value="wrong_desc">Most wrong</option>
+            </select>
+          </div>
+          <div class="all-actions">
+            <button id="btnAllReload">Reload</button>
+            <button id="btnAllDelete" class="danger">Delete selected</button>
+          </div>
         </div>
-        <div>
-          <label>Chapter contains</label><br>
-          <input type="text" id="allChapterFilter" placeholder="Not case-sensitive">
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="allSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Flags</th>
+                <th>Seen</th>
+                <th>Wrong</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody id="allTableBody"></tbody>
+          </table>
         </div>
-        <div>
-          <label>Flags</label><br>
-          <select id="allFlagFilter">
-            <option value="any">Any</option>
-            <option value="flagged">Flagged only</option>
-            <option value="wrong">Wrong ≥1</option>
-          </select>
-        </div>
-      </div>
-      <div class="mt8 small" id="allSummary"></div>
-      <div class="mt8" style="max-height:360px; overflow:auto;">
-        <table id="allTable">
-          <thead>
-            <tr>
-              <th class="nowrap">#</th>
-              <th>Question</th>
-              <th>Chapter</th>
-              <th class="nowrap">Wrong</th>
-              <th class="nowrap">Flag</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
       </div>
     </section>
 
     <!-- MAINTENANCE TAB -->
-    <section id="tab-maint" class="tab card" style="display:none">
-      <h2>Maintenance &amp; Bulk actions</h2>
-      <div class="row">
-        <div>
-          <label>Chapter (exact match, case-insensitive)</label><br>
-          <input type="text" id="maintChapter" placeholder="e.g. Ch45 Burns">
+    <section class="tab-content" id="tab-maintenance">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Show</label><br>
+            <select id="maintFilter">
+              <option value="maintenance">Maintenance only</option>
+              <option value="flagged">Flagged + Maintenance</option>
+              <option value="all">All needing review</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Chapter filter</label><br>
+            <input id="maintChapterFilter" placeholder="Chapter (e.g. Ch45)">
+          </div>
+          <div class="all-actions">
+            <button id="btnMaintReload">Reload</button>
+            <button id="btnMaintDelete" class="danger">Delete selected</button>
+          </div>
         </div>
-        <div>
-          <label>Text contains</label><br>
-          <input type="text" id="maintSearch" placeholder="Substring in question">
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="maintSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Flags</th>
+                <th>Wrong</th>
+              </tr>
+            </thead>
+            <tbody id="maintTableBody"></tbody>
+          </table>
         </div>
-        <div>
-          <label>ID range</label><br>
-          <input type="number" id="maintIdFrom" placeholder="From" style="width:80px;">
-          <input type="number" id="maintIdTo" placeholder="To" style="width:80px;">
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>Special filters</label><br>
-          <select id="maintSpecial">
-            <option value="any">Any</option>
-            <option value="flagged">Flagged only</option>
-            <option value="wrong">Wrong ≥1</option>
-            <option value="maintenance">Marked for maintenance</option>
-          </select>
-        </div>
-        <div>
-          <label>Selection helpers</label><br>
-          <button type="button" id="btnMaintSelectAll">Select all (filtered)</button>
-          <button type="button" id="btnMaintClearSel">Clear selection</button>
-        </div>
-      </div>
-      <div class="mt8 small" id="maintSummary">0 questions, 0 selected.</div>
-      <div class="mt8" style="max-height:360px; overflow:auto;">
-        <table id="maintTable">
-          <thead>
-            <tr>
-              <th><input type="checkbox" id="maintSelectAllMaster"></th>
-              <th class="nowrap">ID</th>
-              <th>Question</th>
-              <th>Chapter</th>
-              <th class="nowrap">Flags</th>
-              <th class="nowrap">Review</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div class="mt8">
-        <button class="danger" id="btnDeleteSelected">Delete selected</button>
-        <span class="small">Click the checkbox only for selection. Use “Review” button to open a question without losing your selection.</span>
       </div>
     </section>
 
     <!-- BACKUP & CLOUD TAB -->
-    <section id="tab-backup" class="tab card" style="display:none">
-      <h2>Backup, Cloud &amp; URL import</h2>
-
-      <h3>Local import / export</h3>
-      <div class="row">
-        <div>
-          <label>JSON file (local)</label><br>
-          <input type="file" id="fileInput" accept=".json">
-        </div>
-        <div>
-          <button type="button" id="btnImport">Import</button>
-          <button type="button" id="btnExport">Export backup</button>
-        </div>
-      </div>
-
-      <h3>Import from URL</h3>
-      <div class="row">
-        <div style="flex:1 1 220px;">
-          <label>JSON URL</label><br>
-          <input type="text" id="urlInput" placeholder="https://raw.githubusercontent.com/.../burns.json" style="width:100%;">
-        </div>
-        <div>
-          <button type="button" id="btnImportUrl">Fetch &amp; Import</button>
+    <section class="tab-content" id="tab-backup">
+      <div class="card">
+        <h2>Local backup</h2>
+        <p class="muted tiny">
+          Export creates a JSON file with all questions + stats. Import can merge or restore from that file.
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnBackupExport" class="primary">Export full backup</button>
+            <input type="file" id="backupFileInput" accept=".json">
+            <button id="btnBackupImport">Import backup</button>
+          </div>
+          <div class="backup-status">
+            <div>Last activity: <span id="lastActivityLabel">–</span></div>
+            <div>Last local backup: <span id="lastBackupLabel">–</span></div>
+          </div>
         </div>
       </div>
-      <div class="small">Expected JSON: array of questions OR {"questions":[...]}. Existing data will be merged, not overwritten.</div>
 
-      <h3 class="mt8">GitHub token (optional, stays on this device)</h3>
-      <div class="row">
-        <div style="flex:1 1 220px;">
-          <label>Personal access token</label><br>
-          <input type="text" id="tokenInput" placeholder="ghp_xxx or github_pat_xxx" style="width:100%;">
-        </div>
-        <div>
-          <button type="button" id="btnSaveToken">Save token</button>
-          <button type="button" id="btnClearToken">Clear</button><br>
-          <button type="button" id="btnOpenTokenPage" style="margin-top:4px;">Open GitHub token page</button>
+      <div class="card">
+        <h2>Cloud sync (GitHub)</h2>
+        <p class="muted tiny">
+          Uses your GitHub token to save / load one JSON file in a private repo (e.g. <code>Awad1992/mcq-data</code>).
+          Token stays only on this device (localStorage).
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnCloudUpload">Upload → GitHub</button>
+            <button id="btnCloudDownload">Download ← GitHub</button>
+          </div>
+          <div class="muted tiny" id="cloudInfo"></div>
         </div>
       </div>
-      <div class="small">Token is stored in this browser (localStorage). It is only sent when you explicitly use cloud sync in a future version.</div>
     </section>
-  </main>
 
-  <script>
-    // ---------- Data & storage ----------
-    const STORAGE_KEY = 'mcq_study_app_v3_questions';
-    const SETTINGS_KEY = 'mcq_study_app_v3_settings';
-    const TOKEN_KEY    = 'mcq_study_app_v3_token';
-
-    /** @typedef {{id:number,question:string,choices:string[],correctIndex:number,explanation?:string,chapter?:string,tags?:string[],wrongCount?:number,flagged?:boolean,maintenance?:boolean,createdAt?:string}} MCQ */
-
-    /** @type {MCQ[]} */
-    let questions = [];
-    let currentIndex = 0;
-    let currentMode = 'all'; // practice mode
-
-    function loadFromStorage() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) questions = parsed;
-          else if (Array.isArray(parsed.questions)) questions = parsed.questions;
-        }
-      } catch (e) {
-        console.error('Failed to parse storage', e);
-      }
-      try {
-        const sraw = localStorage.getItem(SETTINGS_KEY);
-        if (sraw) {
-          const settings = JSON.parse(sraw);
-          if (settings.practiceMode) {
-            currentMode = settings.practiceMode;
-            document.getElementById('practiceMode').value = currentMode;
-          }
-        }
-      } catch {}
-
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (token) document.getElementById('tokenInput').value = token;
-    }
-
-    function saveToStorage() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ practiceMode: currentMode }));
-    }
-
-    function generateNewId() {
-      let maxId = 0;
-      for (const q of questions) if (typeof q.id === 'number' && q.id > maxId) maxId = q.id;
-      return maxId + 1;
-    }
-
-    // ---------- Normalization for imported questions ----------
-    function normalizeImportedArray(arr) {
-      const norm = [];
-      if (!Array.isArray(arr)) return norm;
-      for (const raw of arr) {
-        if (!raw) continue;
-        const q = {};
-        q.id = typeof raw.id === 'number' ? raw.id : generateNewId();
-        const text = raw.question || raw.q || raw.text;
-        if (!text) continue;
-        q.question = String(text);
-        q.chapter = raw.chapter || raw.chapterLabel || '';
-        const choices = raw.choices || raw.options || raw.answers;
-        if (!Array.isArray(choices) || choices.length < 2) continue;
-        q.choices = choices.map(String);
-        let ci = raw.correctIndex;
-        if (typeof ci !== 'number') {
-          if (typeof raw.correct === 'number') ci = raw.correct;
-          else if (typeof raw.correctAnswer === 'number') ci = raw.correctAnswer;
-          else if (typeof raw.correctLetter === 'string') {
-            const map = {A:0,B:1,C:2,D:3,E:4};
-            ci = map[raw.correctLetter.toUpperCase()] ?? 0;
-          } else ci = 0;
-        }
-        if (ci < 0 || ci >= q.choices.length) ci = 0;
-        q.correctIndex = ci;
-        if (raw.explanation) q.explanation = String(raw.explanation);
-        if (Array.isArray(raw.tags)) q.tags = raw.tags.map(String);
-        q.wrongCount = Number.isFinite(raw.wrongCount) ? raw.wrongCount : 0;
-        q.flagged = !!raw.flagged;
-        q.maintenance = !!raw.maintenance;
-        q.createdAt = raw.createdAt || new Date().toISOString();
-        norm.push(q);
-      }
-      return norm;
-    }
-
-    function mergeQuestions(newQs) {
-      const byKey = new Map();
-      for (const q of questions) {
-        const key = q.id ?? q.question;
-        byKey.set(String(key), q);
-      }
-      for (const q of newQs) {
-        const key = q.id ?? q.question;
-        const skey = String(key);
-        if (byKey.has(skey)) {
-          // merge: keep existing stats
-          const existing = byKey.get(skey);
-          const merged = Object.assign({}, q, {
-            wrongCount: existing.wrongCount ?? 0,
-            flagged: existing.flagged ?? false,
-            maintenance: existing.maintenance ?? false
-          });
-          byKey.set(skey, merged);
-        } else {
-          byKey.set(skey, q);
-        }
-      }
-      questions = Array.from(byKey.values()).sort((a,b)=>(a.id||0)-(b.id||0));
-      saveToStorage();
-      refreshAll();
-    }
-
-    // ---------- Stats ----------
-    function computeStats() {
-      const total = questions.length;
-      let answered = 0, wrong = 0, flagged = 0, maint = 0;
-      for (const q of questions) {
-        if (q.wrongCount && q.wrongCount > 0) { answered++; wrong++; }
-        if (q.flagged) flagged++;
-        if (q.maintenance) maint++;
-      }
-      return { total, answered, wrong, flagged, maint };
-    }
-
-    function renderStats() {
-      const s = computeStats();
-      const row = document.getElementById('statsRow');
-      row.innerHTML = [
-        `Total: ${s.total}`,
-        `Answered (wrong ≥1): ${s.answered}`,
-        `Wrong ≥1: ${s.wrong}`,
-        `Flagged: ${s.flagged}`,
-        `Maintenance: ${s.maint}`
-      ].map(t=>`<span>${t}</span>`).join('');
-    }
-
-    // ---------- Practice list helpers ----------
-    function getActiveList() {
-      if (!questions.length) return [];
-      switch (currentMode) {
-        case 'new':
-          return questions.filter(q => !q.wrongCount && !q.flagged);
-        case 'wrong':
-          return questions.filter(q => (q.wrongCount||0) > 0);
-        case 'flagged':
-          return questions.filter(q => q.flagged);
-        case 'all':
-        default:
-          return questions;
-      }
-    }
-
-    function clampIndex(idx, list) {
-      if (!list.length) return 0;
-      if (idx < 0) return list.length - 1;
-      if (idx >= list.length) return 0;
-      return idx;
-    }
-
-    function renderCurrentQuestion() {
-      const list = getActiveList();
-      const qText = document.getElementById('qText');
-      const qChoices = document.getElementById('qChoices');
-      const qMeta = document.getElementById('qMeta');
-      const qExpl = document.getElementById('qExplanation');
-      if (!list.length) {
-        qText.textContent = 'No questions for this mode. Import or change practice mode.';
-        qChoices.innerHTML = '';
-        qMeta.textContent = '';
-        qExpl.textContent = '';
-        return;
-      }
-      currentIndex = clampIndex(currentIndex, list);
-      const q = list[currentIndex];
-      qText.textContent = q.question;
-      qChoices.innerHTML = q.choices.map((ch, i) => `
-        <li>
+    <!-- SETTINGS TAB -->
+    <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h2>GitHub settings</h2>
+        <div class="settings-grid">
           <label>
-            <input type="radio" name="choice" value="${i}">
-            <strong>${String.fromCharCode(65+i)}.</strong> ${ch}
+            <span class="small-label">Personal access token</span>
+            <input type="password" id="ghTokenInput" placeholder="ghp_xxx..." autocomplete="off">
           </label>
-        </li>`).join('');
-      const idx = questions.findIndex(qq => qq.id === q.id);
-      const metaBits = [];
-      metaBits.push(`ID ${q.id ?? idx+1}`);
-      if (q.chapter) metaBits.push(q.chapter);
-      metaBits.push(`Wrong: ${q.wrongCount||0}`);
-      if (q.flagged) metaBits.push('⚑ flagged');
-      if (q.maintenance) metaBits.push('🛠 maintenance');
-      qMeta.textContent = metaBits.join(' • ');
-      qExpl.textContent = '';
-    }
+          <label>
+            <span class="small-label">Repo (owner/name)</span>
+            <input id="ghRepoInput" value="Awad1992/mcq-data">
+          </label>
+          <label>
+            <span class="small-label">Backup filename</span>
+            <input id="ghFileInput" value="mcq_backup.json">
+          </label>
+        </div>
+        <div class="btn-row-main">
+          <button id="btnSaveGitHub" class="primary">Save settings</button>
+          <button id="btnClearGitHub" class="ghost">Clear</button>
+          <a class="link-btn" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+            Open GitHub token page
+          </a>
+        </div>
+        <p class="muted tiny">
+          Token is stored only in this browser (localStorage). Changing token or repo does not affect your questions.
+        </p>
+      </div>
 
-    function submitAnswer() {
-      const list = getActiveList();
-      if (!list.length) return;
-      const q = list[currentIndex];
-      const radios = document.querySelectorAll('input[name="choice"]');
-      let chosen = -1;
-      radios.forEach(r => { if (r.checked) chosen = parseInt(r.value,10); });
-      if (chosen === -1) {
-        alert('اختر إجابة أولاً.');
-        return;
-      }
-      const globalIdx = questions.findIndex(qq => qq.id === q.id);
-      if (globalIdx === -1) return;
-      const gq = questions[globalIdx];
-      const correct = (chosen === gq.correctIndex);
-      if (!correct) gq.wrongCount = (gq.wrongCount||0) + 1;
-      else gq.wrongCount = (gq.wrongCount||0) + 1; // count as answered even if right
-      saveToStorage();
-      renderStats();
-      const explDiv = document.getElementById('qExplanation');
-      let msg = correct ? '✔ Correct.' : '✘ Wrong.';
-      if (gq.explanation) msg += ' ' + gq.explanation;
-      explDiv.textContent = msg;
-    }
+      <div class="card">
+        <h2>App info</h2>
+        <p class="muted tiny">
+          Version: <strong>3.4.0</strong><br>
+          Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
+          Safe backup: Importing an older backup will warn you if it is older than your last activity.
+        </p>
+      </div>
+    </section>
 
-    // ---------- All Questions tab ----------
-    function renderAllQuestions() {
-      const tbody = document.querySelector('#allTable tbody');
-      const text = document.getElementById('allSearchText').value.trim().toLowerCase();
-      const chap = document.getElementById('allChapterFilter').value.trim().toLowerCase();
-      const flagFilter = document.getElementById('allFlagFilter').value;
-      let filtered = questions.slice();
-      if (text) {
-        filtered = filtered.filter(q =>
-          q.question.toLowerCase().includes(text) ||
-          (q.explanation||'').toLowerCase().includes(text) ||
-          (q.chapter||'').toLowerCase().includes(text)
-        );
-      }
-      if (chap) {
-        filtered = filtered.filter(q => (q.chapter||'').toLowerCase().includes(chap));
-      }
-      if (flagFilter === 'flagged') {
-        filtered = filtered.filter(q => q.flagged);
-      } else if (flagFilter === 'wrong') {
-        filtered = filtered.filter(q => (q.wrongCount||0) > 0);
-      }
-      document.getElementById('allSummary').textContent =
-        `${filtered.length} / ${questions.length} questions shown.`;
+  </main>
+</div>
 
-      tbody.innerHTML = filtered.map((q, idx) => `
-        <tr>
-          <td class="nowrap">${q.id ?? idx+1}</td>
-          <td>${q.question}</td>
-          <td>${q.chapter||''}</td>
-          <td class="nowrap">${q.wrongCount||0}</td>
-          <td class="nowrap">${q.flagged ? '⚑' : ''}</td>
-        </tr>`).join('');
-    }
-
-    // ---------- Maintenance tab ----------
-    let maintSelected = new Set(); // ids
-
-    function applyMaintFilters() {
-      const ch = document.getElementById('maintChapter').value.trim().toLowerCase();
-      const text = document.getElementById('maintSearch').value.trim().toLowerCase();
-      const idFrom = parseInt(document.getElementById('maintIdFrom').value,10);
-      const idTo = parseInt(document.getElementById('maintIdTo').value,10);
-      const special = document.getElementById('maintSpecial').value;
-      let filtered = questions.slice();
-      if (ch) {
-        filtered = filtered.filter(q => (q.chapter||'').toLowerCase() === ch);
-      }
-      if (text) {
-        filtered = filtered.filter(q => q.question.toLowerCase().includes(text));
-      }
-      if (!isNaN(idFrom)) {
-        filtered = filtered.filter(q => (q.id||0) >= idFrom);
-      }
-      if (!isNaN(idTo)) {
-        filtered = filtered.filter(q => (q.id||0) <= idTo);
-      }
-      if (special === 'flagged') {
-        filtered = filtered.filter(q => q.flagged);
-      } else if (special === 'wrong') {
-        filtered = filtered.filter(q => (q.wrongCount||0) > 0);
-      } else if (special === 'maintenance') {
-        filtered = filtered.filter(q => q.maintenance);
-      }
-      return filtered;
-    }
-
-    function renderMaintenance() {
-      const tbody = document.querySelector('#maintTable tbody');
-      const filtered = applyMaintFilters();
-      const rows = filtered.map(q => {
-        const checked = maintSelected.has(q.id);
-        const flags = [];
-        if (q.flagged) flags.push('⚑');
-        if ((q.wrongCount||0) > 0) flags.push('❌'+(q.wrongCount||0));
-        if (q.maintenance) flags.push('🛠');
-        return `
-          <tr>
-            <td><input type="checkbox" data-id="${q.id}" ${checked?'checked':''}></td>
-            <td class="nowrap">${q.id}</td>
-            <td>${q.question}</td>
-            <td>${q.chapter||''}</td>
-            <td class="nowrap">${flags.join(' ')}</td>
-            <td class="nowrap"><button type="button" data-review="${q.id}">Review</button></td>
-          </tr>`;
-      }).join('');
-      tbody.innerHTML = rows;
-      document.getElementById('maintSummary').textContent =
-        `${filtered.length} questions, ${maintSelected.size} selected.`;
-    }
-
-    function deleteSelected() {
-      if (!maintSelected.size) {
-        alert('لا يوجد أسئلة محددة للحذف.');
-        return;
-      }
-      if (!confirm('حذف '+maintSelected.size+' سؤال؟ لا يمكن التراجع.')) return;
-      questions = questions.filter(q => !maintSelected.has(q.id));
-      maintSelected.clear();
-      saveToStorage();
-      renderStats();
-      renderAllQuestions();
-      renderMaintenance();
-      renderCurrentQuestion();
-    }
-
-    // ---------- Import / export ----------
-    function handleLocalImport(file) {
-      if (!file) {
-        alert('اختر ملف JSON أولاً.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const txt = String(e.target.result);
-          const parsed = JSON.parse(txt);
-          const arr = Array.isArray(parsed) ? parsed :
-                      Array.isArray(parsed.questions) ? parsed.questions : null;
-          if (!arr) throw new Error('Invalid JSON structure');
-          const norm = normalizeImportedArray(arr);
-          if (!norm.length) throw new Error('No valid questions found');
-          mergeQuestions(norm);
-          alert('تم استيراد '+norm.length+' سؤال ودمجهم مع القاعدة الحالية.');
-        } catch (err) {
-          console.error(err);
-          alert('فشل استيراد الملف: '+err.message);
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    function exportBackup() {
-      const blob = new Blob([JSON.stringify(questions, null, 2)], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'backup-mcq.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    async function importFromUrl() {
-      const url = document.getElementById('urlInput').value.trim();
-      if (!url) {
-        alert('أدخل رابط JSON أولاً.');
-        return;
-      }
-      try {
-        document.getElementById('btnImportUrl').disabled = true;
-        document.getElementById('btnImportUrl').textContent = 'Fetching...';
-        const resp = await fetch(url, { cache: 'no-store' });
-        if (!resp.ok) throw new Error('HTTP '+resp.status);
-        const data = await resp.json();
-        const arr = Array.isArray(data) ? data :
-                    Array.isArray(data.questions) ? data.questions : null;
-        if (!arr) throw new Error('Structure not recognized');
-        const norm = normalizeImportedArray(arr);
-        if (!norm.length) throw new Error('No valid questions in file');
-        mergeQuestions(norm);
-        alert('تم جلب '+norm.length+' سؤال من الرابط ودمجهم مع القاعدة.');
-      } catch (err) {
-        console.error(err);
-        alert('فشل تحميل الملف من الرابط: '+err.message);
-      } finally {
-        document.getElementById('btnImportUrl').disabled = false;
-        document.getElementById('btnImportUrl').textContent = 'Fetch & Import';
-      }
-    }
-
-    // ---------- Token helpers ----------
-    function saveToken() {
-      const v = document.getElementById('tokenInput').value.trim();
-      if (!v) {
-        alert('أدخل التوكن أولاً أو استخدم Clear لمسحه.');
-        return;
-      }
-      localStorage.setItem(TOKEN_KEY, v);
-      document.getElementById('cloud-pill').textContent = 'Cloud: token saved';
-      alert('تم حفظ التوكن في هذا المتصفح فقط.');
-    }
-    function clearToken() {
-      localStorage.removeItem(TOKEN_KEY);
-      document.getElementById('tokenInput').value = '';
-      document.getElementById('cloud-pill').textContent = 'Cloud: idle';
-      alert('تم حذف التوكن من هذا الجهاز.');
-    }
-    function openTokenPage() {
-      window.open('https://github.com/settings/tokens', '_blank');
-    }
-
-    // ---------- Tab handling ----------
-    function switchTab(tabName) {
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        const active = btn.dataset.tab === tabName;
-        btn.classList.toggle('active', active);
-      });
-      document.querySelectorAll('.tab').forEach(sec => {
-        sec.style.display = sec.id === 'tab-'+tabName ? 'block' : 'none';
-      });
-      if (tabName === 'all') renderAllQuestions();
-      if (tabName === 'maint') renderMaintenance();
-    }
-
-    // ---------- Event wiring ----------
-    function initEvents() {
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-      });
-      document.getElementById('practiceMode').addEventListener('change', e => {
-        currentMode = e.target.value;
-        saveToStorage();
-        currentIndex = 0;
-        renderCurrentQuestion();
-      });
-      document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
-      document.getElementById('btnNext').addEventListener('click', () => {
-        const list = getActiveList();
-        if (!list.length) return;
-        currentIndex = clampIndex(currentIndex+1, list);
-        renderCurrentQuestion();
-      });
-      document.getElementById('btnPrev').addEventListener('click', () => {
-        const list = getActiveList();
-        if (!list.length) return;
-        currentIndex = clampIndex(currentIndex-1, list);
-        renderCurrentQuestion();
-      });
-      document.getElementById('btnFlag').addEventListener('click', () => {
-        const list = getActiveList();
-        if (!list.length) return;
-        const q = list[currentIndex];
-        const idx = questions.findIndex(qq => qq.id === q.id);
-        if (idx === -1) return;
-        questions[idx].flagged = !questions[idx].flagged;
-        saveToStorage();
-        renderStats();
-        renderCurrentQuestion();
-      });
-      document.getElementById('btnMaint').addEventListener('click', () => {
-        const list = getActiveList();
-        if (!list.length) { switchTab('maint'); return; }
-        const q = list[currentIndex];
-        const idx = questions.findIndex(qq => qq.id === q.id);
-        if (idx === -1) return;
-        questions[idx].maintenance = !questions[idx].maintenance;
-        saveToStorage();
-        renderStats();
-        switchTab('maint');
-      });
-      document.getElementById('allSearchText').addEventListener('input', renderAllQuestions);
-      document.getElementById('allChapterFilter').addEventListener('input', renderAllQuestions);
-      document.getElementById('allFlagFilter').addEventListener('change', renderAllQuestions);
-
-      ['maintChapter','maintSearch','maintIdFrom','maintIdTo','maintSpecial']
-        .forEach(id => document.getElementById(id).addEventListener('input', renderMaintenance));
-      document.getElementById('maintSpecial').addEventListener('change', renderMaintenance);
-      document.getElementById('btnMaintSelectAll').addEventListener('click', () => {
-        const filtered = applyMaintFilters();
-        filtered.forEach(q => maintSelected.add(q.id));
-        renderMaintenance();
-      });
-      document.getElementById('btnMaintClearSel').addEventListener('click', () => {
-        maintSelected.clear();
-        renderMaintenance();
-      });
-      document.getElementById('maintSelectAllMaster').addEventListener('change', (e) => {
-        if (e.target.checked) {
-          const filtered = applyMaintFilters();
-          filtered.forEach(q => maintSelected.add(q.id));
-        } else {
-          maintSelected.clear();
-        }
-        renderMaintenance();
-      });
-      document.getElementById('maintTable').addEventListener('click', (e) => {
-        const cb = e.target.closest('input[type="checkbox"][data-id]');
-        if (cb) {
-          const id = parseInt(cb.dataset.id,10);
-          if (cb.checked) maintSelected.add(id);
-          else maintSelected.delete(id);
-          document.getElementById('maintSummary').textContent =
-            `${applyMaintFilters().length} questions, ${maintSelected.size} selected.`;
-          return; // IMPORTANT: do not navigate when selecting
-        }
-        const btn = e.target.closest('button[data-review]');
-        if (btn) {
-          const id = parseInt(btn.dataset.review,10);
-          const idx = questions.findIndex(q => q.id === id);
-          if (idx !== -1) {
-            currentMode = 'all';
-            document.getElementById('practiceMode').value = 'all';
-            currentIndex = idx;
-            saveToStorage();
-            switchTab('home');
-            renderCurrentQuestion();
-          }
-        }
-      });
-
-      document.getElementById('btnImport').addEventListener('click', () => {
-        const file = document.getElementById('fileInput').files[0];
-        handleLocalImport(file);
-      });
-      document.getElementById('btnExport').addEventListener('click', exportBackup);
-      document.getElementById('btnImportUrl').addEventListener('click', importFromUrl);
-
-      document.getElementById('btnSaveToken').addEventListener('click', saveToken);
-      document.getElementById('btnClearToken').addEventListener('click', clearToken);
-      document.getElementById('btnOpenTokenPage').addEventListener('click', openTokenPage);
-    }
-
-    function refreshAll() {
-      renderStats();
-      renderCurrentQuestion();
-      renderAllQuestions();
-      renderMaintenance();
-    }
-
-    // ---------- Bootstrap ----------
-    loadFromStorage();
-    initEvents();
-    refreshAll();
-  </script>
+<script>
+  window.APP_VERSION = "3.4.0";
+</script>
+<script src="app.js?v=3.4.0"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js?v=3.4.0').catch(()=>{});
+  }
+</script>
 </body>
 </html>
