@@ -1,5 +1,3 @@
-// Simple cache-first service worker for MCQ App Pro 3.0
-
 const CACHE_NAME = "mcq-app-pro-v3";
 const ASSETS = [
   "./",
@@ -11,9 +9,7 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
 });
 
@@ -32,7 +28,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
-
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
