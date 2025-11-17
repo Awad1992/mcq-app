@@ -1,10 +1,10 @@
 {
-  "name": "MCQ App Pro 2.0",
+  "name": "MCQ App Pro 3.0",
   "short_name": "MCQ Pro",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#101010",
+  "background_color": "#111111",
+  "theme_color": "#111111",
   "icons": [
     {
       "src": "icons/icon-192.png",
