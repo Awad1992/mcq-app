@@ -1,134 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>MCQ App Pro 2.0</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <title>MCQ App Pro 3.0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-
 <div class="app">
-
-  <!-- ==== HEADER ==== -->
-  <div class="top-bar">
-    <h1>MCQ App Pro 2.0</h1>
-    <div class="badges">
-      <span class="chip">Offline First</span>
-      <span class="chip chip-blue">Cloud Sync</span>
-      <span class="chip chip-flag">Flag System</span>
-      <span class="chip chip-wrong">Track Wrong</span>
+  <header class="top-bar">
+    <div>
+      <h1>MCQ App Pro 3.0</h1>
+      <div class="chips">
+        <span class="chip chip-offline" id="offlineStatus">Offline First</span>
+        <span class="chip chip-cloud">Cloud Sync</span>
+        <span class="chip chip-flag">Flag System</span>
+        <span class="chip chip-wrong">Track Wrong</span>
+      </div>
     </div>
-  </div>
+    <button id="btnInstall" class="ghost small hidden">Install PWA</button>
+  </header>
 
-  <!-- ==== SETTINGS CARD ==== -->
-  <div class="card settings-card">
-    <div class="section-title">Cloud Sync Settings</div>
-
-    <label class="lbl">GitHub Token</label>
-    <input id="tokenInput" placeholder="ghp_XXXXXX">
-
-    <label class="lbl">Data Repository</label>
-    <input id="repoInput" placeholder="username/mcq-data">
-
-    <button id="btnSaveSettings">Save Settings</button>
-
-    <div class="muted small" style="margin-top:0.4rem;">
-      • يتم حفظ الإعدادات محلياً في الجهاز  
-      • لا يتم إرسال التوكن لأي سيرفر خارجي  
-      • فقط GitHub API
+  <!-- Cloud sync settings -->
+  <section class="card">
+    <h2 class="section-title">Cloud Sync Settings</h2>
+    <div class="settings-grid">
+      <label>
+        <span class="label">GitHub Token</span>
+        <input id="githubToken" type="password" placeholder="ghp_xxxxxx" />
+      </label>
+      <label>
+        <span class="label">Data Repository</span>
+        <input id="githubRepo" type="text" placeholder="Awad1992/mcq-data" />
+      </label>
+      <label class="inline">
+        <input id="autoSync" type="checkbox" />
+        <span class="label">Enable auto backup &amp; sync (upload after changes)</span>
+      </label>
+      <div class="settings-actions">
+        <button id="btnSaveSettings">Save Settings</button>
+        <span class="muted small">
+          * يتم حفظ الإعدادات والتوكن محلياً فقط على الجهاز. لا يتم إرسال التوكن لأي سيرفر خارجي غير GitHub API.
+        </span>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ==== STATS ==== -->
-  <div class="card">
-    <div class="stats-row" id="statsBar"></div>
-  </div>
+  <!-- Stats -->
+  <section class="card">
+    <div class="stats-row" id="statsBar">
+      <!-- filled by JS -->
+    </div>
+  </section>
 
-  <!-- ==== MAIN AREA ==== -->
-  <div class="card main-area">
+  <!-- Main layout -->
+  <section class="card">
     <div class="row">
-
-      <!-- ==== MAIN COLUMN ==== -->
+      <!-- Left: practice -->
       <div class="col-main">
+        <div class="controls-row">
+          <div>
+            <span class="label small">Practice Mode</span><br />
+            <select id="modeSelect">
+              <option value="all">All active</option>
+              <option value="new">New (never answered)</option>
+              <option value="wrong">Previously wrong</option>
+              <option value="flagged">Flagged only</option>
+              <option value="chapter">By chapter</option>
+              <option value="tag">By tag</option>
+            </select>
+          </div>
+          <div>
+            <span class="label small">Chapter / Tag filter</span><br />
+            <input id="chapterFilter" placeholder="e.g. Ch45 Burns" />
+            <input id="tagFilter" placeholder="e.g. sepsis" />
+          </div>
+        </div>
 
-        <label class="small-label">Practice Mode</label>
-        <select id="modeSelect">
-          <option value="all">All active</option>
-          <option value="new">New only</option>
-          <option value="wrong">Previously wrong</option>
-          <option value="flagged">Flagged</option>
-          <option value="chapter">By chapter</option>
-        </select>
+        <div id="questionPanel" class="question-panel">
+          <!-- question -->
+        </div>
 
-        <input id="chapterFilter" placeholder="Chapter name" style="display:none; margin-top:0.3rem;">
-
-        <div id="questionPanel" class="q-panel"></div>
-        <div id="feedbackPanel"></div>
+        <div id="feedbackPanel" class="feedback-panel"></div>
 
         <div class="btn-row">
           <button class="primary" id="btnSubmit">Submit</button>
           <button id="btnNext">Next</button>
           <button class="ghost" id="btnFlag">Flag</button>
+          <button class="ghost danger" id="btnDeleteQuestion">Delete</button>
         </div>
-
       </div>
 
-      <!-- ==== SIDE COLUMN ==== -->
+      <!-- Right: import/export + history -->
       <div class="col-side">
-
-        <!-- IMPORT/EXPORT -->
-        <div class="side-card">
-          <div class="small-label">Import / Export</div>
-          <input type="file" id="fileInput" accept=".json" style="margin-top:0.3rem;">
-
-          <button id="btnImport" style="margin-top:0.3rem;">Import</button>
-          <button id="btnExport">Export</button>
-
-          <div class="muted small">Format: JSON array</div>
-        </div>
-
-        <!-- CLOUD SYNC -->
-        <div class="side-card">
-          <div class="small-label">Cloud Sync</div>
-
-          <button id="btnSyncUpload">Upload Backup → GitHub</button>
-          <button id="btnSyncDownload">Download Backup ← GitHub</button>
-
-          <div class="muted small">
-            آخر تحديث: <span id="lastSyncLabel">–</span>
+        <section>
+          <div class="label small">Import / Export (JSON)</div>
+          <input type="file" id="fileInput" accept=".json" />
+          <div class="btn-row small-gap">
+            <button id="btnImport">Import</button>
+            <button id="btnExport">Export</button>
           </div>
-        </div>
+          <div class="label small" style="margin-top:0.6rem;">Cloud Sync</div>
+          <div class="btn-row small-gap">
+            <button id="btnUploadBackup">Upload Backup → GitHub</button>
+            <button id="btnDownloadBackup">Download Backup ← GitHub</button>
+          </div>
+          <div class="small muted" id="lastSyncInfo">Last sync: –</div>
+        </section>
 
-        <!-- HISTORY -->
-        <div class="side-card">
-          <div class="small-label">History</div>
-          <div class="history-list" id="historyList"></div>
-        </div>
-
+        <section class="card side-card">
+          <div class="label small">History</div>
+          <div class="history-list" id="historyList">
+            <!-- filled by JS -->
+          </div>
+        </section>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- FOOTER -->
-  <div class="card">
-    <div class="muted">
-      Tip: Import MCQs generated by ChatGPT or allow automated generation from chapters (coming soon).
+  <!-- PDF → MCQ generator -->
+  <section class="card">
+    <h2 class="section-title">PDF → MCQ Generator (Mode C)</h2>
+    <div class="pdf-grid">
+      <div>
+        <div class="label small">1. Select PDF chapter</div>
+        <input type="file" id="pdfInput" accept=".pdf" />
+        <div class="label small" style="margin-top:0.5rem;">2. Meta</div>
+        <input id="pdfChapter" placeholder="Chapter label (e.g. Ch45 Burns)" />
+        <input id="pdfTags" placeholder="Tags (comma separated, e.g. burns, fluids)" />
+        <div class="label small" style="margin-top:0.5rem;">3. Question settings</div>
+        <input id="pdfQuestionCount" type="number" min="3" max="80" value="15" />
+        <label class="inline small">
+          <input id="pdfPreferHighYield" type="checkbox" checked />
+          Focus on likely high-yield / confusing points when possible
+        </label>
+        <div class="btn-row small-gap" style="margin-top:0.6rem;">
+          <button id="btnExtractPdf">Extract text</button>
+          <button id="btnGenerateFromPdf">Generate MCQs</button>
+        </div>
+      </div>
+      <div>
+        <div class="label small">PDF extraction log</div>
+        <textarea id="pdfLog" readonly></textarea>
+      </div>
     </div>
-  </div>
+    <p class="muted small">
+      يتم توليد الأسئلة محلياً من نص الـ PDF. الخوارزمية تحاول التركيز على جمل تحتوي على قيم رقمية وتعريفات
+      وفروقات بين مفاهيم (high-yield / confusing points) ثم تولّد أسئلة جديدة مع شرح للجواب الصحيح
+      ولماذا الخيارات الأخرى خاطئة باختصار. راجع الأسئلة سريعاً قبل الاعتماد النهائي.
+    </p>
+  </section>
 
+  <!-- Performance -->
+  <section class="card">
+    <h2 class="section-title">Performance Overview</h2>
+    <canvas id="perfChart" height="120"></canvas>
+    <p class="muted small">
+      المنحنى يبيّن نسبة الإجابات الصحيحة عبر الزمن (جميع الأسئلة). يساعدك تشوف إذا في تحسّن حقيقي.
+    </p>
+  </section>
+
+  <!-- Footer tip -->
+  <section class="card">
+    <div class="label small">Tip</div>
+    <p class="muted small">
+      يمكنك استيراد بنوك أسئلة جاهزة بصيغة JSON أو استخدام مولّد الـ PDF لبناء أسئلة جديدة لكل شابتر.
+      ركّز أثناء الدراسة على وضع <strong>Flag</strong> على الأسئلة الملبِّسة، ثم راجع وضع
+      <strong>Practice Mode = Flagged / Wrong</strong>.
+    </p>
+  </section>
 </div>
 
-<script src="app.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-}
+  // pdf.js worker
+  if (window['pdfjsLib']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js"></script>
+<script>
+  // Service worker registration
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  }
 
+  // PWA install prompt
+  let deferredPrompt = null;
+  const btnInstall = document.getElementById('btnInstall');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btnInstall.classList.remove('hidden');
+  });
+  btnInstall.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    btnInstall.classList.add('hidden');
+  });
+</script>
 </body>
 </html>
