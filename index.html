@@ -19,7 +19,7 @@
         <span class="chip chip-wrong">Track Wrong</span>
       </div>
     </div>
-    <button id="btnInstall" class="ghost small hidden">Install PWA</button>
+    <button id="btnInstall" class="ghost small hidden">Install App</button>
   </header>
 
   <!-- Cloud sync settings -->
@@ -39,9 +39,12 @@
         <span class="label">Enable auto backup &amp; sync (upload after changes)</span>
       </label>
       <div class="settings-actions">
-        <button id="btnSaveSettings">Save Settings</button>
+        <div class="btn-row small-gap">
+          <button id="btnSaveSettings">Save Settings</button>
+          <button id="btnClearToken" class="ghost small">Clear token on this device</button>
+        </div>
         <span class="muted small">
-          * يتم حفظ الإعدادات والتوكن محلياً فقط على الجهاز. لا يتم إرسال التوكن لأي سيرفر خارجي غير GitHub API.
+          * يتم حفظ الإعدادات والتوكن محلياً فقط على جهازك (localStorage). لا يتم إرساله لأي مكان آخر غير GitHub API عند عمل Backup.
         </span>
       </div>
     </div>
@@ -146,9 +149,8 @@
       </div>
     </div>
     <p class="muted small">
-      يتم توليد الأسئلة محلياً من نص الـ PDF. الخوارزمية تحاول التركيز على جمل تحتوي على قيم رقمية وتعريفات
-      وفروقات بين مفاهيم (high-yield / confusing points) ثم تولّد أسئلة جديدة مع شرح للجواب الصحيح
-      ولماذا الخيارات الأخرى خاطئة باختصار. راجع الأسئلة سريعاً قبل الاعتماد النهائي.
+      يتم توليد الأسئلة محلياً من نص الـ PDF. الخوارزمية تحاول التركيز على جمل فيها أرقام، تعريفات، فروقات بين مفاهيم (high-yield / ملخبطة)
+      ثم تولّد أسئلة جديدة مع شرح للجواب الصحيح ولماذا الخيارات الأخرى خاطئة باختصار. راجعها بسرعة قبل الاعتماد النهائي.
     </p>
   </section>
 
@@ -166,42 +168,38 @@
     <div class="label small">Tip</div>
     <p class="muted small">
       يمكنك استيراد بنوك أسئلة جاهزة بصيغة JSON أو استخدام مولّد الـ PDF لبناء أسئلة جديدة لكل شابتر.
-      ركّز أثناء الدراسة على وضع <strong>Flag</strong> على الأسئلة الملبِّسة، ثم راجع وضع
-      <strong>Practice Mode = Flagged / Wrong</strong>.
+      ركّز أثناء الدراسة على وضع <strong>Flag</strong> على الأسئلة الملبِّسة، ثم راجع Practice Mode = Flagged / Wrong.
     </p>
   </section>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-  // pdf.js worker
-  if (window['pdfjsLib']) {
+  if (window["pdfjsLib"]) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js"></script>
 <script>
-  // Service worker registration
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
   }
 
-  // PWA install prompt
   let deferredPrompt = null;
-  const btnInstall = document.getElementById('btnInstall');
-  window.addEventListener('beforeinstallprompt', (e) => {
+  const btnInstall = document.getElementById("btnInstall");
+  window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    btnInstall.classList.remove('hidden');
+    btnInstall.classList.remove("hidden");
   });
-  btnInstall.addEventListener('click', async () => {
+  btnInstall.addEventListener("click", async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
-    btnInstall.classList.add('hidden');
+    btnInstall.classList.add("hidden");
   });
 </script>
 </body>
