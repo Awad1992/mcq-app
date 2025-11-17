@@ -1,207 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>MCQ App Pro 4.0</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="style.css" />
-  <link rel="manifest" href="manifest.json" />
+  <meta charset="utf-8">
+  <title>MCQ Study App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="app-header">
-      <h1>MCQ App Pro 4.0</h1>
-      <div class="header-badges">
-        <span class="chip">Offline + Sync</span>
-        <span class="chip chip-wrong">Track Wrong</span>
-        <span class="chip chip-flag">Flag</span>
-        <span class="chip chip-maint">Maintenance</span>
-      </div>
-    </header>
-
-    <!-- TABS -->
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="tab-practice">Practice</button>
-      <button class="tab-btn" data-tab="tab-manage">Manage</button>
-      <button class="tab-btn" data-tab="tab-maintenance">Maintenance</button>
-      <button class="tab-btn" data-tab="tab-settings">Settings</button>
-    </nav>
-
-    <!-- STATS BAR -->
-    <section class="card stats-card">
-      <div id="statsBar" class="stats-row">
-        <!-- Filled by JS -->
-      </div>
-    </section>
-
-    <!-- ============ TAB: PRACTICE ============ -->
-    <section id="tab-practice" class="tab active">
-      <div class="card">
-        <div class="practice-layout">
-          <div class="practice-main">
-            <div id="practiceMeta" class="practice-meta">
-              <!-- chapter / source / flags -->
-            </div>
-            <div id="questionPanel" class="question-panel">
-              <!-- question -->
-            </div>
-            <div id="feedbackPanel" class="feedback-panel"></div>
-
-            <div class="btn-row">
-              <button id="btnPrev" class="ghost">Previous</button>
-              <button id="btnSubmit" class="primary">Submit</button>
-              <button id="btnNext">Next</button>
-              <button id="btnFlag" class="ghost">Flag</button>
-              <button id="btnMaint" class="ghost">Maintenance</button>
-            </div>
-          </div>
-
-          <aside class="practice-side">
-            <div class="side-block">
-              <div class="small-label">Last wrong (recent)</div>
-              <div id="lastWrongList" class="mini-list"></div>
-            </div>
-            <div class="side-block">
-              <div class="small-label">Last flagged</div>
-              <div id="lastFlagList" class="mini-list"></div>
-            </div>
-            <div class="side-block">
-              <div class="small-label">Last maintenance</div>
-              <div id="lastMaintList" class="mini-list"></div>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ TAB: MANAGE QUESTIONS ============ -->
-    <section id="tab-manage" class="tab">
-      <div class="card">
-        <h2>Question Manager</h2>
-
-        <div class="filters-row">
-          <input id="filterText" placeholder="Search text..." />
-          <input id="filterChapter" placeholder="Chapter (e.g. Ch45)" />
-          <select id="filterFlag">
-            <option value="any">Flag: Any</option>
-            <option value="only">Flag: Only</option>
-            <option value="none">Flag: None</option>
-          </select>
-          <select id="filterMaint">
-            <option value="any">Maint: Any</option>
-            <option value="only">Maint: Only</option>
-            <option value="none">Maint: None</option>
-          </select>
-          <select id="sortBy">
-            <option value="addedDesc">Newest first</option>
-            <option value="addedAsc">Oldest first</option>
-            <option value="chapterAsc">Chapter A→Z</option>
-            <option value="chapterDesc">Chapter Z→A</option>
-            <option value="wrongDesc">Most wrong</option>
-          </select>
-          <button id="btnApplyFilters">Apply</button>
-        </div>
-
-        <div class="manage-actions">
-          <button id="btnSelectAll">Select all</button>
-          <button id="btnClearSelection">Clear selection</button>
-          <button id="btnDeleteSelected" class="danger">Delete selected</button>
-        </div>
-
-        <div class="table-wrapper">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th>✓</th>
-                <th>ID</th>
-                <th>Question</th>
-                <th>Chapter</th>
-                <th>Added</th>
-                <th>Wrong</th>
-                <th>Flag</th>
-                <th>Maint</th>
-                <th>Edit</th>
-              </tr>
-            </thead>
-            <tbody id="manageTableBody">
-              <!-- filled by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ TAB: MAINTENANCE ============ -->
-    <section id="tab-maintenance" class="tab">
-      <div class="card">
-        <h2>Maintenance Questions</h2>
-        <div class="manage-actions">
-          <button id="btnMaintSelectAll">Select all</button>
-          <button id="btnMaintClear">Clear selection</button>
-          <button id="btnMaintRemove" class="ghost">Remove maint tag</button>
-          <button id="btnMaintDelete" class="danger">Delete selected</button>
-        </div>
-        <div class="table-wrapper">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th>✓</th>
-                <th>ID</th>
-                <th>Question</th>
-                <th>Chapter</th>
-                <th>Wrong</th>
-                <th>Flag</th>
-                <th>Open</th>
-              </tr>
-            </thead>
-            <tbody id="maintTableBody">
-              <!-- filled by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ TAB: SETTINGS ============ -->
-    <section id="tab-settings" class="tab">
-      <div class="card">
-        <h2>Settings & Backup</h2>
-
-        <h3>Cloud Sync (GitHub)</h3>
-        <label class="small-label">GitHub Token</label>
-        <input id="ghToken" placeholder="github_pat_..." />
-
-        <label class="small-label">Data Repository</label>
-        <input id="ghRepo" placeholder="Awad1992/mcq-data" />
-
-        <div class="btn-row">
-          <button id="btnSaveSettings">Save settings</button>
-          <button id="btnUploadGitHub">Upload backup → GitHub</button>
-          <button id="btnDownloadGitHub">Download backup → GitHub</button>
-        </div>
-
-        <div id="syncStatus" class="muted"></div>
-
-        <hr />
-
-        <h3>Local Import / Export</h3>
-        <input type="file" id="fileInput" accept=".json" />
-        <div class="btn-row">
-          <button id="btnImport">Import JSON</button>
-          <button id="btnExport">Export JSON</button>
-        </div>
-        <p class="muted">
-          JSON format: [{ "chapter": "...", "text": "...", "choices": [{ "text": "...", "isCorrect": true/false }], "explanation": "..." }, ...]
-        </p>
-      </div>
-    </section>
+<div class="app">
+  <div class="top-bar">
+    <h1>MCQ Study App</h1>
+    <div>
+      <span class="chip">Local · Offline</span>
+      <span class="chip chip-wrong">Track wrong</span>
+      <span class="chip chip-flag">Flag key Qs</span>
+    </div>
   </div>
 
-  <script src="app.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-    }
-  </script>
+  <div class="card">
+    <div class="stats-row" id="statsBar">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="col-main">
+        <div style="margin-bottom:0.5rem;">
+          <label class="small-label">Practice mode</label><br>
+          <select id="modeSelect">
+            <option value="all">All active questions</option>
+            <option value="new">New (never answered)</option>
+            <option value="wrong">Focus: previously wrong</option>
+            <option value="flagged">Flagged only</option>
+            <option value="chapter">By chapter</option>
+          </select>
+          <input id="chapterFilter" placeholder="Chapter filter (e.g. Ch45 Burns)" style="display:none; margin-left:0.3rem; max-width:180px;">
+        </div>
+
+        <div id="questionPanel">
+          <!-- current question -->
+        </div>
+
+        <div id="feedbackPanel">
+          <!-- correctness + explanation -->
+        </div>
+
+        <div style="margin-top:0.5rem;">
+          <button class="primary" id="btnSubmit">Submit</button>
+          <button id="btnNext">Next</button>
+          <button class="ghost" id="btnFlag">Flag</button>
+        </div>
+      </div>
+
+      <div class="col-side">
+        <div style="margin-bottom:0.5rem;">
+          <div class="small-label">Import / Export</div>
+          <input type="file" id="fileInput" accept=".json" style="margin-top:0.2rem;">
+          <div style="margin-top:0.3rem;">
+            <button id="btnImport">Import</button>
+            <button id="btnExport">Export backup</button>
+          </div>
+          <div class="muted" style="margin-top:0.25rem;">
+            JSON format: questions with options, correct answer, explanation, chapter.
+          </div>
+        </div>
+
+        <div class="card side-card" style="margin-bottom:0.5rem;">
+          <div class="small-label" style="margin-bottom:0.25rem;">Backup status</div>
+          <div id="backupStatus" class="muted">No backup yet.</div>
+        </div>
+
+        <div class="card side-card">
+          <div class="small-label" style="margin-bottom:0.25rem;">GitHub token (optional)</div>
+          <input id="githubTokenInput" type="password" placeholder="Token is stored only on this device" style="width:100%;">
+          <div class="muted tiny" style="margin-top:0.2rem;">
+            Saved in this browser (localStorage). Not sent anywhere until you use online sync.
+          </div>
+          <div style="margin-top:0.3rem;">
+            <button id="btnSaveToken">Save token</button>
+            <button id="btnClearToken">Clear</button>
+          </div>
+          <div style="margin-top:0.3rem;">
+            <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noopener" class="muted">
+              ▶ Open GitHub token page
+            </a>
+          </div>
+        </div>
+
+        <div class="card side-card" style="margin-top:0.5rem;">
+          <div class="small-label" style="margin-bottom:0.25rem;">Recent history</div>
+          <div class="history-list" id="historyList">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="small-label">Tip</div>
+    <div class="muted">
+      Build chapter MCQs as JSON with ChatGPT and import them here. لاحقاً يمكن إضافة توليد مباشر من PDF، لكن المحرك الحالي جاهز لبنك كبير من الأسئلة.
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+}
+</script>
 </body>
 </html>
