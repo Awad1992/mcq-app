@@ -1,0 +1,9 @@
+{
+ "name": "MCQ App",
+ "short_name": "MCQ",
+ "start_url": "./index.html",
+ "display": "standalone",
+ "background_color": "#ffffff",
+ "theme_color": "#ffffff",
+ "icons": []
+}
