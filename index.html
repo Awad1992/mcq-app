@@ -2,279 +2,197 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Pro 3.4</title>
+  <title>MCQ Study App v3.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=3.4.0">
-  <link rel="stylesheet" href="style.css?v=3.4.0">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app">
   <header class="top-bar">
-    <div>
-      <h1>MCQ Study App Pro <span class="ver">v3.4</span></h1>
-      <div class="subtitle">Local bank + history + flags + maintenance + GitHub sync</div>
+    <div class="top-left">
+      <h1>MCQ Study App</h1>
+      <span class="chip">Offline · IndexedDB</span>
+      <span class="chip chip-flag">Flag / Maintenance</span>
+      <span class="chip chip-wrong">Tracks wrong answers</span>
     </div>
-    <div class="chips">
-      <span class="chip">Offline</span>
-      <span class="chip chip-ok">Tracks wrong</span>
-      <span class="chip chip-flag">Flags</span>
-      <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
+    <div class="top-right">
+      <button id="btnBackupNow" class="secondary">Backup now</button>
+      <span class="muted small-text" id="lastBackupInfo">No backup yet</span>
     </div>
   </header>
 
+  <section class="card stats-card">
+    <div id="statsBar" class="stats-row"></div>
+  </section>
+
   <nav class="tabs">
-    <button class="tab-button active" data-tab="home">Home</button>
-    <button class="tab-button" data-tab="all">All Questions</button>
-    <button class="tab-button" data-tab="maintenance">Maintenance</button>
-    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
-    <button class="tab-button" data-tab="settings">Settings</button>
+    <button class="tab-button active" data-tab="practiceTab">Practice</button>
+    <button class="tab-button" data-tab="maintenanceTab">Maintenance</button>
+    <button class="tab-button" data-tab="settingsTab">Settings</button>
   </nav>
 
-  <main class="tab-container">
-
-    <!-- HOME TAB -->
-    <section class="tab-content active" id="tab-home">
-      <div class="card">
-        <div class="stats-row" id="statsBar"></div>
-      </div>
-
-      <div class="card">
-        <div class="row">
-          <div class="col-main">
-            <div class="row-controls">
-              <div>
-                <label class="small-label">Practice mode</label><br>
-                <select id="modeSelect">
-                  <option value="all">All active questions</option>
-                  <option value="new">New (never answered)</option>
-                  <option value="wrong">Previously wrong</option>
-                  <option value="flagged">Flagged</option>
-                  <option value="chapter">By chapter</option>
-                </select>
-                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
-              </div>
-              <div>
-                <label class="small-label">Quick filters</label><br>
-                <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
-                <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
-              </div>
-            </div>
-
-            <div id="questionPanel" class="question-panel"></div>
-            <div id="feedbackPanel" class="feedback-panel"></div>
-
-            <div class="btn-row-main">
-              <button class="primary" id="btnSubmit">Submit</button>
-              <button id="btnPrev">Previous</button>
-              <button id="btnNext">Next</button>
-              <button class="ghost" id="btnFlag">Flag</button>
-              <button class="ghost" id="btnMaint">Maintenance</button>
+  <!-- PRACTICE TAB -->
+  <section id="practiceTab" class="tab-panel active">
+    <div class="card">
+      <div class="row">
+        <div class="col-main">
+          <div class="controls-row">
+            <div>
+              <label class="small-label">Practice mode</label>
+              <select id="modeSelect">
+                <option value="all">All active</option>
+                <option value="new">New only</option>
+                <option value="wrong">Previously wrong</option>
+                <option value="flagged">Flagged only</option>
+                <option value="chapter">By chapter</option>
+              </select>
+              <input id="chapterFilter" placeholder="Exact chapter (not case-sensitive)" style="display:none; max-width:220px;">
             </div>
           </div>
 
-          <div class="col-side">
-            <div class="side-block">
-              <div class="small-label">Import / Export (local file)</div>
-              <input type="file" id="fileInput" accept=".json">
-              <div class="btn-row-tight">
-                <button id="btnImport">Import</button>
-                <button id="btnExport">Export</button>
-              </div>
-              <div class="muted tiny">
-                JSON file with questions, choices, correct answer, explanation, chapter.
-              </div>
-            </div>
+          <div id="questionPanel" class="question-panel"></div>
+          <div id="feedbackPanel" class="feedback-panel"></div>
 
-            <div class="card side-card">
-              <div class="small-label">Recent history</div>
-              <div class="history-list" id="historyList"></div>
-            </div>
+          <div class="buttons-row">
+            <button id="btnSubmit" class="primary">Submit</button>
+            <button id="btnNext">Next</button>
+            <button id="btnFlag" class="ghost">Flag / Unflag</button>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- ALL QUESTIONS TAB -->
-    <section class="tab-content" id="tab-all">
-      <div class="card">
-        <div class="row-controls">
-          <div>
-            <label class="small-label">Search</label><br>
-            <input id="allSearch" placeholder="Text / chapter / source" style="min-width:220px;">
+        <aside class="col-side">
+          <div class="side-block">
+            <div class="small-label">Recent history</div>
+            <div id="historyList" class="history-list"></div>
           </div>
-          <div>
-            <label class="small-label">Filter</label><br>
-            <select id="allFilter">
-              <option value="all">All</option>
+        </aside>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="col-main">
+          <div class="small-label">Import questions</div>
+          <input type="file" id="fileInput" accept=".json">
+          <button id="btnImport" class="secondary">Import JSON</button>
+        </div>
+        <div class="col-side">
+          <div class="small-label">Import from URL</div>
+          <input type="text" id="urlInput" placeholder="https://.../questions.json">
+          <button id="btnImportUrl">Fetch &amp; import</button>
+        </div>
+      </div>
+      <div class="muted small-text" style="margin-top:0.25rem;">
+        Import is merge-safe: existing newer questions are preserved (no loss if you load an old backup).
+      </div>
+    </div>
+  </section>
+
+  <!-- MAINTENANCE TAB -->
+  <section id="maintenanceTab" class="tab-panel">
+    <div class="card">
+      <div class="row">
+        <div class="col-main">
+          <div class="small-label">Filter questions</div>
+          <div class="filters-row">
+            <input id="mSearchText" placeholder="Text contains (case-insensitive)">
+            <input id="mChapterExact" placeholder="Exact chapter (case-insensitive)">
+            <select id="mFlagFilter">
+              <option value="any">Flag: any</option>
               <option value="flagged">Flagged only</option>
-              <option value="wrong">Wrong ≥ 1</option>
-              <option value="maintenance">Maintenance only</option>
+              <option value="unflagged">Un-flagged only</option>
+            </select>
+            <select id="mStatusFilter">
+              <option value="any">Status: any</option>
+              <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-          </div>
-          <div>
-            <label class="small-label">Sort</label><br>
-            <select id="allSort">
-              <option value="created_desc">Newest first</option>
-              <option value="created_asc">Oldest first</option>
-              <option value="chapter">By chapter</option>
-              <option value="wrong_desc">Most wrong</option>
+            <select id="mSortBy">
+              <option value="id">Sort by ID</option>
+              <option value="chapter">Sort by chapter</option>
+              <option value="createdAt">Sort by created time</option>
+              <option value="updatedAt">Sort by updated time</option>
             </select>
-          </div>
-          <div class="all-actions">
-            <button id="btnAllReload">Reload</button>
-            <button id="btnAllDelete" class="danger">Delete selected</button>
+            <button id="btnReloadMaintenance">Reload</button>
           </div>
         </div>
-
-        <div class="table-wrapper">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="allSelectAll"></th>
-                <th>ID</th>
-                <th>Question</th>
-                <th>Chapter</th>
-                <th>Flags</th>
-                <th>Seen</th>
-                <th>Wrong</th>
-                <th>Last seen</th>
-              </tr>
-            </thead>
-            <tbody id="allTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- MAINTENANCE TAB -->
-    <section class="tab-content" id="tab-maintenance">
-      <div class="card">
-        <div class="row-controls">
-          <div>
-            <label class="small-label">Show</label><br>
-            <select id="maintFilter">
-              <option value="maintenance">Maintenance only</option>
-              <option value="flagged">Flagged + Maintenance</option>
-              <option value="all">All needing review</option>
-            </select>
+        <div class="col-side">
+          <div class="small-label">Bulk actions</div>
+          <div class="buttons-row">
+            <button id="btnToggleSelectAll">Select / Unselect all</button>
+            <button id="btnDeleteSelected" class="danger">Delete selected</button>
           </div>
-          <div>
-            <label class="small-label">Chapter filter</label><br>
-            <input id="maintChapterFilter" placeholder="Chapter (e.g. Ch45)">
-          </div>
-          <div class="all-actions">
-            <button id="btnMaintReload">Reload</button>
-            <button id="btnMaintDelete" class="danger">Delete selected</button>
-          </div>
-        </div>
-
-        <div class="table-wrapper">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="maintSelectAll"></th>
-                <th>ID</th>
-                <th>Question</th>
-                <th>Chapter</th>
-                <th>Flags</th>
-                <th>Wrong</th>
-              </tr>
-            </thead>
-            <tbody id="maintTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- BACKUP & CLOUD TAB -->
-    <section class="tab-content" id="tab-backup">
-      <div class="card">
-        <h2>Local backup</h2>
-        <p class="muted tiny">
-          Export creates a JSON file with all questions + stats. Import can merge or restore from that file.
-        </p>
-        <div class="row-controls">
-          <div>
-            <button id="btnBackupExport" class="primary">Export full backup</button>
-            <input type="file" id="backupFileInput" accept=".json">
-            <button id="btnBackupImport">Import backup</button>
-          </div>
-          <div class="backup-status">
-            <div>Last activity: <span id="lastActivityLabel">–</span></div>
-            <div>Last local backup: <span id="lastBackupLabel">–</span></div>
+          <div class="buttons-row">
+            <button id="btnFlagSelected">Flag selected</button>
+            <button id="btnUnflagSelected">Unflag selected</button>
           </div>
         </div>
       </div>
-
-      <div class="card">
-        <h2>Cloud sync (GitHub)</h2>
-        <p class="muted tiny">
-          Uses your GitHub token to save / load one JSON file in a private repo (e.g. <code>Awad1992/mcq-data</code>).
-          Token stays only on this device (localStorage).
-        </p>
-        <div class="row-controls">
-          <div>
-            <button id="btnCloudUpload">Upload → GitHub</button>
-            <button id="btnCloudDownload">Download ← GitHub</button>
-          </div>
-          <div class="muted tiny" id="cloudInfo"></div>
-        </div>
+      <div class="muted small-text">
+        Clicking a row checkbox only selects it. To open a question for practice, use the “Open” button in that row.
       </div>
-    </section>
+    </div>
 
-    <!-- SETTINGS TAB -->
-    <section class="tab-content" id="tab-settings">
-      <div class="card">
-        <h2>GitHub settings</h2>
-        <div class="settings-grid">
-          <label>
-            <span class="small-label">Personal access token</span>
-            <input type="password" id="ghTokenInput" placeholder="ghp_xxx..." autocomplete="off">
-          </label>
-          <label>
-            <span class="small-label">Repo (owner/name)</span>
-            <input id="ghRepoInput" value="Awad1992/mcq-data">
-          </label>
-          <label>
-            <span class="small-label">Backup filename</span>
-            <input id="ghFileInput" value="mcq_backup.json">
-          </label>
-        </div>
-        <div class="btn-row-main">
-          <button id="btnSaveGitHub" class="primary">Save settings</button>
-          <button id="btnClearGitHub" class="ghost">Clear</button>
-          <a class="link-btn" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-            Open GitHub token page
-          </a>
-        </div>
-        <p class="muted tiny">
-          Token is stored only in this browser (localStorage). Changing token or repo does not affect your questions.
-        </p>
+    <div class="card">
+      <div class="small-label">Questions list</div>
+      <div id="maintenanceList" class="maintenance-list"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS TAB -->
+  <section id="settingsTab" class="tab-panel">
+    <div class="card">
+      <h2>Backup &amp; sync</h2>
+      <div class="settings-grid">
+        <label>
+          <span class="small-label">GitHub token (stored locally only)</span>
+          <input type="password" id="ghTokenInput" placeholder="ghp_...">
+        </label>
+        <label>
+          <span class="small-label">Repo (owner/name)</span>
+          <input type="text" id="ghRepoInput" placeholder="Awad1992/mcq-data">
+        </label>
+        <label>
+          <span class="small-label">Backup filename</span>
+          <input type="text" id="ghFileInput" placeholder="backup.json">
+        </label>
       </div>
-
-      <div class="card">
-        <h2>App info</h2>
-        <p class="muted tiny">
-          Version: <strong>3.4.0</strong><br>
-          Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
-          Safe backup: Importing an older backup will warn you if it is older than your last activity.
-        </p>
+      <div class="settings-row">
+        <label class="inline">
+          <input type="checkbox" id="autoBackupCheckbox">
+          Enable auto-backup every 60 seconds
+        </label>
+        <button id="btnSaveSettings" class="primary">Save settings</button>
+        <button id="btnOpenTokenPage" type="button">Open GitHub token page</button>
       </div>
-    </section>
+      <div class="muted small-text">
+        Token and repo info are saved in your browser (localStorage). They are not sent anywhere except directly to GitHub when backing up.
+      </div>
+    </div>
 
-  </main>
+    <div class="card">
+      <h2>Local data</h2>
+      <div class="settings-row">
+        <button id="btnExportLocal">Download local backup (JSON)</button>
+        <button id="btnWipeAll" class="danger">Wipe all local data</button>
+      </div>
+      <div class="muted small-text">
+        Downloaded JSON is also merge-safe. Importing an old file will not erase newer questions.
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <span class="muted small-text">MCQ Study App v3.6 · Local-first · Designed for ICU board prep</span>
+  </footer>
 </div>
 
+<script src="app.js"></script>
 <script>
-  window.APP_VERSION = "3.4.0";
-</script>
-<script src="app.js?v=3.4.0"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=3.4.0').catch(()=>{});
-  }
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+}
 </script>
 </body>
 </html>

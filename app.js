@@ -1,1094 +1,715 @@
-// MCQ Study App Pro v3.4
-// DB + UI + backup + GitHub sync + maintenance
 
-const DB_NAME = 'mcqdb_pro_v34';
-const DB_VERSION = 2;
+// MCQ Study App v3.6
+// Local-first, IndexedDB-backed, with practice + maintenance + settings.
 
-let db = null;
+const DB_NAME = 'mcq_app_db_v36';
+const DB_VERSION = 1;
+const STORE_NAME = 'questions';
 
+let db;
 let currentQuestion = null;
-let currentChoices = [];
 let currentMode = 'all';
-let currentChapter = '';
-let lastResult = null;
-let lastSelectedIndex = null;
-let historyStack = [];
-let lastActivityAt = null;
+let currentChapterFilter = '';
+let history = [];
+let autoBackupTimer = null;
 
-const questionPanel = document.getElementById('questionPanel');
-const feedbackPanel = document.getElementById('feedbackPanel');
-const historyListEl = document.getElementById('historyList');
-const modeSelect = document.getElementById('modeSelect');
-const chapterFilterEl = document.getElementById('chapterFilter');
+function log(...args) {
+  console.log('[MCQ]', ...args);
+}
 
-// Tabs
-document.querySelectorAll('.tab-button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const tab = btn.getAttribute('data-tab');
-    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(sec => sec.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + tab).classList.add('active');
+// ---------- IndexedDB helpers ----------
 
-    if (tab === 'all') {
-      reloadAllQuestionsTable();
-    } else if (tab === 'maintenance') {
-      reloadMaintenanceTable();
-    } else if (tab === 'backup') {
-      refreshBackupLabels();
-      refreshCloudInfo();
-    } else if (tab === 'settings') {
-      loadGitHubConfigIntoUI();
-    }
-  });
-});
-
-// Mode select
-modeSelect.addEventListener('change', () => {
-  currentMode = modeSelect.value;
-  if (currentMode === 'chapter') {
-    chapterFilterEl.style.display = 'inline-block';
-  } else {
-    chapterFilterEl.style.display = 'none';
-    currentChapter = '';
-  }
-  loadNextQuestion(true);
-});
-
-chapterFilterEl.addEventListener('change', () => {
-  currentChapter = chapterFilterEl.value.trim();
-  loadNextQuestion(true);
-});
-
-// Quick filter buttons
-document.getElementById('btnQuickWrong').addEventListener('click', () => {
-  currentMode = 'wrong';
-  modeSelect.value = 'wrong';
-  chapterFilterEl.style.display = 'none';
-  loadNextQuestion(true);
-});
-
-document.getElementById('btnQuickFlagged').addEventListener('click', () => {
-  currentMode = 'flagged';
-  modeSelect.value = 'flagged';
-  chapterFilterEl.style.display = 'none';
-  loadNextQuestion(true);
-});
-
-// Buttons Home
-document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
-document.getElementById('btnNext').addEventListener('click', () => {
-  lastResult = null;
-  feedbackPanel.innerHTML = '';
-  loadNextQuestion(false);
-});
-document.getElementById('btnPrev').addEventListener('click', goPreviousQuestion);
-document.getElementById('btnFlag').addEventListener('click', toggleFlag);
-document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceFlag);
-
-// Import / Export (home)
-document.getElementById('btnImport').addEventListener('click', handleImportSimple);
-document.getElementById('btnExport').addEventListener('click', exportQuestionsOnly);
-
-// All questions tab controls
-document.getElementById('btnAllReload').addEventListener('click', reloadAllQuestionsTable);
-document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
-document.getElementById('allSelectAll').addEventListener('change', e => {
-  document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
-    ch.checked = e.target.checked;
-  });
-});
-document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
-document.getElementById('allFilter').addEventListener('change', reloadAllQuestionsTable);
-document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
-
-// Maintenance tab controls
-document.getElementById('btnMaintReload').addEventListener('click', reloadMaintenanceTable);
-document.getElementById('btnMaintDelete').addEventListener('click', deleteSelectedMaint);
-document.getElementById('maintSelectAll').addEventListener('change', e => {
-  document.querySelectorAll('#maintTableBody input[type="checkbox"]').forEach(ch => {
-    ch.checked = e.target.checked;
-  });
-});
-document.getElementById('maintFilter').addEventListener('change', reloadMaintenanceTable);
-document.getElementById('maintChapterFilter').addEventListener('input', debounce(reloadMaintenanceTable, 300));
-
-// Backup tab controls
-document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
-document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
-
-// Cloud sync controls
-document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
-document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
-
-// Settings tab – GitHub
-document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
-document.getElementById('btnClearGitHub').addEventListener('click', () => {
-  localStorage.removeItem('mcq_github_config');
-  loadGitHubConfigIntoUI();
-  refreshCloudInfo();
-});
-
-// --- IndexedDB setup ---
-function openDB() {
+function openDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('questions')) {
-        const store = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
-        store.createIndex('by_chapter', 'chapter', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('answers')) {
-        const ans = db.createObjectStore('answers', { keyPath: 'id', autoIncrement: true });
-        ans.createIndex('by_question', 'questionId', { unique: false });
-        ans.createIndex('by_time', 'answeredAt', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('meta')) {
-        db.createObjectStore('meta', { keyPath: 'key' });
+    req.onupgradeneeded = (ev) => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+        store.createIndex('chapter', 'chapter', { unique: false });
+        store.createIndex('createdAt', 'createdAt', { unique: false });
+        store.createIndex('updatedAt', 'updatedAt', { unique: false });
+        store.createIndex('flagged', 'flagged', { unique: false });
+        store.createIndex('active', 'active', { unique: false });
       }
     };
-    req.onsuccess = (e) => {
-      db = e.target.result;
-      loadMeta();
+    req.onsuccess = () => {
+      db = req.result;
       resolve(db);
     };
-    req.onerror = (e) => reject(e.target.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
-function loadMeta() {
-  const tx = db.transaction('meta', 'readonly');
-  const store = tx.objectStore('meta');
-  const req = store.get('lastActivityAt');
-  req.onsuccess = () => {
-    lastActivityAt = req.result ? req.result.value : null;
-    refreshBackupLabels();
-  };
+function getStore(mode = 'readonly') {
+  const tx = db.transaction(STORE_NAME, mode);
+  return tx.objectStore(STORE_NAME);
 }
 
-// Helpers
-function randomChoice(arr) {
-  if (!arr.length) return null;
-  const idx = Math.floor(Math.random() * arr.length);
-  return arr[idx];
-}
-
-function debounce(fn, ms) {
-  let t = null;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
-}
-
-// --- Stats ---
-async function getStats() {
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const all = await new Promise(res => {
+function getAllQuestions() {
+  return new Promise((resolve, reject) => {
+    const store = getStore('readonly');
     const req = store.getAll();
-    req.onsuccess = e => res(e.target.result || []);
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
   });
-  const stats = {
-    total: all.length,
-    flagged: all.filter(q => q.flagged).length,
-    answered: all.filter(q => q.timesSeen > 0).length,
-    withWrong: all.filter(q => q.timesWrong > 0).length,
-    maintenance: all.filter(q => q.maintenance).length
+}
+
+function putQuestion(q) {
+  return new Promise((resolve, reject) => {
+    const store = getStore('readwrite');
+    const req = store.put(q);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function deleteQuestion(id) {
+  return new Promise((resolve, reject) => {
+    const store = getStore('readwrite');
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ---------- UI helpers ----------
+
+function $(id) {
+  return document.getElementById(id);
+}
+
+function setText(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+
+function renderStats(questions) {
+  const statsBar = $('statsBar');
+  if (!statsBar) return;
+  const total = questions.length;
+  const active = questions.filter(q => q.active !== false).length;
+  const flagged = questions.filter(q => q.flagged).length;
+  const wrongCount = questions.filter(q => q.wrongCount && q.wrongCount > 0).length;
+  statsBar.innerHTML = '';
+  const make = (label, val) => {
+    const div = document.createElement('div');
+    div.className = 'stat-pill';
+    div.textContent = `${label}: ${val}`;
+    statsBar.appendChild(div);
   };
-  return stats;
+  make('Total', total);
+  make('Active', active);
+  make('Flagged', flagged);
+  make('Ever wrong', wrongCount);
 }
 
-async function updateStatsBar() {
-  const el = document.getElementById('statsBar');
-  const s = await getStats();
-  el.innerHTML = `
-    <div>Total: <strong>${s.total}</strong></div>
-    <div>Answered: <strong>${s.answered}</strong></div>
-    <div>Wrong ≥1: <strong>${s.withWrong}</strong></div>
-    <div>Flagged: <strong>${s.flagged}</strong></div>
-    <div>Maintenance: <strong>${s.maintenance}</strong></div>
-  `;
-}
-
-// --- Pick question ---
-async function pickQuestion() {
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const all = await new Promise(res => {
-    const req = store.getAll();
-    req.onsuccess = e => res(e.target.result || []);
+function renderHistory() {
+  const list = $('historyList');
+  if (!list) return;
+  list.innerHTML = '';
+  history.slice(-20).reverse().forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'history-item ' + (h.correct ? 'correct' : 'wrong');
+    div.textContent = `${h.when} · Q${h.id} · ${h.chapter || ''} · ${h.correct ? '✓' : '✗'}`;
+    list.appendChild(div);
   });
-  if (!all.length) return null;
+}
 
-  let filtered = all.filter(q => q.active !== false);
+// ---------- Practice logic ----------
 
+async function loadNextQuestion() {
+  const questions = await getAllQuestions();
+  renderStats(questions);
+
+  let pool = questions.filter(q => q.active !== false);
   if (currentMode === 'new') {
-    filtered = filtered.filter(q => !q.timesSeen);
+    pool = pool.filter(q => !q.seen);
   } else if (currentMode === 'wrong') {
-    filtered = filtered.filter(q => q.timesWrong > 0);
+    pool = pool.filter(q => q.wrongCount && q.wrongCount > 0);
   } else if (currentMode === 'flagged') {
-    filtered = filtered.filter(q => q.flagged);
-  } else if (currentMode === 'chapter' && currentChapter) {
-    const chap = currentChapter.toLowerCase();
-    filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
+    pool = pool.filter(q => q.flagged);
+  } else if (currentMode === 'chapter' && currentChapterFilter.trim() !== '') {
+    const target = currentChapterFilter.trim().toLowerCase();
+    pool = pool.filter(q => (q.chapter || '').toLowerCase() === target);
   }
 
-  if (!filtered.length) filtered = all;
-
-  filtered.sort((a, b) => {
-    const as = a.lastSeenAt || '';
-    const bs = b.lastSeenAt || '';
-    if (as === bs) return (a.timesSeen || 0) - (b.timesSeen || 0);
-    return as.localeCompare(bs);
-  });
-
-  const slice = filtered.slice(0, Math.min(filtered.length, 50));
-  return randomChoice(slice);
-}
-
-function renderQuestion() {
-  if (!currentQuestion) {
-    questionPanel.innerHTML = '<div class="muted">No questions yet. Import JSON to start.</div>';
+  if (!pool.length) {
+    $('questionPanel').innerHTML = '<div class="muted">No questions match this mode/filter.</div>';
+    $('feedbackPanel').innerHTML = '';
+    currentQuestion = null;
     return;
   }
-  const q = currentQuestion;
-  const letters = ['A','B','C','D','E','F','G'];
-  currentChoices = q.choices || [];
 
-  let html = '';
-  html += `<div class="q-text">Q#${q.id ?? ''} – ${q.text || ''}</div>`;
-  if (q.chapter || q.source || q.maintenance || q.flagged) {
-    html += '<div class="tag-chapter">';
-    if (q.chapter) html += `<span>${q.chapter}</span>`;
-    if (q.source) html += ` · <span>${q.source}</span>`;
-    if (q.flagged) html += ` · <span class="pill pill-flag">Flag</span>`;
-    if (q.maintenance) html += ` · <span class="pill pill-maint">Maint</span>`;
-    html += '</div>';
-  }
-
-  html += '<div style="margin-top:0.4rem;">';
-  currentChoices.forEach((c, idx) => {
-    const letter = letters[idx] || '?';
-    const checked = (idx === lastSelectedIndex) ? 'checked' : '';
-    html += `<label class="choice">
-      <input type="radio" name="choice" value="${idx}" ${checked}>
-      <strong>${letter}.</strong> ${c.text || ''}
-    </label>`;
-  });
-  html += '</div>';
-
-  questionPanel.innerHTML = html;
-}
-
-async function updateHistoryList() {
-  const tx = db.transaction(['answers','questions'], 'readonly');
-  const aStore = tx.objectStore('answers');
-  const qStore = tx.objectStore('questions');
-
-  const allAns = await new Promise(res => {
-    const req = aStore.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-
-  allAns.sort((a, b) => (b.answeredAt || '').localeCompare(a.answeredAt || ''));
-  const recent = allAns.slice(0, 50);
-
-  const qMap = {};
-  await Promise.all(recent.map(a => new Promise(r => {
-    if (qMap[a.questionId]) return r();
-    const rq = qStore.get(a.questionId);
-    rq.onsuccess = e => { qMap[a.questionId] = e.target.result; r(); };
-    rq.onerror = () => r();
-  })));
-
-  let html = '';
-  recent.forEach(a => {
-    const q = qMap[a.questionId];
-    if (!q) return;
-    const label = (q.chapter || '').slice(0, 16);
-    html += `<div class="history-item" data-qid="${q.id}">
-      <div>${(q.text || '').slice(0, 80)}${q.text && q.text.length > 80 ? '…' : ''}</div>
-      <div class="muted">
-        ${label ? `<span>${label}</span>` : ''}
-        <span class="pill ${a.isCorrect ? 'pill-correct' : 'pill-wrong'}">${a.isCorrect ? 'Correct' : 'Wrong'}</span>
-        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
-        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
-      </div>
-    </div>`;
-  });
-
-  historyListEl.innerHTML = html || '<div class="muted tiny">No history yet.</div>';
-
-  historyListEl.querySelectorAll('.history-item').forEach(item => {
-    item.addEventListener('click', async () => {
-      const id = parseInt(item.getAttribute('data-qid'), 10);
-      const tx2 = db.transaction('questions', 'readonly');
-      const store2 = tx2.objectStore('questions');
-      const q = await new Promise(r => {
-        const rq = store2.get(id);
-        rq.onsuccess = e => r(e.target.result);
-        rq.onerror = () => r(null);
-      });
-      if (!q) return;
-      currentQuestion = q;
-      lastResult = null;
-      lastSelectedIndex = null;
-      feedbackPanel.innerHTML = '';
-      renderQuestion();
-    });
-  });
-}
-
-async function loadNextQuestion(resetHistory) {
-  if (resetHistory) {
-    historyStack = [];
-  } else if (currentQuestion && currentQuestion.id != null) {
-    historyStack.push(currentQuestion.id);
-  }
-  currentQuestion = await pickQuestion();
-  lastResult = null;
-  lastSelectedIndex = null;
-  feedbackPanel.innerHTML = '';
-  renderQuestion();
-  updateStatsBar();
-  updateHistoryList();
-}
-
-// Previous question
-async function goPreviousQuestion() {
-  if (!historyStack.length) return;
-  const prevId = historyStack.pop();
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const q = await new Promise(res => {
-    const req = store.get(prevId);
-    req.onsuccess = e => res(e.target.result);
-    req.onerror = () => res(null);
-  });
-  if (!q) return;
+  const q = pool[Math.floor(Math.random() * pool.length)];
   currentQuestion = q;
-  lastResult = null;
-  lastSelectedIndex = null;
-  feedbackPanel.innerHTML = '';
-  renderQuestion();
+
+  q.seen = true;
+  q.updatedAt = q.updatedAt || new Date().toISOString();
+  await putQuestion(q);
+
+  renderQuestion(q);
+  $('feedbackPanel').innerHTML = '';
 }
 
-// Submit answer
+function renderQuestion(q) {
+  const panel = $('questionPanel');
+  if (!panel) return;
+
+  const chapter = q.chapter ? `<div class="muted small-text">Chapter: ${q.chapter}</div>` : '';
+  const source = q.source ? `<div class="muted small-text">Source: ${q.source}</div>` : '';
+  const wrongInfo = q.wrongCount ? `<div class="muted small-text">Wrong attempts: ${q.wrongCount}</div>` : '';
+
+  let html = `
+    <h2 style="font-size:1rem; margin:0 0 0.4rem;">Q${q.id || ''}: ${q.text}</h2>
+    ${chapter}
+    ${source}
+    ${wrongInfo}
+    <div style="margin-top:0.4rem;">
+  `;
+
+  (q.options || q.choices || []).forEach((opt, idx) => {
+    const label = typeof opt === 'string' ? opt : opt.text;
+    html += `
+      <label class="answer-option">
+        <input type="radio" name="answer" value="${idx}">
+        <span>${label}</span>
+      </label>
+    `;
+  });
+
+  html += '</div>';
+  panel.innerHTML = html;
+
+  const btnFlag = $('btnFlag');
+  if (btnFlag) {
+    btnFlag.textContent = q.flagged ? 'Unflag' : 'Flag';
+  }
+}
+
 async function submitAnswer() {
   if (!currentQuestion) return;
-  const radios = document.querySelectorAll('input[name="choice"]');
-  let selectedIdx = null;
+  const radios = document.querySelectorAll('input[name="answer"]');
+  let selectedIndex = -1;
   radios.forEach(r => {
-    if (r.checked) selectedIdx = parseInt(r.value, 10);
+    if (r.checked) selectedIndex = parseInt(r.value, 10);
   });
-  if (selectedIdx === null) {
-    alert('اختر إجابة أولاً.');
+  if (selectedIndex === -1) {
+    alert('Choose an option first.');
     return;
   }
-  lastSelectedIndex = selectedIdx;
-  const correctIdx = (currentQuestion.choices || []).findIndex(c => c.isCorrect);
-  const isCorrect = (selectedIdx === correctIdx);
+
+  const q = currentQuestion;
+  const opts = q.options || q.choices || [];
+  const correctIndex = opts.findIndex(o => o.isCorrect);
+  const correct = selectedIndex === correctIndex;
+
+  q.totalAttempts = (q.totalAttempts || 0) + 1;
+  if (!correct) {
+    q.wrongCount = (q.wrongCount || 0) + 1;
+  }
+  q.updatedAt = new Date().toISOString();
+  await putQuestion(q);
+
+  const fb = $('feedbackPanel');
+  if (fb) {
+    const correctText = correct ? 'Correct ✅' : 'Wrong ❌';
+    let explanation = q.explanation || '';
+    if (!explanation && q.rationale) explanation = q.rationale;
+    if (!explanation) explanation = 'No explanation provided in JSON.';
+    fb.innerHTML = `
+      <div style="font-weight:600; margin-bottom:0.25rem;">${correctText}</div>
+      <div class="small-text">${explanation}</div>
+      <div style="margin-top:0.4rem;" class="small-text muted">
+        Correct option: ${correctIndex >= 0 ? String.fromCharCode(65 + correctIndex) : '-'}
+      </div>
+    `;
+  }
+
+  history.push({
+    id: q.id,
+    chapter: q.chapter || '',
+    correct,
+    when: new Date().toLocaleTimeString()
+  });
+  renderHistory();
+
+  const questionPanel = $('questionPanel');
+  if (questionPanel) {
+    const optsEls = questionPanel.querySelectorAll('.answer-option');
+    optsEls.forEach((el, idx) => {
+      if (idx === correctIndex) {
+        el.classList.add('correct');
+      } else if (idx === selectedIndex && !correct) {
+        el.classList.add('wrong');
+      }
+    });
+  }
+
+  const questions = await getAllQuestions();
+  renderStats(questions);
+}
+
+// ---------- Tabs ----------
+
+function setActiveTab(tabId) {
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === tabId);
+  });
+}
+
+// ---------- Import / Export ----------
+
+function normalizeQuestion(raw) {
+  const now = new Date().toISOString();
+  const base = {
+    text: raw.text || raw.question || '',
+    chapter: raw.chapter || '',
+    source: raw.source || '',
+    explanation: raw.explanation || raw.explain || '',
+    flagged: !!raw.flagged,
+    active: raw.active !== false,
+    createdAt: raw.createdAt || now,
+    updatedAt: raw.updatedAt || now,
+    wrongCount: raw.wrongCount || 0,
+    totalAttempts: raw.totalAttempts || 0
+  };
+
+  let options = raw.options || raw.choices || [];
+  if (!Array.isArray(options)) options = [];
+  options = options.map(o => {
+    if (typeof o === 'string') return { text: o, isCorrect: false };
+    return { text: o.text || '', isCorrect: !!o.isCorrect };
+  });
+
+  if (!options.some(o => o.isCorrect) && typeof raw.correctIndex === 'number') {
+    options = options.map((o, idx) => ({ ...o, isCorrect: idx === raw.correctIndex }));
+  }
+
+  return { ...raw, ...base, options };
+}
+
+async function mergeQuestions(imported) {
+  const storeQuestions = await getAllQuestions();
+  const byId = new Map();
+  storeQuestions.forEach(q => byId.set(q.id, q));
 
   const now = new Date().toISOString();
-  lastActivityAt = now;
-  saveMeta('lastActivityAt', now);
+  let created = 0;
+  let updated = 0;
 
-  const tx = db.transaction(['questions','answers'], 'readwrite');
-  const qStore = tx.objectStore('questions');
-  const aStore = tx.objectStore('answers');
-
-  const q = Object.assign({}, currentQuestion);
-  q.timesSeen = (q.timesSeen || 0) + 1;
-  q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
-  q.timesWrong = (q.timesWrong || 0) + (!isCorrect ? 1 : 0);
-  q.lastSeenAt = now;
-  qStore.put(q);
-
-  aStore.add({
-    questionId: q.id,
-    answeredAt: now,
-    selectedIndex: selectedIdx,
-    isCorrect
-  });
-
-  tx.oncomplete = () => {
-    currentQuestion = q;
-    lastResult = isCorrect;
-    showFeedback(correctIdx, selectedIdx, q.explanation);
-    updateStatsBar();
-    updateHistoryList();
-    refreshBackupLabels();
-  };
-}
-
-function showFeedback(correctIdx, selectedIdx, explanation) {
-  const letters = ['A','B','C','D','E','F','G'];
-  const choices = currentChoices;
-
-  const choiceEls = document.querySelectorAll('.choice');
-  choiceEls.forEach((el, idx) => {
-    el.classList.remove('correct','wrong','show');
-    if (idx === correctIdx) el.classList.add('correct','show');
-    if (idx === selectedIdx && idx !== correctIdx) el.classList.add('wrong','show');
-  });
-
-  let html = '<div style="margin-top:0.3rem;">';
-  if (lastResult) {
-    html += '<div style="color:#2e7d32; font-weight:600;">Correct ✅</div>';
-  } else {
-    html += '<div style="color:#c62828; font-weight:600;">Wrong ❌</div>';
-  }
-  if (correctIdx >= 0 && choices[correctIdx]) {
-    html += `<div class="muted" style="margin-top:0.25rem;">Correct answer: <strong>${letters[correctIdx]}.</strong> ${choices[correctIdx].text || ''}</div>`;
-  }
-  if (explanation) {
-    html += `<div class="muted" style="margin-top:0.25rem;"><strong>Explanation:</strong> ${explanation}</div>`;
-  }
-  html += '</div>';
-  feedbackPanel.innerHTML = html;
-}
-
-// Flags
-async function toggleFlag() {
-  if (!currentQuestion) return;
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  const q = Object.assign({}, currentQuestion);
-  q.flagged = !q.flagged;
-  store.put(q);
-  tx.oncomplete = () => {
-    currentQuestion = q;
-    renderQuestion();
-    updateStatsBar();
-    updateHistoryList();
-  };
-}
-
-async function toggleMaintenanceFlag() {
-  if (!currentQuestion) return;
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  const q = Object.assign({}, currentQuestion);
-  q.maintenance = !q.maintenance;
-  store.put(q);
-  tx.oncomplete = () => {
-    currentQuestion = q;
-    renderQuestion();
-    updateStatsBar();
-    updateHistoryList();
-  };
-}
-
-// Simple import (questions only)
-function handleImportSimple() {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) {
-    alert('اختر ملف JSON أولاً.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      let arr = data;
-      if (!Array.isArray(arr) && data.questions) {
-        arr = data.questions;
+  for (const raw of imported) {
+    const norm = normalizeQuestion(raw);
+    if (norm.id && byId.has(norm.id)) {
+      const existing = byId.get(norm.id);
+      const existingTime = existing.updatedAt || existing.createdAt || now;
+      const newTime = norm.updatedAt || norm.createdAt || now;
+      if (new Date(newTime) > new Date(existingTime)) {
+        norm.id = existing.id;
+        await putQuestion(norm);
+        updated++;
       }
-      if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
-      const tx = db.transaction('questions', 'readwrite');
-      const store = tx.objectStore('questions');
-      arr.forEach(q => {
-        const obj = {
-          text: q.text,
-          chapter: q.chapter || '',
-          source: q.source || '',
-          explanation: q.explanation || '',
-          choices: q.choices || [],
-          timesSeen: q.timesSeen || 0,
-          timesCorrect: q.timesCorrect || 0,
-          timesWrong: q.timesWrong || 0,
-          lastSeenAt: q.lastSeenAt || null,
-          createdAt: q.createdAt || new Date().toISOString(),
-          flagged: !!q.flagged,
-          maintenance: !!q.maintenance,
-          active: q.active !== false
-        };
-        if (q.id != null) obj.id = q.id;
-        store.put(obj);
-      });
-      tx.oncomplete = () => {
-        alert('Imported ' + arr.length + ' questions.');
-        loadNextQuestion(true);
-      };
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-}
-
-// Export questions only
-async function exportQuestionsOnly() {
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const all = await new Promise(res => {
-    const req = store.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-  const data = all.map(q => ({
-    id: q.id,
-    text: q.text,
-    chapter: q.chapter,
-    source: q.source,
-    explanation: q.explanation,
-    choices: q.choices,
-    flagged: !!q.flagged,
-    maintenance: !!q.maintenance,
-    active: q.active !== false,
-    timesSeen: q.timesSeen || 0,
-    timesCorrect: q.timesCorrect || 0,
-    timesWrong: q.timesWrong || 0,
-    lastSeenAt: q.lastSeenAt || null,
-    createdAt: q.createdAt || null
-  }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mcq_questions.json';
-  a.click();
-}
-
-// Meta helpers
-function saveMeta(key, value) {
-  const tx = db.transaction('meta', 'readwrite');
-  const store = tx.objectStore('meta');
-  store.put({ key, value });
-}
-
-// Format time
-function fmtTime(iso) {
-  if (!iso) return '–';
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
-// --- Backup full (questions + answers + meta) ---
-async function buildBackupObject() {
-  const qtx = db.transaction('questions', 'readonly');
-  const qs = qtx.objectStore('questions');
-  const questions = await new Promise(res => {
-    const req = qs.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-
-  const atx = db.transaction('answers', 'readonly');
-  const as = atx.objectStore('answers');
-  const answers = await new Promise(res => {
-    const req = as.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-
-  const metaTx = db.transaction('meta', 'readonly');
-  const ms = metaTx.objectStore('meta');
-  const metaAll = await new Promise(res => {
-    const req = ms.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-  const metaObj = {};
-  metaAll.forEach(m => { metaObj[m.key] = m.value; });
-
-  const exportedAt = new Date().toISOString();
-  const backup = {
-    meta: {
-      exportedAt,
-      appVersion: window.APP_VERSION || '3.4.0',
-      totalQuestions: questions.length,
-      totalAnswers: answers.length,
-      lastActivityAt: metaObj.lastActivityAt || null
-    },
-    questions,
-    answers
-  };
-  return backup;
-}
-
-async function exportFullBackup() {
-  const backup = await buildBackupObject();
-  const exportedAt = backup.meta.exportedAt;
-  saveMeta('lastBackupAt', exportedAt);
-  refreshBackupLabels();
-
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
-  const safeTs = exportedAt.replace(/[:]/g, '-');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'mcq_backup_' + safeTs + '.json';
-  a.click();
-}
-
-// Import backup
-async function handleBackupImport() {
-  const file = document.getElementById('backupFileInput').files[0];
-  if (!file) {
-    alert('اختر ملف backup JSON أولاً.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      await importBackupObject(data);
-      alert('Backup import completed.');
-      loadNextQuestion(true);
-      refreshBackupLabels();
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-}
-
-async function importBackupObject(backup) {
-  let questions = [];
-  let answers = [];
-  let meta = {};
-  if (Array.isArray(backup)) {
-    questions = backup;
-  } else if (backup && backup.questions) {
-    questions = backup.questions;
-    answers = backup.answers || [];
-    meta = backup.meta || {};
-  } else {
-    throw new Error('Invalid backup format');
-  }
-
-  const backupExportedAt = meta.exportedAt || null;
-
-  const metaTx = db.transaction('meta', 'readonly');
-  const ms = metaTx.objectStore('meta');
-  const lastActivityRec = await new Promise(res => {
-    const req = ms.get('lastActivityAt');
-    req.onsuccess = e => res(req.result?.value || null);
-    req.onerror = () => res(null);
-  });
-  const localLastActivity = lastActivityRec || null;
-
-  if (backupExportedAt && localLastActivity && backupExportedAt < localLastActivity) {
-    const proceed = confirm(
-      '⚠ Backup file seems older than your last activity.\n' +
-      'Import may overwrite some older stats.\n\nContinue anyway?'
-    );
-    if (!proceed) return;
-  }
-
-  // Merge questions: keep local if same id; add new ones
-  const qtx = db.transaction('questions', 'readwrite');
-  const qs = qtx.objectStore('questions');
-  const existing = await new Promise(res => {
-    const req = qs.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-  const byId = new Map();
-  existing.forEach(q => byId.set(q.id, q));
-
-  questions.forEach(q => {
-    const id = q.id;
-    if (id != null && byId.has(id)) {
-      // Merge: prefer local stats
-      const local = byId.get(id);
-      const merged = Object.assign({}, q, {
-        timesSeen: local.timesSeen || q.timesSeen || 0,
-        timesCorrect: local.timesCorrect || q.timesCorrect || 0,
-        timesWrong: local.timesWrong || q.timesWrong || 0,
-        lastSeenAt: local.lastSeenAt || q.lastSeenAt || null,
-        flagged: local.flagged || q.flagged || false,
-        maintenance: local.maintenance || q.maintenance || false,
-        active: local.active !== false
-      });
-      qs.put(merged);
     } else {
-      const obj = {
-        id: id,
-        text: q.text,
-        chapter: q.chapter || '',
-        source: q.source || '',
-        explanation: q.explanation || '',
-        choices: q.choices || [],
-        timesSeen: q.timesSeen || 0,
-        timesCorrect: q.timesCorrect || 0,
-        timesWrong: q.timesWrong || 0,
-        lastSeenAt: q.lastSeenAt || null,
-        createdAt: q.createdAt || new Date().toISOString(),
-        flagged: !!q.flagged,
-        maintenance: !!q.maintenance,
-        active: q.active !== false
-      };
-      qs.put(obj);
+      delete norm.id;
+      const id = await putQuestion(norm);
+      norm.id = id;
+      created++;
     }
-  });
-
-  // Merge answers: just append
-  if (answers.length) {
-    const atx = db.transaction('answers', 'readwrite');
-    const as = atx.objectStore('answers');
-    answers.forEach(a => {
-      const obj = {
-        questionId: a.questionId,
-        answeredAt: a.answeredAt || null,
-        selectedIndex: a.selectedIndex,
-        isCorrect: !!a.isCorrect
-      };
-      as.add(obj);
-    });
   }
 
-  // Update meta if backup is newer
-  if (backupExportedAt && (!localLastActivity || backupExportedAt > localLastActivity)) {
-    saveMeta('lastActivityAt', backupExportedAt);
-    lastActivityAt = backupExportedAt;
-  }
-  if (backupExportedAt) {
-    saveMeta('lastBackupAt', backupExportedAt);
-  }
+  const questions = await getAllQuestions();
+  renderStats(questions);
+  alert(`Import finished. New: ${created}, Updated: ${updated}. Existing newer entries preserved.`);
 }
 
-// Backup labels
-function refreshBackupLabels() {
-  const lastActEl = document.getElementById('lastActivityLabel');
-  const lastBackupEl = document.getElementById('lastBackupLabel');
-  const tx = db.transaction('meta', 'readonly');
-  const store = tx.objectStore('meta');
-  const req1 = store.get('lastActivityAt');
-  const req2 = store.get('lastBackupAt');
-  req1.onsuccess = () => {
-    lastActEl.textContent = fmtTime(req1.result ? req1.result.value : null);
+function handleFileImport() {
+  const input = $('fileInput');
+  if (!input || !input.files || !input.files[0]) {
+    alert('Pick a JSON file first.');
+    return;
+  }
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) {
+        alert('JSON must be an array of questions.');
+        return;
+      }
+      await mergeQuestions(data);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to parse JSON.');
+    }
   };
-  req2.onsuccess = () => {
-    lastBackupEl.textContent = fmtTime(req2.result ? req2.result.value : null);
-  };
+  reader.readAsText(file);
 }
 
-// --- All Questions table ---
-async function reloadAllQuestionsTable() {
-  const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
-  const filter = document.getElementById('allFilter').value;
-  const sortVal = document.getElementById('allSort').value;
-  const tbody = document.getElementById('allTableBody');
-  tbody.innerHTML = '';
-
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const all = await new Promise(res => {
-    const req = store.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-
-  let arr = all;
-
-  if (searchVal) {
-    arr = arr.filter(q => {
-      const s = (q.text || '') + ' ' + (q.chapter || '') + ' ' + (q.source || '');
-      return s.toLowerCase().includes(searchVal);
-    });
+async function handleUrlImport() {
+  const url = $('urlInput').value.trim();
+  if (!url) {
+    alert('Enter a URL.');
+    return;
   }
-
-  if (filter === 'flagged') {
-    arr = arr.filter(q => q.flagged);
-  } else if (filter === 'wrong') {
-    arr = arr.filter(q => q.timesWrong > 0);
-  } else if (filter === 'maintenance') {
-    arr = arr.filter(q => q.maintenance);
-  } else if (filter === 'inactive') {
-    arr = arr.filter(q => q.active === false);
-  }
-
-  if (sortVal === 'created_desc') {
-    arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-  } else if (sortVal === 'created_asc') {
-    arr.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  } else if (sortVal === 'chapter') {
-    arr.sort((a, b) => (a.chapter || '').localeCompare(b.chapter || ''));
-  } else if (sortVal === 'wrong_desc') {
-    arr.sort((a, b) => (b.timesWrong || 0) - (a.timesWrong || 0));
-  }
-
-  arr.forEach(q => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="checkbox" data-id="${q.id}"></td>
-      <td>${q.id}</td>
-      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
-      <td>${q.chapter || ''}</td>
-      <td>
-        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
-        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
-        ${q.active === false ? '<span class="pill pill-wrong">Inactive</span>' : ''}
-      </td>
-      <td>${q.timesSeen || 0}</td>
-      <td>${q.timesWrong || 0}</td>
-      <td>${q.lastSeenAt ? fmtTime(q.lastSeenAt) : ''}</td>
-    `;
-    tr.addEventListener('click', (e) => {
-      if (e.target.tagName.toLowerCase() === 'input') return;
-      currentQuestion = q;
-      lastResult = null;
-      lastSelectedIndex = null;
-      feedbackPanel.innerHTML = '';
-      renderQuestion();
-      document.querySelector('.tab-button[data-tab="home"]').click();
-    });
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteSelectedAll() {
-  const checked = Array.from(document.querySelectorAll('#allTableBody input[type="checkbox"]:checked'));
-  if (!checked.length) return;
-  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
-  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  ids.forEach(id => store.delete(id));
-  tx.oncomplete = () => {
-    reloadAllQuestionsTable();
-    loadNextQuestion(true);
-  };
-}
-
-// --- Maintenance table ---
-async function reloadMaintenanceTable() {
-  const filter = document.getElementById('maintFilter').value;
-  const chapVal = document.getElementById('maintChapterFilter').value.toLowerCase().trim();
-  const tbody = document.getElementById('maintTableBody');
-  tbody.innerHTML = '';
-
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const all = await new Promise(res => {
-    const req = store.getAll();
-    req.onsuccess = e => res(e.target.result || []);
-  });
-
-  let arr = all.filter(q => q.maintenance || q.flagged);
-  if (filter === 'maintenance') {
-    arr = arr.filter(q => q.maintenance);
-  } else if (filter === 'flagged') {
-    arr = arr.filter(q => q.flagged || q.maintenance);
-  }
-
-  if (chapVal) {
-    arr = arr.filter(q => (q.chapter || '').toLowerCase().includes(chapVal));
-  }
-
-  arr.sort((a, b) => (b.timesWrong || 0) - (a.timesWrong || 0));
-
-  arr.forEach(q => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="checkbox" data-id="${q.id}"></td>
-      <td>${q.id}</td>
-      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
-      <td>${q.chapter || ''}</td>
-      <td>
-        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
-        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
-      </td>
-      <td>${q.timesWrong || 0}</td>
-    `;
-    tr.addEventListener('click', (e) => {
-      if (e.target.tagName.toLowerCase() === 'input') return;
-      currentQuestion = q;
-      lastResult = null;
-      lastSelectedIndex = null;
-      feedbackPanel.innerHTML = '';
-      renderQuestion();
-      document.querySelector('.tab-button[data-tab="home"]').click();
-    });
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteSelectedMaint() {
-  const checked = Array.from(document.querySelectorAll('#maintTableBody input[type="checkbox"]:checked'));
-  if (!checked.length) return;
-  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
-  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  ids.forEach(id => store.delete(id));
-  tx.oncomplete = () => {
-    reloadMaintenanceTable();
-    reloadAllQuestionsTable();
-    loadNextQuestion(true);
-  };
-}
-
-// --- GitHub config + cloud sync ---
-function loadGitHubConfig() {
   try {
-    const raw = localStorage.getItem('mcq_github_config');
-    if (!raw) return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
-    const obj = JSON.parse(raw);
-    return {
-      token: obj.token || '',
-      repo: obj.repo || 'Awad1992/mcq-data',
-      filename: obj.filename || 'mcq_backup.json'
-    };
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) {
+      alert('URL JSON must be an array of questions.');
+      return;
+    }
+    await mergeQuestions(data);
+  } catch (e) {
+    console.error(e);
+    alert('Failed to fetch/parse JSON from URL.');
+  }
+}
+
+async function exportLocalBackup() {
+  const questions = await getAllQuestions();
+  const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mcq-backup-${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------- GitHub backup ----------
+
+function loadSettings() {
+  const raw = localStorage.getItem('mcq_settings_v36');
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
   } catch {
-    return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
+    return {};
   }
 }
 
-function saveGitHubConfig(cfg) {
-  localStorage.setItem('mcq_github_config', JSON.stringify(cfg));
+function saveSettingsToStorage(settings) {
+  localStorage.setItem('mcq_settings_v36', JSON.stringify(settings));
 }
 
-function loadGitHubConfigIntoUI() {
-  const cfg = loadGitHubConfig();
-  document.getElementById('ghTokenInput').value = cfg.token;
-  document.getElementById('ghRepoInput').value = cfg.repo;
-  document.getElementById('ghFileInput').value = cfg.filename;
+function applySettingsToUI() {
+  const s = loadSettings();
+  $('ghTokenInput').value = s.token || '';
+  $('ghRepoInput').value = s.repo || '';
+  $('ghFileInput').value = s.file || 'mcq-backup.json';
+  $('autoBackupCheckbox').checked = !!s.autoBackup;
+  const info = s.lastBackupAt ? `Last backup: ${s.lastBackupAt}` : 'No backup yet';
+  setText('lastBackupInfo', info);
 }
 
-function saveGitHubConfigFromUI() {
-  const token = document.getElementById('ghTokenInput').value.trim();
-  const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
-  const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
-  const cfg = { token, repo, filename };
-  saveGitHubConfig(cfg);
-  refreshCloudInfo();
-  alert('GitHub settings saved.');
+function collectSettingsFromUI() {
+  return {
+    token: $('ghTokenInput').value.trim(),
+    repo: $('ghRepoInput').value.trim(),
+    file: $('ghFileInput').value.trim() || 'mcq-backup.json',
+    autoBackup: $('autoBackupCheckbox').checked,
+    lastBackupAt: loadSettings().lastBackupAt || null
+  };
 }
 
-function refreshCloudInfo() {
-  const cfg = loadGitHubConfig();
-  const el = document.getElementById('cloudInfo');
-  const syncStatus = document.getElementById('syncStatus');
-  if (!cfg.token || !cfg.repo) {
-    el.textContent = 'Cloud sync disabled. Add token + repo in Settings.';
-    syncStatus.textContent = 'No cloud sync';
+async function backupToGitHub(showAlerts = true) {
+  const s = loadSettings();
+  if (!s.token || !s.repo || !s.file) {
+    if (showAlerts) alert('Set token, repo, and filename first in Settings.');
     return;
   }
-  el.textContent = 'Cloud ready → Repo: ' + cfg.repo + ' · File: ' + cfg.filename;
-  syncStatus.textContent = 'Cloud: ready';
-}
-
-// GitHub helper: base64
-function encodeBase64(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function decodeBase64(str) {
-  return decodeURIComponent(escape(atob(str)));
-}
-
-// Cloud upload
-async function cloudUpload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
+  const [owner, repo] = s.repo.split('/');
+  if (!owner || !repo) {
+    if (showAlerts) alert('Repo must be in form owner/name.');
     return;
   }
-  const backup = await buildBackupObject();
-  const contentStr = JSON.stringify(backup, null, 2);
-  const contentB64 = encodeBase64(contentStr);
+  const questions = await getAllQuestions();
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(questions, null, 2))));
 
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(s.file)}`;
 
-  let existingSha = null;
+  let sha = null;
   try {
-    const getRes = await fetch(url, {
-      headers: { Authorization: `token ${cfg.token}` }
+    const headRes = await fetch(url, {
+      headers: { Authorization: `Bearer ${s.token}`, Accept: 'application/vnd.github+json' }
     });
-    if (getRes.status === 200) {
-      const info = await getRes.json();
-      existingSha = info.sha;
+    if (headRes.ok) {
+      const meta = await headRes.json();
+      sha = meta.sha;
     }
-  } catch (err) {
-    console.error(err);
+  } catch (e) {
+    console.error('HEAD failed (non-fatal):', e);
   }
 
   const body = {
     message: 'MCQ backup ' + new Date().toISOString(),
-    content: contentB64
+    content,
+    sha: sha || undefined
   };
-  if (existingSha) body.sha = existingSha;
 
   const res = await fetch(url, {
     method: 'PUT',
     headers: {
-      Authorization: `token ${cfg.token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${s.token}`,
+      Accept: 'application/vnd.github+json'
     },
     body: JSON.stringify(body)
   });
 
   if (!res.ok) {
-    const txt = await res.text();
-    alert('Upload failed: ' + res.status + ' ' + txt);
+    console.error('Backup error', await res.text());
+    if (showAlerts) alert('GitHub backup failed.');
     return;
   }
-  alert('Backup uploaded to GitHub.');
+
+  const now = new Date().toISOString();
+  const updated = { ...s, lastBackupAt: now };
+  saveSettingsToStorage(updated);
+  applySettingsToUI();
+  if (showAlerts) alert('Backup completed.');
 }
 
-// Cloud download
-async function cloudDownload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
-    return;
+function setupAutoBackup() {
+  if (autoBackupTimer) {
+    clearInterval(autoBackupTimer);
+    autoBackupTimer = null;
   }
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
+  const s = loadSettings();
+  if (s.autoBackup) {
+    autoBackupTimer = setInterval(() => backupToGitHub(false), 60 * 1000);
   }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `token ${cfg.token}` }
+}
+
+// ---------- Maintenance ----------
+
+function filterQuestionsForMaintenance(all) {
+  const text = $('mSearchText').value.trim().toLowerCase();
+  const chapterExact = $('mChapterExact').value.trim().toLowerCase();
+  const flagFilter = $('mFlagFilter').value;
+  const statusFilter = $('mStatusFilter').value;
+
+  return all.filter(q => {
+    if (text && !(q.text || '').toLowerCase().includes(text)) return false;
+    if (chapterExact && (q.chapter || '').toLowerCase() !== chapterExact) return false;
+    if (flagFilter === 'flagged' && !q.flagged) return false;
+    if (flagFilter === 'unflagged' && q.flagged) return false;
+    if (statusFilter === 'active' && q.active === false) return false;
+    if (statusFilter === 'inactive' && q.active !== false) return false;
+    return true;
   });
-  if (res.status === 404) {
-    alert('No backup file found in GitHub repo.');
-    return;
-  }
-  if (!res.ok) {
-    const txt = await res.text();
-    alert('Download failed: ' + res.status + ' ' + txt);
-    return;
-  }
-  const info = await res.json();
-  const contentStr = decodeBase64(info.content);
-  let data = null;
-  try {
-    data = JSON.parse(contentStr);
-  } catch (err) {
-    alert('Invalid JSON in backup file.');
-    return;
-  }
-  await importBackupObject(data);
-  alert('Cloud backup downloaded and merged.');
-  loadNextQuestion(true);
-  refreshBackupLabels();
 }
 
-// Initial DB open
-openDB().then(() => {
-  refreshBackupLabels();
-  refreshCloudInfo();
-  loadGitHubConfigIntoUI();
-  loadNextQuestion(true);
-}).catch(err => {
-  console.error(err);
-  alert('Failed to open local database.');
+function sortQuestionsForMaintenance(list) {
+  const sortBy = $('mSortBy').value;
+  const copy = [...list];
+  copy.sort((a, b) => {
+    if (sortBy === 'chapter') {
+      return (a.chapter || '').localeCompare(b.chapter || '');
+    } else if (sortBy === 'createdAt') {
+      return (a.createdAt || '').localeCompare(b.createdAt || '');
+    } else if (sortBy === 'updatedAt') {
+      return (a.updatedAt || '').localeCompare(b.updatedAt || '');
+    } else {
+      return (a.id || 0) - (b.id || 0);
+    }
+  });
+  return copy;
+}
+
+async function loadMaintenanceList() {
+  const all = await getAllQuestions();
+  const filtered = filterQuestionsForMaintenance(all);
+  const sorted = sortQuestionsForMaintenance(filtered);
+
+  const container = $('maintenanceList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  sorted.forEach(q => {
+    const row = document.createElement('div');
+    row.className = 'maintenance-row';
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.dataset.id = q.id;
+
+    const middle = document.createElement('div');
+    const title = document.createElement('div');
+    title.textContent = `Q${q.id}: ${q.text}`;
+    const meta = document.createElement('div');
+    meta.className = 'maintenance-meta';
+    meta.textContent = [
+      q.chapter ? `Ch: ${q.chapter}` : '',
+      q.flagged ? 'Flagged' : '',
+      q.active === false ? 'Inactive' : 'Active',
+      q.createdAt ? `Created: ${q.createdAt.slice(0, 10)}` : ''
+    ].filter(Boolean).join(' · ');
+
+    middle.appendChild(title);
+    middle.appendChild(meta);
+
+    const actions = document.createElement('div');
+    const btnOpen = document.createElement('button');
+    btnOpen.textContent = 'Open';
+    btnOpen.addEventListener('click', () => {
+      currentQuestion = q;
+      setActiveTab('practiceTab');
+      renderQuestion(q);
+    });
+    actions.appendChild(btnOpen);
+
+    row.appendChild(chk);
+    row.appendChild(middle);
+    row.appendChild(actions);
+
+    container.appendChild(row);
+  });
+}
+
+function getSelectedIdsFromMaintenance() {
+  const container = $('maintenanceList');
+  if (!container) return [];
+  const checks = container.querySelectorAll('input[type="checkbox"][data-id]');
+  const ids = [];
+  checks.forEach(c => {
+    if (c.checked) ids.push(Number(c.dataset.id));
+  });
+  return ids;
+}
+
+async function deleteSelectedQuestions() {
+  const ids = getSelectedIdsFromMaintenance();
+  if (!ids.length) {
+    alert('Select at least one question.');
+    return;
+  }
+  if (!confirm(`Delete ${ids.length} selected question(s)? This cannot be undone.`)) return;
+  for (const id of ids) {
+    await deleteQuestion(id);
+  }
+  await loadMaintenanceList();
+  const questions = await getAllQuestions();
+  renderStats(questions);
+}
+
+async function flagSelected(flagValue) {
+  const ids = getSelectedIdsFromMaintenance();
+  if (!ids.length) {
+    alert('Select at least one question.');
+    return;
+  }
+  const all = await getAllQuestions();
+  const byId = new Map(all.map(q => [q.id, q]));
+  for (const id of ids) {
+    const q = byId.get(id);
+    if (!q) continue;
+    q.flagged = flagValue;
+    q.updatedAt = new Date().toISOString();
+    await putQuestion(q);
+  }
+  await loadMaintenanceList();
+}
+
+function toggleSelectAllMaintenance() {
+  const container = $('maintenanceList');
+  if (!container) return;
+  const checks = Array.from(container.querySelectorAll('input[type="checkbox"][data-id]'));
+  if (!checks.length) return;
+  const allChecked = checks.every(c => c.checked);
+  checks.forEach(c => c.checked = !allChecked);
+}
+
+// ---------- Init ----------
+
+async function init() {
+  await openDb();
+  applySettingsToUI();
+  setupAutoBackup();
+
+  $('modeSelect').addEventListener('change', ev => {
+    currentMode = ev.target.value;
+    $('chapterFilter').style.display = currentMode === 'chapter' ? 'inline-block' : 'none';
+    loadNextQuestion();
+  });
+
+  $('chapterFilter').addEventListener('input', ev => {
+    currentChapterFilter = ev.target.value;
+  });
+
+  $('btnSubmit').addEventListener('click', submitAnswer);
+  $('btnNext').addEventListener('click', loadNextQuestion);
+  $('btnFlag').addEventListener('click', async () => {
+    if (!currentQuestion) return;
+    currentQuestion.flagged = !currentQuestion.flagged;
+    currentQuestion.updatedAt = new Date().toISOString();
+    await putQuestion(currentQuestion);
+    renderQuestion(currentQuestion);
+    const questions = await getAllQuestions();
+    renderStats(questions);
+  });
+
+  $('btnImport').addEventListener('click', handleFileImport);
+  $('btnImportUrl').addEventListener('click', handleUrlImport);
+  $('btnExportLocal').addEventListener('click', exportLocalBackup);
+  $('btnBackupNow').addEventListener('click', () => backupToGitHub(true));
+
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+  });
+
+  $('btnSaveSettings').addEventListener('click', () => {
+    const s = collectSettingsFromUI();
+    saveSettingsToStorage(s);
+    applySettingsToUI();
+    setupAutoBackup();
+    alert('Settings saved.');
+  });
+
+  $('btnOpenTokenPage').addEventListener('click', () => {
+    window.open('https://github.com/settings/tokens', '_blank');
+  });
+
+  $('btnReloadMaintenance').addEventListener('click', loadMaintenanceList);
+  $('mSearchText').addEventListener('input', loadMaintenanceList);
+  $('mChapterExact').addEventListener('input', loadMaintenanceList);
+  $('mFlagFilter').addEventListener('change', loadMaintenanceList);
+  $('mStatusFilter').addEventListener('change', loadMaintenanceList);
+  $('mSortBy').addEventListener('change', loadMaintenanceList);
+
+  $('btnToggleSelectAll').addEventListener('click', toggleSelectAllMaintenance);
+  $('btnDeleteSelected').addEventListener('click', deleteSelectedQuestions);
+  $('btnFlagSelected').addEventListener('click', () => flagSelected(true));
+  $('btnUnflagSelected').addEventListener('click', () => flagSelected(false));
+
+  $('btnWipeAll').addEventListener('click', async () => {
+    if (!confirm('Wipe all local questions? This cannot be undone.')) return;
+    const store = getStore('readwrite');
+    const req = store.clear();
+    req.onsuccess = async () => {
+      const questions = await getAllQuestions();
+      renderStats(questions);
+      $('questionPanel').innerHTML = '<div class="muted">All questions cleared.</div>';
+      $('feedbackPanel').innerHTML = '';
+      $('maintenanceList').innerHTML = '';
+    };
+  });
+
+  const questions = await getAllQuestions();
+  renderStats(questions);
+  renderHistory();
+  loadNextQuestion();
+}
+
+window.addEventListener('load', () => {
+  init().catch(err => {
+    console.error(err);
+    alert('Failed to initialize app.');
+  });
 });
