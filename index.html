@@ -201,6 +201,12 @@
 
     <!-- ALL QUESTIONS TAB -->
     <section class="tab-content" id="tab-all">
+      <div class="subnav">
+        <button class="subnav-btn subnav-btn-active" data-allview="bank">Question bank</button>
+        <button class="subnav-btn" data-allview="builder">Build from text / PDF</button>
+      </div>
+
+      <div id="allViewBank">
       <div class="card">
         <div class="row-controls">
           <div>
@@ -235,7 +241,11 @@
             <label class="small-label">Range / chapter</label><br>
             <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
             <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
-            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;">
+            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;"><br>
+            <input id="allLastN" type="number" min="0" placeholder="Last N (0 = all)" style="width:120px; margin-top:4px;">
+            <label class="small-label" style="display:inline-block; margin-left:8px;">
+              <input type="checkbox" id="allRangeMode"> Range select (first↔last)
+            </label>
           </div>
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>
@@ -277,7 +287,57 @@
             <tbody id="allTableBody"></tbody>
           </table>
         </div>
+        <div class="all-footer">
+          <div class="all-selected-indicator">
+            Selected: <span id="allSelectedCount">0</span>
+          </div>
+          <div class="all-bulk-actions">
+            <button id="allBulkSetChapter">Set chapter for selected</button>
+            <button id="allBulkAddTag">Add tag to selected</button>
+          </div>
+          <div class="all-pager">
+            <button id="allPrevPage">&lt; Prev</button>
+            <span id="allPageInfo">Page 1 / 1</span>
+            <button id="allNextPage">Next &gt;</button>
+          </div>
+        </div>
+            </div> <!-- end allViewBank -->
+
+      <div id="allViewBuilder" style="display:none;">
+        <div class="card">
+          <h2>Build questions from text / file</h2>
+          <p class="muted tiny">
+            Paste source text (any language). I will help you generate a ChatGPT prompt and then let you paste back the JSON questions for preview and import.
+          </p>
+          <div class="builder-row">
+            <div class="builder-col">
+              <h3>Step 1 – Source</h3>
+              <textarea id="builderSourceText" rows="8" placeholder="Paste source text here..."></textarea>
+              <div class="builder-inline">
+                <label># MCQs to generate:</label>
+                <input id="builderNumQuestions" type="number" min="1" max="200" value="20" style="width:80px;">
+              </div>
+              <button id="btnBuilderMakePrompt">Generate prompt for ChatGPT</button>
+              <textarea id="builderPromptOut" rows="10" readonly placeholder="Prompt for ChatGPT will appear here..."></textarea>
+            </div>
+            <div class="builder-col">
+              <h3>Step 2 – JSON from ChatGPT</h3>
+              <p class="muted tiny">
+                After ChatGPT generates the JSON array of questions, paste it below and click Preview.
+              </p>
+              <textarea id="builderJsonInput" rows="12" placeholder='[ { "id": 1, "text": "...", ... }, ... ]'></textarea>
+              <div class="builder-inline">
+                <button id="btnBuilderPreview">Preview questions</button>
+                <button id="btnBuilderImportSelected">Import selected into bank</button>
+              </div>
+              <div id="builderPreview" class="builder-preview muted tiny">
+                No preview yet.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
     </section>
 
     <!-- BACKUP & CLOUD TAB -->

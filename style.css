@@ -726,3 +726,58 @@ body.theme-night .modal-body {
   font-size: 11px;
   padding: 3px 6px;
 }
+
+
+.subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.subnav-btn {
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #f8f8f8;
+  cursor: pointer;
+}
+
+.subnav-btn-active {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}
+
+.builder-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.builder-col {
+  flex: 1 1 280px;
+  min-width: 260px;
+}
+
+.builder-col textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+
+.builder-inline {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-preview {
+  margin-top: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 4px 6px;
+  background: #fafafa;
+}
