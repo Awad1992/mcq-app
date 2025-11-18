@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Pro 3.5</title>
+  <title>MCQ Study App Pro 4.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=3.5.0">
-  <link rel="stylesheet" href="style.css?v=3.5.0">
+  <link rel="manifest" href="manifest.json?v=4.0.0">
+  <link rel="stylesheet" href="style.css?v=4.0.0">
 </head>
 <body>
 <div class="app">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Pro <span class="ver">v3.5</span></h1>
-      <div class="subtitle">Local bank + history + flags + maintenance + GitHub sync + smarter control</div>
+      <h1>MCQ Study App Pro <span class="ver">v4.0</span></h1>
+      <div class="subtitle">Local bank · history · flags · maintenance tag · smart filters · auto‑backup</div>
     </div>
     <div class="chips">
       <span class="chip">Offline</span>
@@ -26,7 +26,6 @@
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Home</button>
     <button class="tab-button" data-tab="all">All Questions</button>
-    <button class="tab-button" data-tab="maintenance">Maintenance</button>
     <button class="tab-button" data-tab="backup">Backup & Cloud</button>
     <button class="tab-button" data-tab="settings">Settings</button>
   </nav>
@@ -37,6 +36,7 @@
     <section class="tab-content active" id="tab-home">
       <div class="card">
         <div class="stats-row" id="statsBar"></div>
+        <div class="stats-row" id="sessionStatsBar"></div>
       </div>
 
       <div class="card">
@@ -55,10 +55,10 @@
                 <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
               </div>
               <div>
-                <label class="small-label">Session options</label><br>
+                <label class="small-label">Session control</label><br>
+                <input id="sessionSizeInput" type="number" min="0" placeholder="Session size (0 = unlimited)" style="max-width:180px; margin-bottom:0.25rem;"><br>
                 <label class="tiny">
-                  <input type="checkbox" id="allowRepeatsCheckbox" checked>
-                  Allow repeats in this session
+                  <input type="checkbox" id="noRepeatThisSession" checked> No repeat IDs this session
                 </label>
               </div>
               <div>
@@ -107,20 +107,21 @@
       <div class="card">
         <div class="row-controls">
           <div>
-            <label class="small-label">Search (contains)</label><br>
-            <input id="allSearch" placeholder="Text / chapter / source" style="min-width:220px;">
+            <label class="small-label">Search (text / chapter / source)</label><br>
+            <input id="allSearch" placeholder="Any text..." style="min-width:220px;">
           </div>
           <div>
-            <label class="small-label">Exact chapter</label><br>
+            <label class="small-label">Chapter (exact, not case‑sensitive)</label><br>
             <input id="allChapterExact" placeholder="Exact chapter name">
           </div>
           <div>
             <label class="small-label">ID range</label><br>
-            <div class="tiny">
-              <input id="allIdFrom" type="number" placeholder="From" style="width:80px;">
-              <input id="allIdTo" type="number" placeholder="To" style="width:80px;">
-            </div>
+            <input id="allIdFrom" type="number" min="1" placeholder="From" style="width:80px;">
+            <input id="allIdTo" type="number" min="1" placeholder="To" style="width:80px;">
           </div>
+        </div>
+
+        <div class="row-controls" style="margin-top:0.5rem;">
           <div>
             <label class="small-label">Filter</label><br>
             <select id="allFilter">
@@ -129,7 +130,8 @@
               <option value="wrong">Wrong ≥ 1</option>
               <option value="maintenance">Maintenance only</option>
               <option value="inactive">Inactive</option>
-              <option value="duplicates">Duplicates only</option>
+              <option value="seenOnce">Seen exactly once</option>
+              <option value="duplicates">Duplicates (by text)</option>
             </select>
           </div>
           <div>
@@ -144,7 +146,7 @@
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>
             <button id="btnAllDelete" class="danger">Delete selected</button>
-            <button id="btnDeleteDuplicates" class="danger tiny">Clean duplicates</button>
+            <button id="btnAllDeleteDup" class="danger">Delete duplicates (keep one)</button>
           </div>
         </div>
 
@@ -168,46 +170,6 @@
       </div>
     </section>
 
-    <!-- MAINTENANCE TAB -->
-    <section class="tab-content" id="tab-maintenance">
-      <div class="card">
-        <div class="row-controls">
-          <div>
-            <label class="small-label">Show</label><br>
-            <select id="maintFilter">
-              <option value="maintenance">Maintenance only</option>
-              <option value="flagged">Flagged + Maintenance</option>
-              <option value="all">All needing review</option>
-            </select>
-          </div>
-          <div>
-            <label class="small-label">Chapter filter</label><br>
-            <input id="maintChapterFilter" placeholder="Chapter (e.g. Ch45)">
-          </div>
-          <div class="all-actions">
-            <button id="btnMaintReload">Reload</button>
-            <button id="btnMaintDelete" class="danger">Delete selected</button>
-          </div>
-        </div>
-
-        <div class="table-wrapper">
-          <table class="q-table">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="maintSelectAll"></th>
-                <th>ID</th>
-                <th>Question</th>
-                <th>Chapter</th>
-                <th>Flags</th>
-                <th>Wrong</th>
-              </tr>
-            </thead>
-            <tbody id="maintTableBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
     <!-- BACKUP & CLOUD TAB -->
     <section class="tab-content" id="tab-backup">
       <div class="card">
@@ -224,26 +186,24 @@
           <div class="backup-status">
             <div>Last activity: <span id="lastActivityLabel">–</span></div>
             <div>Last local backup: <span id="lastBackupLabel">–</span></div>
-            <div>Last auto-backup: <span id="lastAutoBackupLabel">–</span></div>
+            <div>Auto backup: <span id="autoBackupLabel">–</span></div>
           </div>
         </div>
+      </div>
 
-        <div class="row-controls" style="margin-top:0.5rem;">
+      <div class="card">
+        <h2>Import backup from URL</h2>
+        <p class="muted tiny">
+          URL must point to a JSON file (same format as exported backup or questions array).
+        </p>
+        <div class="row-controls">
           <div>
-            <label class="small-label">Import questions from URL</label><br>
-            <input id="importUrlInput" placeholder="https://.../mcq.json" style="min-width:260px;">
+            <input id="backupUrlInput" placeholder="https://.../mcq_backup.json" style="min-width:260px;">
           </div>
           <div>
-            <button id="btnImportUrl">Import from URL</button>
-          </div>
-          <div>
-            <button id="btnRestoreAutoBackup">Restore auto-backup</button>
+            <button id="btnBackupImportUrl">Import from URL</button>
           </div>
         </div>
-        <p class="muted tiny">
-          Auto-backup runs every ~60 seconds inside this browser only (no files created). Restore auto-backup will merge
-          that internal copy back into the database.
-        </p>
       </div>
 
       <div class="card">
@@ -264,6 +224,23 @@
 
     <!-- SETTINGS TAB -->
     <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h2>Practice behavior</h2>
+        <div class="settings-grid">
+          <label>
+            <span class="small-label">Shuffle choices</span>
+            <input type="checkbox" id="setShuffleChoices">
+          </label>
+          <label>
+            <span class="small-label">Avoid duplicate texts in practice</span>
+            <input type="checkbox" id="setAvoidDupText">
+          </label>
+        </div>
+        <p class="muted tiny">
+          These options control how questions are picked each session.
+        </p>
+      </div>
+
       <div class="card">
         <h2>GitHub settings</h2>
         <div class="settings-grid">
@@ -295,9 +272,8 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>3.5.0</strong><br>
-          Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
-          Auto-backup: internal JSON snapshot every 60s (meta store), with one-click restore.<br>
+          Version: <strong>4.0.0</strong><br>
+          Storage: IndexedDB (local), plus optional GitHub JSON sync and 1‑minute local auto‑backup.<br>
           Safe backup: Importing an older backup will warn you if it is older than your last activity.
         </p>
       </div>
@@ -307,12 +283,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "3.5.0";
+  window.APP_VERSION = "4.0.0";
 </script>
-<script src="app.js?v=3.5.0"></script>
+<script src="app.js?v=4.0.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=3.5.0').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.0.0').catch(()=>{});
   }
 </script>
 </body>

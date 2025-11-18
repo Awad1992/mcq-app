@@ -1,1 +1,11 @@
-// placeholder service worker for v3.5\nself.addEventListener('install',()=>self.skipWaiting());\nself.addEventListener('activate',e=>{});
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  // Network-first, simple pass-through (no special caching for now).
+});
