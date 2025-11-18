@@ -1,172 +1,424 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Ultra Pro Max V5 – MCQ Bank</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <title>MCQ Study App Ultra-Pro 4.1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json?v=4.1.0">
+  <link rel="stylesheet" href="style.css?v=4.1.0">
 </head>
 <body>
-<header>
-  <h1>Ultra Pro Max V5 – MCQ Bank</h1>
-  <nav>
-    <button data-view="editor">New / Edit Question</button>
-    <button data-view="list">All Questions</button>
+<div class="app" id="appRoot">
+  <header class="top-bar">
+    <div>
+      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.1</span></h1>
+      <div class="subtitle">Local bank + spaced repetition + weak‑spot engine + dashboard + flashcards + exam sim</div>
+    </div>
+    <div class="chips">
+      <span class="chip">Offline</span>
+      <span class="chip chip-ok">Tracks wrong / weak</span>
+      <span class="chip chip-flag">Flags & tags</span>
+      <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
+      <select id="themeSelect" class="chip chip-theme">
+        <option value="light">☀︎ Light</option>
+        <option value="dark">🌙 Dark</option>
+        <option value="night">🖤 Night</option>
+        <option value="calm">🌿 Calm</option>
+      </select>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="home">Practice</button>
+    <button class="tab-button" data-tab="flashcards">Flashcards</button>
+    <button class="tab-button" data-tab="exam">Exam Sim</button>
+    <button class="tab-button" data-tab="dashboard">Dashboard</button>
+    <button class="tab-button" data-tab="all">All Questions</button>
+    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
+    <button class="tab-button" data-tab="settings">Settings</button>
   </nav>
-  <div class="global-actions">
-    <button id="saveAllBtn">💾 Save</button>
-    <span id="saveStatus"></span>
+
+  <main class="tab-container">
+
+    <!-- PRACTICE TAB -->
+    <section class="tab-content active" id="tab-home">
+      <div class="card">
+        <div class="stats-row" id="statsBar"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="col-main">
+            <div class="row-controls">
+              <div>
+                <label class="small-label">Practice mode</label><br>
+                <select id="modeSelect">
+                  <option value="due">Spaced (due now)</option>
+                  <option value="all">All active</option>
+                  <option value="new">New (never answered)</option>
+                  <option value="wrong">Previously wrong</option>
+                  <option value="flagged">Flagged</option>
+                  <option value="weak">Smart weakness focus</option>
+                  <option value="chapter">By chapter</option>
+                </select>
+                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
+              </div>
+              <div>
+                <label class="small-label">Quick actions</label><br>
+                <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
+                <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
+                <button class="pill-btn" id="btnStartDaily">Daily 10</button>
+              </div>
+              <div>
+                <label class="small-label">Concept‑link</label><br>
+                <div id="relatedBox" class="related-box tiny muted">No related questions yet.</div>
+              </div>
+            </div>
+
+            <div id="questionPanel" class="question-panel"></div>
+            <div id="feedbackPanel" class="feedback-panel"></div>
+
+            <div class="btn-row-main">
+              <button class="primary" id="btnSubmit">Submit</button>
+              <button id="btnPrev">Previous</button>
+              <button id="btnNext">Next</button>
+              <button class="ghost" id="btnFlag">Flag</button>
+              <button class="ghost" id="btnMaint">Maint</button>
+            </div>
+          </div>
+
+          <div class="col-side">
+            <div class="side-block card">
+              <div class="small-label">Quick import / export</div>
+              <input type="file" id="fileInput" accept=".json">
+              <div class="btn-row-tight">
+                <button id="btnImport">Import</button>
+                <button id="btnExport">Export</button>
+              </div>
+              <div class="muted tiny">
+                JSON file with questions, choices, correct answer, explanation, chapter, tags, images.
+              </div>
+            </div>
+
+            <div class="card side-card">
+              <div class="small-label">Recent history</div>
+              <div class="history-list" id="historyList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FLASHCARDS TAB -->
+    <section class="tab-content" id="tab-flashcards">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Flashcards source</label><br>
+            <select id="fcSource">
+              <option value="due">Spaced (due now)</option>
+              <option value="weak">Weak topics</option>
+              <option value="flagged">Flagged</option>
+              <option value="chapter">By chapter</option>
+            </select>
+            <input id="fcChapterFilter" placeholder="Chapter exact (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
+          </div>
+          <div>
+            <label class="small-label">Mode</label><br>
+            <select id="fcMode">
+              <option value="q-first">Question → Answer</option>
+              <option value="a-first">Answer → Question</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card flashcard-card">
+        <div id="flashcardInner" class="flashcard-inner">
+          <div class="flashcard-front" id="flashcardFront">No cards yet.</div>
+          <div class="flashcard-back" id="flashcardBack" style="display:none;"></div>
+        </div>
+        <div class="btn-row-main flashcard-controls">
+          <button id="btnFcShow">Show answer</button>
+          <button id="btnFcAgain">Again</button>
+          <button id="btnFcGood" class="primary">Good</button>
+          <button id="btnFcNext">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXAM SIM TAB -->
+    <section class="tab-content" id="tab-exam">
+      <div class="card">
+        <h2>Exam Simulation</h2>
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Question pool</label><br>
+            <select id="examPool">
+              <option value="all">All active</option>
+              <option value="weak">Weakness focus</option>
+              <option value="flagged">Flagged</option>
+              <option value="chapter">By chapter</option>
+            </select>
+            <input id="examChapterFilter" placeholder="Chapter (optional)" style="display:none; max-width:200px;">
+          </div>
+          <div>
+            <label class="small-label">Number of questions</label><br>
+            <input id="examCount" type="number" min="5" max="200" value="30" style="width:90px;">
+          </div>
+          <div>
+            <label class="small-label">Time limit (minutes)</label><br>
+            <input id="examMinutes" type="number" min="5" max="300" value="60" style="width:90px;">
+          </div>
+<div>
+  <label class="small-label">Last N added</label><br>
+  <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
+</div>
+          <div class="all-actions">
+            <button id="btnStartExam" class="primary">Start exam</button>
+            <span class="muted tiny">Results only at the end.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="examActiveCard" style="display:none;">
+        <div class="exam-header">
+          <div>Q <span id="examIndexLabel">0</span>/<span id="examTotalLabel">0</span></div>
+          <div>Time left: <span id="examTimerLabel">--:--</span></div>
+        </div>
+        <div id="examQuestionPanel" class="question-panel"></div>
+        <div class="btn-row-main">
+          <button id="btnExamPrev">Previous</button>
+          <button id="btnExamNext">Next</button>
+          <button id="btnExamFinish" class="danger">Finish exam</button>
+        </div>
+      </div>
+
+      <div class="card" id="examResultCard" style="display:none;">
+        <h3>Exam report</h3>
+        <div id="examSummary"></div>
+        <div id="examDetails" class="tiny muted" style="margin-top:0.5rem;"></div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD TAB -->
+    <section class="tab-content" id="tab-dashboard">
+      <div class="card">
+        <h2>Study dashboard</h2>
+        <div class="dashboard-grid">
+          <div class="dash-box" id="dashOverall"></div>
+          <div class="dash-box" id="dashWeakChapters"></div>
+          <div class="dash-box" id="dashWeekly"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALL QUESTIONS TAB -->
+    <section class="tab-content" id="tab-all">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Search</label><br>
+            <input id="allSearch" placeholder="Text / chapter / source / tag" style="min-width:220px;">
+          </div>
+          <div>
+            <label class="small-label">Filter</label><br>
+            <select id="allFilter">
+              <option value="all">All</option>
+              <option value="flagged">Flagged only</option>
+              <option value="wrong">Wrong ≥ 1</option>
+              <option value="maintenance">Maintenance only</option>
+              <option value="inactive">Inactive</option>
+              <option value="weak">Weakness cluster</option>
+              <option value="duplicate">Repeated questions</option>
+              <option value="pinned">Pinned only</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Sort</label><br>
+            <select id="allSort">
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="chapter">By chapter</option>
+              <option value="wrong_desc">Most wrong</option>
+              <option value="due_asc">Due soon</option>
+              <option value="text_asc">Text A→Z</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Range / chapter</label><br>
+            <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
+            <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
+            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;">
+          </div>
+<div>
+  <label class="small-label">Last N added</label><br>
+  <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
+</div>
+          <div class="all-actions">
+            <button id="btnAllReload">Reload</button>
+            <button id="btnAllDelete" class="danger">Delete selected</button>
+            <button id="btnAllDeleteDups" class="danger">Delete duplicates (keep one)</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="allSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Tags</th>
+                <th>Meta</th>
+                <th>Seen</th>
+                <th>Wrong</th>
+                <th>Due</th>
+                <th>Edit</th>
+              </tr>
+            </thead>
+            <tbody id="allTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- BACKUP & CLOUD TAB -->
+    <section class="tab-content" id="tab-backup">
+      <div class="card">
+        <h2>Local backup</h2>
+        <p class="muted tiny">
+          Export creates a JSON file with all questions + stats. Import can merge or restore from that file.
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnBackupExport" class="primary">Export full backup</button>
+            <input type="file" id="backupFileInput" accept=".json">
+            <button id="btnBackupImport">Import backup</button>
+          </div>
+          <div class="backup-status">
+            <div>Last activity: <span id="lastActivityLabel">–</span></div>
+            <div>Last local backup: <span id="lastBackupLabel">–</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cloud sync (GitHub)</h2>
+        <p class="muted tiny">
+          Uses your GitHub token to save / load one JSON file in a private repo (e.g. <code>Awad1992/mcq-data</code>).
+          Token stays only on this device (localStorage).
+        </p>
+        <div class="row-controls">
+          <div>
+            <button id="btnCloudUpload">Upload → GitHub</button>
+            <button id="btnCloudDownload">Download ← GitHub</button>
+          </div>
+          <div class="muted tiny" id="cloudInfo"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h2>GitHub settings</h2>
+        <div class="settings-grid">
+          <label>
+            <span class="small-label">Personal access token</span>
+            <input type="password" id="ghTokenInput" placeholder="ghp_xxx..." autocomplete="off">
+          </label>
+          <label>
+            <span class="small-label">Repo (owner/name)</span>
+            <input id="ghRepoInput" value="Awad1992/mcq-data">
+          </label>
+          <label>
+            <span class="small-label">Backup filename</span>
+            <input id="ghFileInput" value="mcq_backup.json">
+          </label>
+        </div>
+        <div class="btn-row-main">
+          <button id="btnSaveGitHub" class="primary">Save settings</button>
+          <button id="btnClearGitHub" class="ghost">Clear</button>
+          <a class="link-btn" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+            Open GitHub token page
+          </a>
+        </div>
+        <p class="muted tiny">
+          Token is stored only in this browser (localStorage). Changing token or repo does not affect your questions.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>App info</h2>
+        <p class="muted tiny">
+          Version: <strong>4.1.0</strong><br>
+          Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
+          Engine: spaced repetition + weakness clustering + tags + flashcards.
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Edit / add question modal -->
+<div id="editModal" class="modal hidden">
+  <div class="modal-backdrop" id="editModalBackdrop"></div>
+  <div class="modal-body">
+    <h3 id="editModalTitle">Edit question</h3>
+    <div class="modal-content">
+      <label class="small-label">Question text</label>
+      <textarea id="editText" rows="3"></textarea>
+
+      <label class="small-label">Chapter</label>
+      <input id="editChapter">
+
+      <label class="small-label">Source</label>
+      <input id="editSource">
+
+      <label class="small-label">Tags (comma‑separated)</label>
+      <input id="editTags">
+
+      <label class="small-label">Explanation</label>
+      <textarea id="editExplanation" rows="3"></textarea>
+
+      <label class="small-label">Image (URL)</label>
+      <input id="editImageUrl" placeholder="https://...">
+
+      <label class="small-label">Or attach image (stored locally)</label>
+      <input id="editImageFile" type="file" accept="image/*">
+
+      <div id="editImagePreview" class="img-preview"></div>
+
+      <div class="small-label" style="margin-top:0.5rem;">Choices</div>
+      <div id="editChoices"></div>
+      <button id="btnAddChoice" class="pill-btn">+ Choice</button>
+
+      <div class="modal-flags">
+        <label><input type="checkbox" id="editFlagged"> Flagged</label>
+        <label><input type="checkbox" id="editMaint"> Maintenance</label>
+        <label><input type="checkbox" id="editPinned"> Pinned</label>
+        <label><input type="checkbox" id="editActive"> Active</label>
+      </div>
+    </div>
+    <div class="btn-row-main modal-actions">
+      <button id="btnEditSave" class="primary">Save</button>
+      <button id="btnEditCancel">Cancel</button>
+    </div>
   </div>
-</header>
+</div>
 
-<main>
-  <section id="view-editor" class="view active">
-    <h2>Question Editor</h2>
-    <form id="questionForm">
-      <div class="field-row">
-        <label for="qId">ID</label>
-        <input type="text" id="qId" readonly placeholder="Auto (Q001)">
-        <button type="button" id="generateIdBtn">Generate ID</button>
-      </div>
-      <div class="field-row">
-        <label for="qStem">Question (Stem)</label>
-        <textarea id="qStem" rows="4" required></textarea>
-      </div>
-      <div class="options-grid">
-        <div class="option-item">
-          <label>Option A</label>
-          <input type="text" data-opt-id="A" class="optText">
-        </div>
-        <div class="option-item">
-          <label>Option B</label>
-          <input type="text" data-opt-id="B" class="optText">
-        </div>
-        <div class="option-item">
-          <label>Option C</label>
-          <input type="text" data-opt-id="C" class="optText">
-        </div>
-        <div class="option-item">
-          <label>Option D</label>
-          <input type="text" data-opt-id="D" class="optText">
-        </div>
-        <div class="option-item">
-          <label>Correct Option</label>
-          <select id="correctOptionId">
-            <option value="">–</option>
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
-          </select>
-        </div>
-      </div>
-      <div class="field-row">
-        <label for="qExplanation">Explanation</label>
-        <textarea id="qExplanation" rows="3"></textarea>
-      </div>
-      <div class="field-row">
-        <label for="qTopic">Topic</label>
-        <input type="text" id="qTopic">
-      </div>
-      <div class="field-row">
-        <label for="qSubtopic">Subtopic</label>
-        <input type="text" id="qSubtopic">
-      </div>
-      <div class="field-row">
-        <label for="qDifficulty">Difficulty</label>
-        <select id="qDifficulty">
-          <option value="moderate">moderate</option>
-          <option value="easy">easy</option>
-          <option value="hard">hard</option>
-          <option value="insane">insane</option>
-        </select>
-      </div>
-      <div class="field-row">
-        <label for="qTags">Tags (comma separated)</label>
-        <input type="text" id="qTags">
-      </div>
-      <div class="field-row">
-        <label for="qSource">Source</label>
-        <input type="text" id="qSource">
-      </div>
-      <div class="field-row inline">
-        <label><input type="checkbox" id="qFlagged"> Flagged</label>
-      </div>
-      <div class="form-actions">
-        <button type="submit" id="saveQuestionBtn">Save / Update</button>
-        <button type="button" id="resetFormBtn">Clear</button>
-      </div>
-    </form>
-  </section>
-
-  <section id="view-list" class="view">
-    <h2>All Questions</h2>
-    <div class="list-toolbar">
-      <div class="filters">
-        <input type="text" id="filterSearch" placeholder="Search text">
-        <input type="text" id="filterTopic" placeholder="Topic">
-        <select id="filterDifficulty">
-          <option value="">Any difficulty</option>
-          <option value="easy">easy</option>
-          <option value="moderate">moderate</option>
-          <option value="hard">hard</option>
-          <option value="insane">insane</option>
-        </select>
-        <select id="filterFlagged">
-          <option value="">All</option>
-          <option value="true">Flagged only</option>
-          <option value="false">Unflagged only</option>
-        </select>
-        <select id="filterAnswered">
-          <option value="">Any status</option>
-          <option value="never">Never answered</option>
-          <option value="wrong">Has wrong attempts</option>
-          <option value="perfect">All attempts correct</option>
-        </select>
-        <input type="number" id="filterLastN" min="0" placeholder="Last N added">
-      </div>
-      <div class="bulk-actions">
-        <button id="bulkSelectAllBtn">Select All</button>
-        <button id="bulkClearSelectionBtn">Clear Selection</button>
-        <button id="bulkDeleteBtn">Delete Selected</button>
-        <button id="bulkFlagBtn">Flag Selected</button>
-        <button id="bulkUnflagBtn">Unflag Selected</button>
-      </div>
-    </div>
-
-    <table id="questionsTable">
-      <thead>
-      <tr>
-        <th><input type="checkbox" id="masterCheckbox"></th>
-        <th>ID</th>
-        <th>Stem</th>
-        <th>Topic</th>
-        <th>Difficulty</th>
-        <th>Flagged</th>
-        <th>Stats</th>
-        <th>Last Answered</th>
-        <th>Actions</th>
-      </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <div class="export-import">
-      <h3>Import / Export</h3>
-      <div class="buttons-row">
-        <button id="exportJsonBtn">Export JSON</button>
-        <input type="file" id="importJsonInput" accept=".json">
-        <button id="importJsonBtn">Import JSON</button>
-      </div>
-      <textarea id="rawJsonArea" placeholder="You can paste or inspect raw JSON here"></textarea>
-    </div>
-  </section>
-</main>
-
-<footer>
-  <small>Ultra Pro Max V5 – data stored in your browser (localStorage).</small>
-</footer>
-
-<script src="script.js"></script>
+<script>
+  window.APP_VERSION = "4.1.0";
+</script>
+<script src="app.js?v=4.1.0"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js?v=4.1.0').catch(()=>{});
+  }
+</script>
 </body>
 </html>

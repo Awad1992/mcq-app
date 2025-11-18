@@ -1205,6 +1205,7 @@ async function reloadAllQuestionsTable() {
   const rangeFrom = parseInt(document.getElementById('rangeFrom').value || '0', 10);
   const rangeTo = parseInt(document.getElementById('rangeTo').value || '0', 10);
   const chapExact = document.getElementById('allChapterExact').value.toLowerCase().trim();
+  const lastN = parseInt(document.getElementById('allLastN').value || '0', 10);
   tbody.innerHTML = '';
 
   const all = await getAllQuestions();
@@ -1274,6 +1275,11 @@ async function reloadAllQuestionsTable() {
     arr.sort((a, b) => (a.text || '').localeCompare(b.text || ''));
   }
 
+
+if (lastN > 0) {
+  arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  arr = arr.slice(0, lastN);
+}
   const nowIso = new Date().toISOString();
 
   arr.forEach(q => {
