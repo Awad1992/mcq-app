@@ -222,16 +222,21 @@ themeSelect.addEventListener('change', () => {
 // Mode select
 modeSelect.addEventListener('change', () => {
   currentMode = modeSelect.value;
+  const chapterSelect = document.getElementById('chapterSelect');
   if (currentMode === 'chapter') {
-    chapterFilterEl.style.display = 'inline-block';
+    if (chapterSelect) chapterSelect.style.display = 'inline-block';
   } else {
-    chapterFilterEl.style.display = 'none';
+    if (chapterSelect) {
+      chapterSelect.style.display = 'none';
+      chapterSelect.value = '';
+    }
     currentChapter = '';
   }
   loadNextQuestion(true);
 });
-chapterFilterEl.addEventListener('change', () => {
-  currentChapter = chapterFilterEl.value.trim();
+document.getElementById('chapterSelect')?.addEventListener('change', (e) => {
+  const sel = e.target;
+  currentChapter = (sel && sel.value ? sel.value.trim() : '');
   loadNextQuestion(true);
 });
 
@@ -239,13 +244,23 @@ chapterFilterEl.addEventListener('change', () => {
 document.getElementById('btnQuickWrong').addEventListener('click', () => {
   currentMode = 'wrong';
   modeSelect.value = 'wrong';
-  chapterFilterEl.style.display = 'none';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
   loadNextQuestion(true);
 });
 document.getElementById('btnQuickFlagged').addEventListener('click', () => {
   currentMode = 'flagged';
   modeSelect.value = 'flagged';
-  chapterFilterEl.style.display = 'none';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
   loadNextQuestion(true);
 });
 document.getElementById('btnStartDaily').addEventListener('click', () => {
@@ -290,7 +305,7 @@ document.getElementById('allFilter').addEventListener('change', () => { allCurre
 document.getElementById('allSort').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
 document.getElementById('rangeFrom').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
 document.getElementById('rangeTo').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
-document.getElementById('allChapterExact').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('allChapterSelect').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
 const allLastNInput = document.getElementById('allLastN');
 if (allLastNInput) {
   allLastNInput.addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
@@ -427,6 +442,49 @@ function loadMeta() {
     lastActivityAt = req.result ? req.result.value : null;
     refreshBackupLabels();
   };
+}
+
+
+let cachedChapters = [];
+
+function refreshChapterOptions() {
+  if (!db) return;
+  try {
+    const tx = db.transaction('questions', 'readonly');
+    const store = tx.objectStore('questions');
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const all = req.result || [];
+      const set = new Set();
+      all.forEach(q => {
+        const ch = (q.chapter || '').trim();
+        if (ch) set.add(ch);
+      });
+      cachedChapters = Array.from(set).sort((a, b) => a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+      const practiceSel = document.getElementById('chapterSelect');
+      const allSel = document.getElementById('allChapterSelect');
+
+      function fillSelect(sel) {
+        if (!sel) return;
+        sel.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = '';
+        optAll.textContent = 'All chapters';
+        sel.appendChild(optAll);
+        cachedChapters.forEach(ch => {
+          const opt = document.createElement('option');
+          opt.value = ch;
+          opt.textContent = ch;
+          sel.appendChild(opt);
+        });
+      }
+
+      fillSelect(practiceSel);
+      fillSelect(allSel);
+    };
+  } catch (e) {
+    console.error('refreshChapterOptions failed', e);
+  }
 }
 
 // Helpers
@@ -968,6 +1026,7 @@ function handleImportSimple() {
       });
       tx.oncomplete = () => {
         alert('Imported ' + normalized.length + ' questions.');
+        refreshChapterOptions();
         loadNextQuestion(true);
       };
     } catch (err) {
@@ -1006,6 +1065,7 @@ async function handleImportFromUrl() {
     });
     tx.oncomplete = () => {
       alert('Imported ' + normalized.length + ' questions from URL.');
+      refreshChapterOptions();
       loadNextQuestion(true);
     };
   } catch (err) {
@@ -1653,11 +1713,11 @@ async function reloadAllQuestionsTable() {
     arr = arr.filter(q => q.id <= rangeTo);
   }
 
-  // chapter exact (keep input, case-insensitive)
-  const chapInput = document.getElementById('allChapterExact');
-  const chapExact = chapInput ? chapInput.value.toLowerCase().trim() : '';
-  if (chapExact) {
-    arr = arr.filter(q => (q.chapter || '').toLowerCase() === chapExact);
+  // chapter filter via dropdown (exact chapter match)
+  const chapSelect = document.getElementById('allChapterSelect');
+  const chapVal = chapSelect ? chapSelect.value.trim() : '';
+  if (chapVal) {
+    arr = arr.filter(q => (q.chapter || '').trim() === chapVal);
   }
 
   // filter modes
@@ -2505,6 +2565,7 @@ openDB().then(() => {
   refreshBackupLabels();
   refreshCloudInfo();
   loadGitHubConfigIntoUI();
+  refreshChapterOptions();
   loadNextQuestion(true);
   buildFlashcardPool();
 }).catch(err => {
@@ -2735,16 +2796,21 @@ themeSelect.addEventListener('change', () => {
 // Mode select
 modeSelect.addEventListener('change', () => {
   currentMode = modeSelect.value;
+  const chapterSelect = document.getElementById('chapterSelect');
   if (currentMode === 'chapter') {
-    chapterFilterEl.style.display = 'inline-block';
+    if (chapterSelect) chapterSelect.style.display = 'inline-block';
   } else {
-    chapterFilterEl.style.display = 'none';
+    if (chapterSelect) {
+      chapterSelect.style.display = 'none';
+      chapterSelect.value = '';
+    }
     currentChapter = '';
   }
   loadNextQuestion(true);
 });
-chapterFilterEl.addEventListener('change', () => {
-  currentChapter = chapterFilterEl.value.trim();
+document.getElementById('chapterSelect')?.addEventListener('change', (e) => {
+  const sel = e.target;
+  currentChapter = (sel && sel.value ? sel.value.trim() : '');
   loadNextQuestion(true);
 });
 
@@ -2752,13 +2818,23 @@ chapterFilterEl.addEventListener('change', () => {
 document.getElementById('btnQuickWrong').addEventListener('click', () => {
   currentMode = 'wrong';
   modeSelect.value = 'wrong';
-  chapterFilterEl.style.display = 'none';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
   loadNextQuestion(true);
 });
 document.getElementById('btnQuickFlagged').addEventListener('click', () => {
   currentMode = 'flagged';
   modeSelect.value = 'flagged';
-  chapterFilterEl.style.display = 'none';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
   loadNextQuestion(true);
 });
 document.getElementById('btnStartDaily').addEventListener('click', () => {
@@ -2803,7 +2879,7 @@ document.getElementById('allFilter').addEventListener('change', () => { allCurre
 document.getElementById('allSort').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
 document.getElementById('rangeFrom').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
 document.getElementById('rangeTo').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
-document.getElementById('allChapterExact').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('allChapterSelect').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
 const allLastNInput = document.getElementById('allLastN');
 if (allLastNInput) {
   allLastNInput.addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
@@ -3481,6 +3557,7 @@ function handleImportSimple() {
       });
       tx.oncomplete = () => {
         alert('Imported ' + normalized.length + ' questions.');
+        refreshChapterOptions();
         loadNextQuestion(true);
       };
     } catch (err) {
@@ -4101,11 +4178,11 @@ async function reloadAllQuestionsTable() {
     arr = arr.filter(q => q.id <= rangeTo);
   }
 
-  // chapter exact (keep input, case-insensitive)
-  const chapInput = document.getElementById('allChapterExact');
-  const chapExact = chapInput ? chapInput.value.toLowerCase().trim() : '';
-  if (chapExact) {
-    arr = arr.filter(q => (q.chapter || '').toLowerCase() === chapExact);
+  // chapter filter via dropdown (exact chapter match)
+  const chapSelect = document.getElementById('allChapterSelect');
+  const chapVal = chapSelect ? chapSelect.value.trim() : '';
+  if (chapVal) {
+    arr = arr.filter(q => (q.chapter || '').trim() === chapVal);
   }
 
   // filter modes
@@ -4953,6 +5030,7 @@ openDB().then(() => {
   refreshBackupLabels();
   refreshCloudInfo();
   loadGitHubConfigIntoUI();
+  refreshChapterOptions();
   loadNextQuestion(true);
   buildFlashcardPool();
 }).catch(err => {

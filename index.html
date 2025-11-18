@@ -63,6 +63,7 @@
                   <option value="weak">Smart weakness focus</option>
                   <option value="chapter">By chapter</option>
                 </select>
+                <select id="chapterSelect" style="display:none; max-width:220px;"></select>
                 <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
               </div>
               <div>
@@ -241,7 +242,10 @@
             <label class="small-label">Range / chapter</label><br>
             <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
             <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
-            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;"><br>
+            <select id="allChapterSelect" style="min-width:180px;">
+              <option value="">All chapters</option>
+            </select>
+            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px; display:none;"><br>
             <input id="allLastN" type="number" min="0" placeholder="Last N (0 = all)" style="width:120px; margin-top:4px;">
             <label class="small-label" style="display:inline-block; margin-left:8px;">
               <input type="checkbox" id="allRangeMode"> Range select (first↔last)
