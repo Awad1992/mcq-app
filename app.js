@@ -2296,7 +2296,7 @@ function startExamTimer() {
 })();
 
 // Builder helpers: prompt + preview + import
-let builderPreviewCache = [];
+builderPreviewCache = [];
 
 function makeBuilderPrompt() {
   const src = (document.getElementById('builderSourceText')?.value || '').trim();
