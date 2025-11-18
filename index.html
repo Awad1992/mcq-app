@@ -2,212 +2,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Ultra Pro Max V5 – MCQ Bank</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>Ultra Pro Max V5 – MCQ Bank</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-    <h1>Ultra Pro Max V5 – MCQ Bank</h1>
-    <nav>
-        <button data-view="editor">New / Edit Question</button>
-        <button data-view="list">All Questions</button>
-        <button data-view="practice">Practice Mode</button>
-    </nav>
-    <div class="global-actions">
-        <button id="saveAllBtn" title="Save all data to browser storage">💾 Save</button>
-        <span id="saveStatus"></span>
-    </div>
+  <h1>Ultra Pro Max V5 – MCQ Bank</h1>
+  <nav>
+    <button data-view="editor">New / Edit Question</button>
+    <button data-view="list">All Questions</button>
+  </nav>
+  <div class="global-actions">
+    <button id="saveAllBtn">💾 Save</button>
+    <span id="saveStatus"></span>
+  </div>
 </header>
 
 <main>
-    <!-- Question Editor View -->
-    <section id="view-editor" class="view active">
-        <h2>Question Editor</h2>
-        <form id="questionForm">
-            <div class="field-row">
-                <label for="qId">ID</label>
-                <input type="text" id="qId" readonly placeholder="Auto (e.g., Q001)">
-                <button type="button" id="generateIdBtn">Generate ID</button>
-            </div>
-
-            <div class="field-row">
-                <label for="qStem">Question (Stem)</label>
-                <textarea id="qStem" rows="4" required></textarea>
-            </div>
-
-            <div class="options-grid">
-                <div class="option-item">
-                    <label>Option A</label>
-                    <input type="text" data-opt-id="A" class="optText">
-                </div>
-                <div class="option-item">
-                    <label>Option B</label>
-                    <input type="text" data-opt-id="B" class="optText">
-                </div>
-                <div class="option-item">
-                    <label>Option C</label>
-                    <input type="text" data-opt-id="C" class="optText">
-                </div>
-                <div class="option-item">
-                    <label>Option D</label>
-                    <input type="text" data-opt-id="D" class="optText">
-                </div>
-                <div class="option-item">
-                    <label>Correct Option</label>
-                    <select id="correctOptionId">
-                        <option value="">–</option>
-                        <option value="A">A</option>
-                        <option value="B">B</option>
-                        <option value="C">C</option>
-                        <option value="D">D</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="field-row">
-                <label for="qExplanation">Explanation</label>
-                <textarea id="qExplanation" rows="4"></textarea>
-            </div>
-
-            <div class="field-row">
-                <label for="qTopic">Topic</label>
-                <input type="text" id="qTopic" placeholder="e.g., Sepsis">
-            </div>
-
-            <div class="field-row">
-                <label for="qSubtopic">Subtopic</label>
-                <input type="text" id="qSubtopic" placeholder="e.g., SOFA score">
-            </div>
-
-            <div class="field-row">
-                <label for="qDifficulty">Difficulty</label>
-                <select id="qDifficulty">
-                    <option value="moderate">moderate</option>
-                    <option value="easy">easy</option>
-                    <option value="hard">hard</option>
-                    <option value="insane">insane</option>
-                </select>
-            </div>
-
-            <div class="field-row">
-                <label for="qTags">Tags (comma separated)</label>
-                <input type="text" id="qTags" placeholder="ARDS, ventilator, PEEP">
-            </div>
-
-            <div class="field-row">
-                <label for="qSource">Source / Reference</label>
-                <input type="text" id="qSource" placeholder="Irwin & Rippe, Ch. 42, p. 123">
-            </div>
-
-            <div class="field-row inline">
-                <label><input type="checkbox" id="qFlagged"> Flagged</label>
-            </div>
-
-            <div class="form-actions">
-                <button type="submit" id="saveQuestionBtn">Save / Update Question</button>
-                <button type="button" id="resetFormBtn">Clear Form</button>
-            </div>
-        </form>
-    </section>
-
-    <!-- All Questions View -->
-    <section id="view-list" class="view">
-        <h2>All Questions</h2>
-        <div class="list-toolbar">
-            <div class="filters">
-                <input type="text" id="filterSearch" placeholder="Search in stem / tags / topic">
-                <input type="text" id="filterTopic" placeholder="Topic">
-                <select id="filterDifficulty">
-                    <option value="">Any difficulty</option>
-                    <option value="easy">easy</option>
-                    <option value="moderate">moderate</option>
-                    <option value="hard">hard</option>
-                    <option value="insane">insane</option>
-                </select>
-                <select id="filterFlagged">
-                    <option value="">All</option>
-                    <option value="true">Flagged only</option>
-                    <option value="false">Unflagged only</option>
-                </select>
-                <select id="filterAnswered">
-                    <option value="">Any status</option>
-                    <option value="never">Never answered</option>
-                    <option value="wrong">Has wrong attempts</option>
-                    <option value="perfect">All attempts correct</option>
-                </select>
-                <input type="number" id="filterLastN" min="0" placeholder="Last N added">
-            </div>
-            <div class="bulk-actions">
-                <button id="bulkSelectAllBtn">Select All</button>
-                <button id="bulkClearSelectionBtn">Clear Selection</button>
-                <button id="bulkDeleteBtn">Delete Selected</button>
-                <button id="bulkFlagBtn">Flag Selected</button>
-                <button id="bulkUnflagBtn">Unflag Selected</button>
-            </div>
+  <section id="view-editor" class="view active">
+    <h2>Question Editor</h2>
+    <form id="questionForm">
+      <div class="field-row">
+        <label for="qId">ID</label>
+        <input type="text" id="qId" readonly placeholder="Auto (Q001)">
+        <button type="button" id="generateIdBtn">Generate ID</button>
+      </div>
+      <div class="field-row">
+        <label for="qStem">Question (Stem)</label>
+        <textarea id="qStem" rows="4" required></textarea>
+      </div>
+      <div class="options-grid">
+        <div class="option-item">
+          <label>Option A</label>
+          <input type="text" data-opt-id="A" class="optText">
         </div>
-
-        <table id="questionsTable">
-            <thead>
-                <tr>
-                    <th><input type="checkbox" id="masterCheckbox"></th>
-                    <th>ID</th>
-                    <th>Stem</th>
-                    <th>Topic</th>
-                    <th>Difficulty</th>
-                    <th>Flagged</th>
-                    <th>Stats</th>
-                    <th>Last Answered</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-
-        <div class="export-import">
-            <h3>Import / Export</h3>
-            <div class="buttons-row">
-                <button id="exportJsonBtn">Export JSON</button>
-                <input type="file" id="importJsonInput" accept=".json">
-                <button id="importJsonBtn">Import JSON</button>
-            </div>
-            <textarea id="rawJsonArea" placeholder="You can paste or inspect raw JSON here"></textarea>
+        <div class="option-item">
+          <label>Option B</label>
+          <input type="text" data-opt-id="B" class="optText">
         </div>
-    </section>
-
-    <!-- Practice Mode View -->
-    <section id="view-practice" class="view">
-        <h2>Practice Mode</h2>
-        <div class="practice-settings">
-            <label>Topic filter
-                <input type="text" id="practiceTopicFilter" placeholder="Leave empty for all">
-            </label>
-            <label>Flagged only
-                <input type="checkbox" id="practiceFlaggedOnly">
-            </label>
-            <label>Max questions
-                <input type="number" id="practiceLimit" min="1" value="20">
-            </label>
-            <button id="startPracticeBtn">Start Session</button>
+        <div class="option-item">
+          <label>Option C</label>
+          <input type="text" data-opt-id="C" class="optText">
         </div>
-
-        <div id="practiceArea" class="hidden">
-            <div id="practiceMeta"></div>
-            <div id="practiceStem"></div>
-            <div id="practiceOptions"></div>
-            <div id="practiceFeedback"></div>
-            <div class="practice-actions">
-                <button id="showAnswerBtn">Show Answer</button>
-                <button id="nextQuestionBtn">Next Question</button>
-                <button id="endPracticeBtn">End Session</button>
-            </div>
+        <div class="option-item">
+          <label>Option D</label>
+          <input type="text" data-opt-id="D" class="optText">
         </div>
-    </section>
+        <div class="option-item">
+          <label>Correct Option</label>
+          <select id="correctOptionId">
+            <option value="">–</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <label for="qExplanation">Explanation</label>
+        <textarea id="qExplanation" rows="3"></textarea>
+      </div>
+      <div class="field-row">
+        <label for="qTopic">Topic</label>
+        <input type="text" id="qTopic">
+      </div>
+      <div class="field-row">
+        <label for="qSubtopic">Subtopic</label>
+        <input type="text" id="qSubtopic">
+      </div>
+      <div class="field-row">
+        <label for="qDifficulty">Difficulty</label>
+        <select id="qDifficulty">
+          <option value="moderate">moderate</option>
+          <option value="easy">easy</option>
+          <option value="hard">hard</option>
+          <option value="insane">insane</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label for="qTags">Tags (comma separated)</label>
+        <input type="text" id="qTags">
+      </div>
+      <div class="field-row">
+        <label for="qSource">Source</label>
+        <input type="text" id="qSource">
+      </div>
+      <div class="field-row inline">
+        <label><input type="checkbox" id="qFlagged"> Flagged</label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="saveQuestionBtn">Save / Update</button>
+        <button type="button" id="resetFormBtn">Clear</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="view-list" class="view">
+    <h2>All Questions</h2>
+    <div class="list-toolbar">
+      <div class="filters">
+        <input type="text" id="filterSearch" placeholder="Search text">
+        <input type="text" id="filterTopic" placeholder="Topic">
+        <select id="filterDifficulty">
+          <option value="">Any difficulty</option>
+          <option value="easy">easy</option>
+          <option value="moderate">moderate</option>
+          <option value="hard">hard</option>
+          <option value="insane">insane</option>
+        </select>
+        <select id="filterFlagged">
+          <option value="">All</option>
+          <option value="true">Flagged only</option>
+          <option value="false">Unflagged only</option>
+        </select>
+        <select id="filterAnswered">
+          <option value="">Any status</option>
+          <option value="never">Never answered</option>
+          <option value="wrong">Has wrong attempts</option>
+          <option value="perfect">All attempts correct</option>
+        </select>
+        <input type="number" id="filterLastN" min="0" placeholder="Last N added">
+      </div>
+      <div class="bulk-actions">
+        <button id="bulkSelectAllBtn">Select All</button>
+        <button id="bulkClearSelectionBtn">Clear Selection</button>
+        <button id="bulkDeleteBtn">Delete Selected</button>
+        <button id="bulkFlagBtn">Flag Selected</button>
+        <button id="bulkUnflagBtn">Unflag Selected</button>
+      </div>
+    </div>
+
+    <table id="questionsTable">
+      <thead>
+      <tr>
+        <th><input type="checkbox" id="masterCheckbox"></th>
+        <th>ID</th>
+        <th>Stem</th>
+        <th>Topic</th>
+        <th>Difficulty</th>
+        <th>Flagged</th>
+        <th>Stats</th>
+        <th>Last Answered</th>
+        <th>Actions</th>
+      </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="export-import">
+      <h3>Import / Export</h3>
+      <div class="buttons-row">
+        <button id="exportJsonBtn">Export JSON</button>
+        <input type="file" id="importJsonInput" accept=".json">
+        <button id="importJsonBtn">Import JSON</button>
+      </div>
+      <textarea id="rawJsonArea" placeholder="You can paste or inspect raw JSON here"></textarea>
+    </div>
+  </section>
 </main>
 
 <footer>
-    <small>Ultra Pro Max V5 – All data stored locally in your browser (localStorage). Remember to export backups regularly.</small>
+  <small>Ultra Pro Max V5 – data stored in your browser (localStorage).</small>
 </footer>
 
 <script src="script.js"></script>
