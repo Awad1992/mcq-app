@@ -1,8 +1,8 @@
-// MCQ Study App Ultra‑Pro v4.2
-// DB + UI + backup + GitHub sync + maintenance tag + smart filters
+// MCQ Study App Ultra-Pro v4.1
+// Based on v3.4 – adds weakness stats, ID range filter, duplicate clusters, safer selection, autosave.
 
-const DB_NAME = 'mcqdb_pro_v34'; // keep same DB so old data stays
-const DB_VERSION = 2;
+const DB_NAME = 'mcqdb_pro_v41';
+const DB_VERSION = 3;
 
 let db = null;
 
@@ -14,7 +14,6 @@ let lastResult = null;
 let lastSelectedIndex = null;
 let historyStack = [];
 let lastActivityAt = null;
-let allowDuplicatesInPractice = true;
 
 const questionPanel = document.getElementById('questionPanel');
 const feedbackPanel = document.getElementById('feedbackPanel');
@@ -33,12 +32,15 @@ document.querySelectorAll('.tab-button').forEach(btn => {
 
     if (tab === 'all') {
       reloadAllQuestionsTable();
+    } else if (tab === 'maintenance') {
+      reloadMaintenanceTable();
+    } else if (tab === 'dashboard') {
+      refreshDashboard();
     } else if (tab === 'backup') {
       refreshBackupLabels();
       refreshCloudInfo();
     } else if (tab === 'settings') {
       loadGitHubConfigIntoUI();
-      loadPracticeConfigIntoUI();
     }
   });
 });
@@ -89,13 +91,10 @@ document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceF
 // Import / Export (home)
 document.getElementById('btnImport').addEventListener('click', handleImportSimple);
 document.getElementById('btnExport').addEventListener('click', exportQuestionsOnly);
-document.getElementById('btnImportFromUrl').addEventListener('click', handleImportFromUrl);
 
 // All questions tab controls
 document.getElementById('btnAllReload').addEventListener('click', reloadAllQuestionsTable);
 document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
-document.getElementById('btnAllCleanDuplicates').addEventListener('click', cleanDuplicates);
-document.getElementById('btnAllSelectRange').addEventListener('click', selectRangeAll);
 document.getElementById('allSelectAll').addEventListener('change', e => {
   document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
     ch.checked = e.target.checked;
@@ -104,6 +103,19 @@ document.getElementById('allSelectAll').addEventListener('change', e => {
 document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
 document.getElementById('allFilter').addEventListener('change', reloadAllQuestionsTable);
 document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
+document.getElementById('idFrom').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+document.getElementById('idTo').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+
+// Maintenance tab controls
+document.getElementById('btnMaintReload').addEventListener('click', reloadMaintenanceTable);
+document.getElementById('btnMaintDelete').addEventListener('click', deleteSelectedMaint);
+document.getElementById('maintSelectAll').addEventListener('change', e => {
+  document.querySelectorAll('#maintTableBody input[type="checkbox"]').forEach(ch => {
+    ch.checked = e.target.checked;
+  });
+});
+document.getElementById('maintFilter').addEventListener('change', reloadMaintenanceTable);
+document.getElementById('maintChapterFilter').addEventListener('input', debounce(reloadMaintenanceTable, 300));
 
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
@@ -113,17 +125,12 @@ document.getElementById('btnBackupImport').addEventListener('click', handleBacku
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
 document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
 
-// Settings tab – GitHub + practice
+// Settings tab – GitHub
 document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
 document.getElementById('btnClearGitHub').addEventListener('click', () => {
   localStorage.removeItem('mcq_github_config');
   loadGitHubConfigIntoUI();
   refreshCloudInfo();
-});
-const allowDupToggleEl = document.getElementById('allowDuplicatesToggle');
-allowDupToggleEl.addEventListener('change', () => {
-  allowDuplicatesInPractice = !!allowDupToggleEl.checked;
-  savePracticeConfig();
 });
 
 // --- IndexedDB setup ---
@@ -148,7 +155,6 @@ function openDB() {
     req.onsuccess = (e) => {
       db = e.target.result;
       loadMeta();
-      loadPracticeConfig();
       resolve(db);
     };
     req.onerror = (e) => reject(e.target.error);
@@ -163,30 +169,6 @@ function loadMeta() {
     lastActivityAt = req.result ? req.result.value : null;
     refreshBackupLabels();
   };
-}
-
-// Practice config (allow duplicates)
-function loadPracticeConfig() {
-  try {
-    const raw = localStorage.getItem('mcq_practice_config');
-    if (raw) {
-      const obj = JSON.parse(raw);
-      allowDuplicatesInPractice = obj.allowDuplicates !== false;
-    } else {
-      allowDuplicatesInPractice = true;
-    }
-  } catch {
-    allowDuplicatesInPractice = true;
-  }
-  if (allowDupToggleEl) {
-    allowDupToggleEl.checked = !!allowDuplicatesInPractice;
-  }
-}
-
-function savePracticeConfig() {
-  localStorage.setItem('mcq_practice_config', JSON.stringify({
-    allowDuplicates: !!allowDuplicatesInPractice
-  }));
 }
 
 // Helpers
@@ -204,13 +186,8 @@ function debounce(fn, ms) {
   };
 }
 
-function normalizeText(t) {
-  if (!t) return '';
-  return t.replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
 // --- Stats ---
-async function getStats() {
+async function getStatsWithWeakness() {
   const tx = db.transaction('questions', 'readonly');
   const store = tx.objectStore('questions');
   const all = await new Promise(res => {
@@ -222,20 +199,84 @@ async function getStats() {
     flagged: all.filter(q => q.flagged).length,
     answered: all.filter(q => q.timesSeen > 0).length,
     withWrong: all.filter(q => q.timesWrong > 0).length,
-    maintenance: all.filter(q => q.maintenance).length
+    maintenance: all.filter(q => q.maintenance).length,
+    weakChapters: []
   };
-  return stats;
+
+  // Weakness by chapter = wrong / seen
+  const chapMap = {};
+  all.forEach(q => {
+    const chap = (q.chapter || 'Unspecified').trim() || 'Unspecified';
+    if (!chapMap[chap]) chapMap[chap] = { seen: 0, wrong: 0 };
+    chapMap[chap].seen += q.timesSeen || 0;
+    chapMap[chap].wrong += q.timesWrong || 0;
+  });
+  const list = Object.keys(chapMap).map(ch => {
+    const s = chapMap[ch].seen;
+    const w = chapMap[ch].wrong;
+    const rate = s > 0 ? (w / s) : 0;
+    return { chapter: ch, seen: s, wrong: w, rate };
+  }).filter(x => x.seen > 0 && x.wrong > 0);
+  list.sort((a, b) => b.rate - a.rate || b.wrong - a.wrong);
+  stats.weakChapters = list.slice(0, 5);
+  return { all, stats };
 }
 
 async function updateStatsBar() {
   const el = document.getElementById('statsBar');
-  const s = await getStats();
+  const { stats } = await getStatsWithWeakness();
+  let weakLabel = '';
+  if (stats.weakChapters.length) {
+    const w = stats.weakChapters[0];
+    const pct = Math.round(w.rate * 100);
+    weakLabel = ` · Weakest: <strong>${w.chapter}</strong> (${pct}% wrong)`;
+  }
   el.innerHTML = `
-    <div>Total: <strong>${s.total}</strong></div>
-    <div>Answered: <strong>${s.answered}</strong></div>
-    <div>Wrong ≥1: <strong>${s.withWrong}</strong></div>
-    <div>Flagged: <strong>${s.flagged}</strong></div>
-    <div>Maintenance: <strong>${s.maintenance}</strong></div>
+    <div>Total: <strong>${stats.total}</strong></div>
+    <div>Answered: <strong>${stats.answered}</strong></div>
+    <div>Wrong ≥1: <strong>${stats.withWrong}</strong></div>
+    <div>Flagged: <strong>${stats.flagged}</strong></div>
+    <div>Maintenance: <strong>${stats.maintenance}</strong></div>
+    <div>${weakLabel}</div>
+  `;
+}
+
+// --- Dashboard ---
+async function refreshDashboard() {
+  const weakEl = document.getElementById('weakChapters');
+  const perfEl = document.getElementById('perfSummary');
+  const { all, stats } = await getStatsWithWeakness();
+
+  if (!all.length) {
+    weakEl.innerHTML = '<div class="muted tiny">No questions yet.</div>';
+    perfEl.innerHTML = '<div class="muted tiny">No data yet.</div>';
+    return;
+  }
+
+  // Weak chapters
+  if (!stats.weakChapters.length) {
+    weakEl.innerHTML = '<div class="muted tiny">No wrong answers yet – good job.</div>';
+  } else {
+    weakEl.innerHTML = stats.weakChapters.map(w => {
+      const pct = Math.round(w.rate * 100);
+      const width = Math.min(100, pct);
+      return `<div class="weak-item">
+        <strong>${w.chapter}</strong> – wrong ${w.wrong}/${w.seen} (${pct}%)
+        <span class="weak-bar" style="width:${width}px;"></span>
+      </div>`;
+    }).join('');
+  }
+
+  const totalSeen = all.reduce((s, q) => s + (q.timesSeen || 0), 0);
+  const totalWrong = all.reduce((s, q) => s + (q.timesWrong || 0), 0);
+  const totalCorrect = all.reduce((s, q) => s + (q.timesCorrect || 0), 0);
+  const acc = totalSeen > 0 ? Math.round((totalCorrect / totalSeen) * 100) : 0;
+
+  perfEl.innerHTML = `
+    <div class="weak-item">Total questions: <strong>${stats.total}</strong></div>
+    <div class="weak-item">Total attempts: <strong>${totalSeen}</strong></div>
+    <div class="weak-item">Total wrong: <strong>${totalWrong}</strong></div>
+    <div class="weak-item">Overall accuracy: <strong>${acc}%</strong></div>
   `;
 }
 
@@ -260,26 +301,21 @@ async function pickQuestion() {
   } else if (currentMode === 'chapter' && currentChapter) {
     const chap = currentChapter.toLowerCase();
     filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
+  } else if (currentMode === 'weak') {
+    // Focus on questions with highest wrong rate
+    const withSeen = filtered.filter(q => (q.timesSeen || 0) > 0 && (q.timesWrong || 0) > 0);
+    if (withSeen.length) {
+      withSeen.sort((a, b) => {
+        const ra = a.timesWrong / a.timesSeen;
+        const rb = b.timesWrong / b.timesSeen;
+        return rb - ra;
+      });
+      const top = withSeen.slice(0, Math.min(50, withSeen.length));
+      filtered = top;
+    }
   }
 
   if (!filtered.length) filtered = all;
-
-  // optional dedupe in practice
-  if (!allowDuplicatesInPractice) {
-    const seen = new Set();
-    const dedup = [];
-    for (const q of filtered) {
-      const key = normalizeText(q.text);
-      if (!key) {
-        dedup.push(q);
-        continue;
-      }
-      if (seen.has(key)) continue;
-      seen.add(key);
-      dedup.push(q);
-    }
-    filtered = dedup;
-  }
 
   filtered.sort((a, b) => {
     const as = a.lastSeenAt || '';
@@ -537,65 +573,42 @@ function handleImportSimple() {
   reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
-      await importQuestionsArray(data);
+      let arr = data;
+      if (!Array.isArray(arr) && data.questions) {
+        arr = data.questions;
+      }
+      if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
+      const tx = db.transaction('questions', 'readwrite');
+      const store = tx.objectStore('questions');
+      const now = new Date().toISOString();
+      arr.forEach(q => {
+        const obj = {
+          text: q.text,
+          chapter: q.chapter || '',
+          source: q.source || '',
+          explanation: q.explanation || '',
+          choices: q.choices || [],
+          timesSeen: q.timesSeen || 0,
+          timesCorrect: q.timesCorrect || 0,
+          timesWrong: q.timesWrong || 0,
+          lastSeenAt: q.lastSeenAt || null,
+          createdAt: q.createdAt || now,
+          flagged: !!q.flagged,
+          maintenance: !!q.maintenance,
+          active: q.active !== false
+        };
+        if (q.id != null) obj.id = q.id;
+        store.put(obj);
+      });
+      tx.oncomplete = () => {
+        alert('Imported ' + arr.length + ' questions.');
+        loadNextQuestion(true);
+      };
     } catch (err) {
       alert('Error: ' + err.message);
     }
   };
   reader.readAsText(file);
-}
-
-async function importQuestionsArray(data) {
-  let arr = data;
-  if (!Array.isArray(arr) && data.questions) {
-    arr = data.questions;
-  }
-  if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  arr.forEach(q => {
-    const obj = {
-      text: q.text,
-      chapter: q.chapter || '',
-      source: q.source || '',
-      explanation: q.explanation || '',
-      choices: q.choices || [],
-      timesSeen: q.timesSeen || 0,
-      timesCorrect: q.timesCorrect || 0,
-      timesWrong: q.timesWrong || 0,
-      lastSeenAt: q.lastSeenAt || null,
-      createdAt: q.createdAt || new Date().toISOString(),
-      flagged: !!q.flagged,
-      maintenance: !!q.maintenance,
-      active: q.active !== false
-    };
-    if (q.id != null) obj.id = q.id;
-    store.put(obj);
-  });
-  tx.oncomplete = () => {
-    alert('Imported ' + arr.length + ' questions.');
-    loadNextQuestion(true);
-  };
-}
-
-// Import from URL
-async function handleImportFromUrl() {
-  const url = document.getElementById('remoteJsonUrl').value.trim();
-  if (!url) {
-    alert('ضع رابط JSON أولاً.');
-    return;
-  }
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      alert('HTTP error: ' + res.status);
-      return;
-    }
-    const data = await res.json();
-    await importQuestionsArray(data);
-  } catch (err) {
-    alert('Fetch/parse error: ' + err.message);
-  }
 }
 
 // Export questions only
@@ -677,7 +690,7 @@ async function buildBackupObject() {
   const backup = {
     meta: {
       exportedAt,
-      appVersion: window.APP_VERSION || '4.2.0',
+      appVersion: window.APP_VERSION || '4.1.0',
       totalQuestions: questions.length,
       totalAnswers: answers.length,
       lastActivityAt: metaObj.lastActivityAt || null
@@ -757,7 +770,6 @@ async function importBackupObject(backup) {
     if (!proceed) return;
   }
 
-  // Merge questions: keep local if same id; add new ones
   const qtx = db.transaction('questions', 'readwrite');
   const qs = qtx.objectStore('questions');
   const existing = await new Promise(res => {
@@ -770,7 +782,6 @@ async function importBackupObject(backup) {
   questions.forEach(q => {
     const id = q.id;
     if (id != null && byId.has(id)) {
-      // Merge: prefer local stats
       const local = byId.get(id);
       const merged = Object.assign({}, q, {
         timesSeen: local.timesSeen || q.timesSeen || 0,
@@ -803,7 +814,6 @@ async function importBackupObject(backup) {
     }
   });
 
-  // Merge answers: just append
   if (answers.length) {
     const atx = db.transaction('answers', 'readwrite');
     const as = atx.objectStore('answers');
@@ -818,7 +828,6 @@ async function importBackupObject(backup) {
     });
   }
 
-  // Update meta if backup is newer
   if (backupExportedAt && (!localLastActivity || backupExportedAt > localLastActivity)) {
     saveMeta('lastActivityAt', backupExportedAt);
     lastActivityAt = backupExportedAt;
@@ -832,15 +841,20 @@ async function importBackupObject(backup) {
 function refreshBackupLabels() {
   const lastActEl = document.getElementById('lastActivityLabel');
   const lastBackupEl = document.getElementById('lastBackupLabel');
+  const lastAutoEl = document.getElementById('lastAutoLabel');
   const tx = db.transaction('meta', 'readonly');
   const store = tx.objectStore('meta');
   const req1 = store.get('lastActivityAt');
   const req2 = store.get('lastBackupAt');
+  const req3 = store.get('lastAutoAt');
   req1.onsuccess = () => {
     lastActEl.textContent = fmtTime(req1.result ? req1.result.value : null);
   };
   req2.onsuccess = () => {
     lastBackupEl.textContent = fmtTime(req2.result ? req2.result.value : null);
+  };
+  req3.onsuccess = () => {
+    lastAutoEl.textContent = fmtTime(req3.result ? req3.result.value : null);
   };
 }
 
@@ -849,6 +863,9 @@ async function reloadAllQuestionsTable() {
   const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
   const filter = document.getElementById('allFilter').value;
   const sortVal = document.getElementById('allSort').value;
+  const idFromVal = parseInt(document.getElementById('idFrom').value || '0', 10);
+  const idToRaw = document.getElementById('idTo').value;
+  const idToVal = idToRaw ? parseInt(idToRaw, 10) : null;
   const tbody = document.getElementById('allTableBody');
   tbody.innerHTML = '';
 
@@ -859,12 +876,18 @@ async function reloadAllQuestionsTable() {
     req.onsuccess = e => res(e.target.result || []);
   });
 
-  // Build duplicate map
-  const dupMap = {};
+  // Duplicate clusters by normalized text
+  const norm = t => (t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const textMap = {};
   all.forEach(q => {
-    const key = normalizeText(q.text);
-    if (!key) return;
-    dupMap[key] = (dupMap[key] || 0) + 1;
+    const k = norm(q.text);
+    if (!k) return;
+    if (!textMap[k]) textMap[k] = [];
+    textMap[k].push(q.id);
+  });
+  const dupIdSet = new Set();
+  Object.values(textMap).forEach(ids => {
+    if (ids.length > 1) ids.forEach(id => dupIdSet.add(id));
   });
 
   let arr = all;
@@ -876,6 +899,13 @@ async function reloadAllQuestionsTable() {
     });
   }
 
+  if (idFromVal && !isNaN(idFromVal)) {
+    arr = arr.filter(q => typeof q.id === 'number' && q.id >= idFromVal);
+  }
+  if (idToVal && !isNaN(idToVal)) {
+    arr = arr.filter(q => typeof q.id === 'number' && q.id <= idToVal);
+  }
+
   if (filter === 'flagged') {
     arr = arr.filter(q => q.flagged);
   } else if (filter === 'wrong') {
@@ -885,10 +915,7 @@ async function reloadAllQuestionsTable() {
   } else if (filter === 'inactive') {
     arr = arr.filter(q => q.active === false);
   } else if (filter === 'duplicates') {
-    arr = arr.filter(q => {
-      const key = normalizeText(q.text);
-      return key && dupMap[key] > 1;
-    });
+    arr = arr.filter(q => dupIdSet.has(q.id));
   }
 
   if (sortVal === 'created_desc') {
@@ -902,8 +929,6 @@ async function reloadAllQuestionsTable() {
   }
 
   arr.forEach(q => {
-    const key = normalizeText(q.text);
-    const isDup = key && dupMap[key] > 1;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="checkbox" data-id="${q.id}"></td>
@@ -913,8 +938,8 @@ async function reloadAllQuestionsTable() {
       <td>
         ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
         ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
+        ${dupIdSet.has(q.id) ? '<span class="pill pill-dup">Dup</span>' : ''}
         ${q.active === false ? '<span class="pill pill-wrong">Inactive</span>' : ''}
-        ${isDup ? '<span class="pill pill-dup">Dup</span>' : ''}
       </td>
       <td>${q.timesSeen || 0}</td>
       <td>${q.timesWrong || 0}</td>
@@ -923,7 +948,7 @@ async function reloadAllQuestionsTable() {
     tr.addEventListener('click', (e) => {
       if (e.target.tagName.toLowerCase() === 'input') return;
       const anySelected = document.querySelectorAll('#allTableBody input[type="checkbox"]:checked').length > 0;
-      if (anySelected) return; // do not navigate if selection active
+      if (anySelected) return;
       currentQuestion = q;
       lastResult = null;
       lastSelectedIndex = null;
@@ -949,24 +974,13 @@ async function deleteSelectedAll() {
   };
 }
 
-// Select range in All Questions
-function selectRangeAll() {
-  const fromVal = parseInt(document.getElementById('allRangeFrom').value, 10);
-  const toVal = parseInt(document.getElementById('allRangeTo').value, 10);
-  if (isNaN(fromVal) || isNaN(toVal)) {
-    alert('ضع قيم صحيحة لـ From / To.');
-    return;
-  }
-  const min = Math.min(fromVal, toVal);
-  const max = Math.max(fromVal, toVal);
-  document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
-    const id = parseInt(ch.getAttribute('data-id'), 10);
-    if (id >= min && id <= max) ch.checked = true;
-  });
-}
+// --- Maintenance table ---
+async function reloadMaintenanceTable() {
+  const filter = document.getElementById('maintFilter').value;
+  const chapVal = document.getElementById('maintChapterFilter').value.toLowerCase().trim();
+  const tbody = document.getElementById('maintTableBody');
+  tbody.innerHTML = '';
 
-// Clean duplicates: keep one copy of each text, delete others
-async function cleanDuplicates() {
   const tx = db.transaction('questions', 'readonly');
   const store = tx.objectStore('questions');
   const all = await new Promise(res => {
@@ -974,41 +988,59 @@ async function cleanDuplicates() {
     req.onsuccess = e => res(e.target.result || []);
   });
 
-  const groups = new Map();
-  all.forEach(q => {
-    const key = normalizeText(q.text);
-    if (!key) return;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(q);
-  });
-
-  const idsToDelete = [];
-  groups.forEach(list => {
-    if (list.length <= 1) return;
-    list.sort((a, b) => {
-      const ca = a.createdAt || '';
-      const cb = b.createdAt || '';
-      if (ca === cb) return (a.id || 0) - (b.id || 0);
-      return ca.localeCompare(cb);
-    });
-    for (let i = 1; i < list.length; i++) {
-      idsToDelete.push(list[i].id);
-    }
-  });
-
-  if (!idsToDelete.length) {
-    alert('No duplicates found.');
-    return;
+  let arr = all.filter(q => q.maintenance || q.flagged);
+  if (filter === 'maintenance') {
+    arr = arr.filter(q => q.maintenance);
+  } else if (filter === 'flagged') {
+    arr = arr.filter(q => q.flagged || q.maintenance);
   }
-  if (!confirm('Will delete ' + idsToDelete.length + ' duplicate question(s) (keep 1 copy each). Continue?')) return;
 
-  const txDel = db.transaction('questions', 'readwrite');
-  const storeDel = txDel.objectStore('questions');
-  idsToDelete.forEach(id => storeDel.delete(id));
-  txDel.oncomplete = () => {
+  if (chapVal) {
+    arr = arr.filter(q => (q.chapter || '').toLowerCase().includes(chapVal));
+  }
+
+  arr.sort((a, b) => (b.timesWrong || 0) - (a.timesWrong || 0));
+
+  arr.forEach(q => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="checkbox" data-id="${q.id}"></td>
+      <td>${q.id}</td>
+      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
+      <td>${q.chapter || ''}</td>
+      <td>
+        ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
+        ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
+      </td>
+      <td>${q.timesWrong || 0}</td>
+    `;
+    tr.addEventListener('click', (e) => {
+      if (e.target.tagName.toLowerCase() === 'input') return;
+      const anySelected = document.querySelectorAll('#maintTableBody input[type="checkbox"]:checked').length > 0;
+      if (anySelected) return;
+      currentQuestion = q;
+      lastResult = null;
+      lastSelectedIndex = null;
+      feedbackPanel.innerHTML = '';
+      renderQuestion();
+      document.querySelector('.tab-button[data-tab="home"]').click();
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteSelectedMaint() {
+  const checked = Array.from(document.querySelectorAll('#maintTableBody input[type="checkbox"]:checked'));
+  if (!checked.length) return;
+  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
+  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  ids.forEach(id => store.delete(id));
+  tx.oncomplete = () => {
+    reloadMaintenanceTable();
     reloadAllQuestionsTable();
     loadNextQuestion(true);
-    updateStatsBar();
   };
 }
 
@@ -1164,20 +1196,32 @@ async function cloudDownload() {
   refreshBackupLabels();
 }
 
+// --- Autosave snapshot every 60 seconds ---
+async function autoSnapshot() {
+  try {
+    const backup = await buildBackupObject();
+    const ts = backup.meta.exportedAt;
+    const tx = db.transaction('meta', 'readwrite');
+    const store = tx.objectStore('meta');
+    store.put({ key: 'autoBackup', value: backup });
+    store.put({ key: 'lastAutoAt', value: ts });
+    tx.oncomplete = () => {
+      const lastAutoEl = document.getElementById('lastAutoLabel');
+      if (lastAutoEl) lastAutoEl.textContent = fmtTime(ts);
+    };
+  } catch (e) {
+    console.error('Autosave failed', e);
+  }
+}
+
 // Initial DB open
 openDB().then(() => {
   refreshBackupLabels();
   refreshCloudInfo();
   loadGitHubConfigIntoUI();
-  loadPracticeConfigIntoUI();
   loadNextQuestion(true);
+  setInterval(autoSnapshot, 60000);
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');
 });
-
-function loadPracticeConfigIntoUI() {
-  if (allowDupToggleEl) {
-    allowDupToggleEl.checked = !!allowDuplicatesInPractice;
-  }
-}

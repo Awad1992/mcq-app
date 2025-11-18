@@ -331,7 +331,7 @@ button:disabled {
 
 .pill-dup {
   background: #e3f2fd;
-  color: #1565c0;
+  color: #1e88e5;
 }
 
 .table-wrapper {
@@ -395,21 +395,41 @@ button:disabled {
   width: 100%;
 }
 
-.settings-inline {
+.id-range {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.85rem;
-}
-
-.range-row {
-  display: flex;
   gap: 0.25rem;
-  align-items: center;
 }
 
-.range-row input {
-  width: 76px;
+.id-range input {
+  width: 80px;
+}
+
+.id-range-sep {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.weak-list {
+  font-size: 0.8rem;
+}
+
+.weak-item {
+  padding: 0.25rem 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.weak-item:last-child {
+  border-bottom: none;
+}
+
+.weak-bar {
+  display: inline-block;
+  height: 6px;
+  border-radius: 999px;
+  background: #ffebee;
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 
 @media (max-width: 768px) {

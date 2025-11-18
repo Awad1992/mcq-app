@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Ultra‑Pro v4.2</title>
+  <title>MCQ Study App Ultra-Pro 4.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=4.2.0">
-  <link rel="stylesheet" href="style.css?v=4.2.0">
+  <link rel="manifest" href="manifest.json?v=4.1.0">
+  <link rel="stylesheet" href="style.css?v=4.1.0">
 </head>
 <body>
 <div class="app">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.2</span></h1>
-      <div class="subtitle">Local bank + history + flags + maintenance tag + smart filters + GitHub sync</div>
+      <h1>MCQ Study App Ultra-Pro <span class="ver">v4.1</span></h1>
+      <div class="subtitle">Local bank + history + flags + maintenance + GitHub sync + smart tools</div>
     </div>
     <div class="chips">
       <span class="chip">Offline</span>
@@ -26,6 +26,8 @@
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Home</button>
     <button class="tab-button" data-tab="all">All Questions</button>
+    <button class="tab-button" data-tab="maintenance">Maintenance</button>
+    <button class="tab-button" data-tab="dashboard">Dashboard</button>
     <button class="tab-button" data-tab="backup">Backup & Cloud</button>
     <button class="tab-button" data-tab="settings">Settings</button>
   </nav>
@@ -50,6 +52,7 @@
                   <option value="wrong">Previously wrong</option>
                   <option value="flagged">Flagged</option>
                   <option value="chapter">By chapter</option>
+                  <option value="weak">Weakness focus</option>
                 </select>
                 <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
               </div>
@@ -85,17 +88,6 @@
               </div>
             </div>
 
-            <div class="side-card card">
-              <div class="small-label">Import from URL</div>
-              <input id="remoteJsonUrl" placeholder="https://...mcq.json">
-              <div class="btn-row-tight">
-                <button id="btnImportFromUrl">Load from URL</button>
-              </div>
-              <div class="muted tiny">
-                Must be a public JSON URL (subject to CORS rules).
-              </div>
-            </div>
-
             <div class="card side-card">
               <div class="small-label">Recent history</div>
               <div class="history-list" id="historyList"></div>
@@ -121,7 +113,7 @@
               <option value="wrong">Wrong ≥ 1</option>
               <option value="maintenance">Maintenance only</option>
               <option value="inactive">Inactive</option>
-              <option value="duplicates">Duplicates</option>
+              <option value="duplicates">Duplicate clusters</option>
             </select>
           </div>
           <div>
@@ -134,16 +126,15 @@
             </select>
           </div>
           <div>
-            <label class="small-label">ID range (select)</label><br>
-            <div class="range-row">
-              <input id="allRangeFrom" type="number" placeholder="From #">
-              <input id="allRangeTo" type="number" placeholder="To #">
-              <button id="btnAllSelectRange">Select</button>
+            <label class="small-label">ID range</label><br>
+            <div class="id-range">
+              <input id="idFrom" placeholder="From" type="number" min="1">
+              <span class="id-range-sep">→</span>
+              <input id="idTo" placeholder="To" type="number" min="1">
             </div>
           </div>
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>
-            <button id="btnAllCleanDuplicates">Clean duplicates</button>
             <button id="btnAllDelete" class="danger">Delete selected</button>
           </div>
         </div>
@@ -168,6 +159,62 @@
       </div>
     </section>
 
+    <!-- MAINTENANCE TAB -->
+    <section class="tab-content" id="tab-maintenance">
+      <div class="card">
+        <div class="row-controls">
+          <div>
+            <label class="small-label">Show</label><br>
+            <select id="maintFilter">
+              <option value="maintenance">Maintenance only</option>
+              <option value="flagged">Flagged + Maintenance</option>
+              <option value="all">All needing review</option>
+            </select>
+          </div>
+          <div>
+            <label class="small-label">Chapter filter</label><br>
+            <input id="maintChapterFilter" placeholder="Chapter (e.g. Ch45)">
+          </div>
+          <div class="all-actions">
+            <button id="btnMaintReload">Reload</button>
+            <button id="btnMaintDelete" class="danger">Delete selected</button>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="maintSelectAll"></th>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Flags</th>
+                <th>Wrong</th>
+              </tr>
+            </thead>
+            <tbody id="maintTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD TAB -->
+    <section class="tab-content" id="tab-dashboard">
+      <div class="card">
+        <h2>Weakness detector</h2>
+        <p class="muted tiny">
+          Shows chapters and questions with highest wrong rate to focus your practice.
+        </p>
+        <div id="weakChapters" class="weak-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Recent performance</h2>
+        <div id="perfSummary" class="weak-list"></div>
+      </div>
+    </section>
+
     <!-- BACKUP & CLOUD TAB -->
     <section class="tab-content" id="tab-backup">
       <div class="card">
@@ -184,6 +231,7 @@
           <div class="backup-status">
             <div>Last activity: <span id="lastActivityLabel">–</span></div>
             <div>Last local backup: <span id="lastBackupLabel">–</span></div>
+            <div>Last autosave: <span id="lastAutoLabel">–</span></div>
           </div>
         </div>
       </div>
@@ -206,17 +254,6 @@
 
     <!-- SETTINGS TAB -->
     <section class="tab-content" id="tab-settings">
-      <div class="card">
-        <h2>Practice settings</h2>
-        <label class="settings-inline">
-          <input type="checkbox" id="allowDuplicatesToggle">
-          <span>Allow showing duplicate questions in practice (same text asked more than once)</span>
-        </label>
-        <p class="muted tiny">
-          When disabled, only one copy of questions with identical text will be used in random practice.
-        </p>
-      </div>
-
       <div class="card">
         <h2>GitHub settings</h2>
         <div class="settings-grid">
@@ -248,9 +285,10 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.2.0</strong><br>
+          Version: <strong>4.1.0</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
-          Safe backup: Importing an older backup will warn you if it is older than your last activity.
+          Safe backup: Importing an older backup will warn you if it is older than your last activity.<br>
+          Autosave: internal snapshot every 60 seconds while app is open.
         </p>
       </div>
     </section>
@@ -259,12 +297,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.2.0";
+  window.APP_VERSION = "4.1.0";
 </script>
-<script src="app.js?v=4.2.0"></script>
+<script src="app.js?v=4.1.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.2.0').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.1.0').catch(()=>{});
   }
 </script>
 </body>
