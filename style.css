@@ -689,3 +689,9 @@ body.theme-night .modal-body {
     top: 4%;
   }
 }
+
+
+.all-table-wrapper {
+  max-height: 60vh;
+  overflow-y: auto;
+}

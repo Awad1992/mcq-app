@@ -20,6 +20,7 @@
       <span class="chip chip-ok">Tracks wrong / weak</span>
       <span class="chip chip-flag">Flags & tags</span>
       <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
+      <button id="btnBackupQuick" class="chip chip-theme">Backup → GitHub</button>
       <select id="themeSelect" class="chip chip-theme">
         <option value="light">☀︎ Light</option>
         <option value="dark">🌙 Dark</option>
@@ -27,10 +28,6 @@
         <option value="calm">🌿 Calm</option>
       </select>
     </div>
-    <div class="chips">
-      <button id="btnBackupQuick" class="chip chip-flag">Backup</button>
-    </div>
-
   </header>
 
   <nav class="tabs">
@@ -84,11 +81,9 @@
             <div id="feedbackPanel" class="feedback-panel"></div>
 
             <div class="btn-row-main">
-              <button id="btnPrev">Previous</button>
               <button class="primary" id="btnSubmit">Submit</button>
+              <button id="btnPrev">Previous</button>
               <button id="btnNext">Next</button>
-            </div>
-            <div class="btn-row-main">
               <button class="ghost" id="btnFlag">Flag</button>
               <button class="ghost" id="btnMaint">Maint</button>
             </div>
@@ -103,7 +98,6 @@
         </div>
       </div>
     </section>
-
 
     <!-- FLASHCARDS TAB -->
     <section class="tab-content" id="tab-flashcards">
@@ -165,14 +159,6 @@
           <div>
             <label class="small-label">Time limit (minutes)</label><br>
             <input id="examMinutes" type="number" min="5" max="300" value="60" style="width:90px;">
-          </div>
-<div>
-  <label class="small-label">Last N added</label><br>
-  <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
-</div>
-          <div>
-            <label class="small-label">Range select mode</label><br>
-            <label class="tiny"><input id="allRangeMode" type="checkbox"> enable range by first+last</label>
           </div>
           <div class="all-actions">
             <button id="btnStartExam" class="primary">Start exam</button>
@@ -249,15 +235,17 @@
             <label class="small-label">Range / chapter</label><br>
             <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
             <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
-            <select id="allChapterExact" style="min-width:180px;"><option value="">All chapters</option></select>
+            <select id="allChapterExact" style="min-width:160px;">
+              <option value="">All chapters</option>
+            </select>
           </div>
-<div>
-  <label class="small-label">Last N added</label><br>
-  <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
-</div>
           <div>
-            <label class="small-label">Range select mode</label><br>
-            <label class="tiny"><input id="allRangeMode" type="checkbox"> enable range by first+last</label>
+            <label class="small-label">Last N added</label><br>
+            <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
+          </div>
+          <div>
+            <label class="small-label">Range select</label><br>
+            <label class="tiny"><input id="allRangeMode" type="checkbox"> enable first+last range</label>
           </div>
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>
@@ -266,7 +254,21 @@
           </div>
         </div>
 
-        <div class="table-wrapper">
+        
+        <div class="row-controls">
+          <div class="side-block">
+            <div class="small-label">Import / export questions</div>
+            <input type="file" id="fileInput" accept=".json">
+            <div class="btn-row-tight">
+              <button id="btnImport">Import</button>
+              <button id="btnExport">Export</button>
+            </div>
+            <div class="muted tiny">
+              JSON file with questions, choices, correct answer, explanation, chapter, tags, images.
+            </div>
+          </div>
+        </div>
+<div class="table-wrapper all-table-wrapper">
           <table class="q-table">
             <thead>
               <tr>
@@ -286,22 +288,7 @@
           </table>
         </div>
       </div>
-    
-      <div class="card">
-        <div class="side-block">
-          <div class="small-label">Import / export questions</div>
-          <input type="file" id="fileInput" accept=".json">
-          <div class="btn-row-tight">
-            <button id="btnImport">Import</button>
-            <button id="btnExport">Export</button>
-            <button id="btnClearImportFile" class="ghost">Clear file</button>
-          </div>
-          <div class="muted tiny">
-            JSON file with questions, choices, correct answer, explanation, chapter, tags, images.
-          </div>
-        </div>
-      </div>
-</section>
+    </section>
 
     <!-- BACKUP & CLOUD TAB -->
     <section class="tab-content" id="tab-backup">
@@ -315,7 +302,6 @@
             <button id="btnBackupExport" class="primary">Export full backup</button>
             <input type="file" id="backupFileInput" accept=".json">
             <button id="btnBackupImport">Import backup</button>
-            <button id="btnBackupClearFile" class="ghost">Clear file</button>
           </div>
           <div class="backup-status">
             <div>Last activity: <span id="lastActivityLabel">–</span></div>

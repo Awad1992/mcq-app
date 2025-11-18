@@ -149,30 +149,14 @@ document.getElementById('allLastN').addEventListener('input', debounce(reloadAll
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
 document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
-const quickBackupBtn = document.getElementById('btnBackupQuick');
-if (quickBackupBtn) {
-  quickBackupBtn.addEventListener('click', cloudUpload);
-}
-
-// Import clear buttons
-const clearImportBtn = document.getElementById('btnClearImportFile');
-if (clearImportBtn) {
-  clearImportBtn.addEventListener('click', () => {
-    const fi = document.getElementById('fileInput');
-    if (fi) fi.value = '';
-  });
-}
-const clearBackupFileBtn = document.getElementById('btnBackupClearFile');
-if (clearBackupFileBtn) {
-  clearBackupFileBtn.addEventListener('click', () => {
-    const fi = document.getElementById('backupFileInput');
-    if (fi) fi.value = '';
-  });
-}
 
 // Cloud sync controls
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
 document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
+const quickBackupBtn = document.getElementById('btnBackupQuick');
+if (quickBackupBtn) {
+  quickBackupBtn.addEventListener('click', cloudUpload);
+}
 
 // Settings tab – GitHub
 document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
@@ -457,7 +441,7 @@ function renderQuestion() {
 
   if (q.imageData || q.imageUrl) {
     const src = q.imageData || q.imageUrl;
-    html += `<div class="img-preview"><img src="${src}" alt="question image"></div>`;
+    html += `<div class="img-preview"><a href="${src}" target="_blank" rel="noopener noreferrer"><img src="${src}" alt="question image"></a></div>`;
   }
 
   html += '<div style="margin-top:0.4rem;">';
@@ -1226,27 +1210,25 @@ async function reloadAllQuestionsTable() {
   const tbody = document.getElementById('allTableBody');
   const rangeFrom = parseInt(document.getElementById('rangeFrom').value || '0', 10);
   const rangeTo = parseInt(document.getElementById('rangeTo').value || '0', 10);
-  const chapExact = document.getElementById('allChapterExact').value.toLowerCase().trim();
-  const lastN = parseInt(document.getElementById('allLastN').value || '0', 10);
+  const lastN = parseInt(document.getElementById('allLastN')?.value || '0', 10);
   tbody.innerHTML = '';
   lastAllRowIndex = null;
 
   const all = await getAllQuestions();
+  const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
+
   const chapSelect = document.getElementById('allChapterExact');
+  let chapExact = '';
   if (chapSelect && chapSelect.tagName.toLowerCase() === 'select') {
     const prevVal = chapSelect.value;
     const chapters = Array.from(new Set(all.map(q => q.chapter || '').filter(x => x))).sort((a, b) => a.localeCompare(b));
     chapSelect.innerHTML = '<option value="">All chapters</option>' +
       chapters.map(c => `<option value="${c.toLowerCase()}">${c}</option>`).join('');
-    if (prevVal) {
+    if (prevVal && chapSelect.querySelector(`option[value="${prevVal}"]`)) {
       chapSelect.value = prevVal;
-      if (chapSelect.value !== prevVal) {
-        chapSelect.value = '';
-      }
     }
+    chapExact = chapSelect.value;
   }
-  const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
-
 
   // duplicate clusters
   const dupMap = new Map();
@@ -1312,11 +1294,10 @@ async function reloadAllQuestionsTable() {
     arr.sort((a, b) => (a.text || '').localeCompare(b.text || ''));
   }
 
+  if (lastN && lastN > 0) {
+    arr = arr.slice(0, lastN);
+  }
 
-if (lastN > 0) {
-  arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-  arr = arr.slice(0, lastN);
-}
   const nowIso = new Date().toISOString();
 
   arr.forEach(q => {
@@ -1350,7 +1331,7 @@ if (lastN > 0) {
         const rangeMode = !!(rangeModeEl && rangeModeEl.checked);
 
         if (!rangeMode) {
-          // Simple behavior: just remember last index, no auto-range
+          // simple behavior: each checkbox independent
           if (!cb.checked) {
             lastAllRowIndex = null;
           } else {
@@ -1361,7 +1342,7 @@ if (lastN > 0) {
           return;
         }
 
-        // Range mode: first+last select all between
+        // range mode: first+last select all between
         if (!cb.checked) {
           lastAllRowIndex = null;
           return;
@@ -1384,7 +1365,17 @@ if (lastN > 0) {
         lastAllRowIndex = thisIndex;
       });
     }
-    // Row click in ALL tab no longer navigates to Practice
+    tr.addEventListener('click', (e) => {
+      if (e.target.tagName.toLowerCase() === 'input' || e.target.classList.contains('btn-edit')) return;
+      const anySelected = !!document.querySelector('#allTableBody input[type="checkbox"].row-select:checked');
+      if (anySelected) return;
+      currentQuestion = q;
+      lastResult = null;
+      lastSelectedIndex = null;
+      feedbackPanel.innerHTML = '';
+      renderQuestion();
+      document.querySelector('.tab-button[data-tab="home"]').click();
+    });
     tbody.appendChild(tr);
   });
 
