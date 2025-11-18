@@ -15,6 +15,30 @@ let lastResult = null;
 let lastSelectedIndex = null;
 let historyStack = [];
 
+// Practice preferences
+let prefSkipSolved = true;
+
+// Load preference from meta if available
+async function loadPracticePrefs() {
+  try {
+    const val = await loadMeta('prefSkipSolved');
+    if (typeof val === 'boolean') {
+      prefSkipSolved = val;
+    }
+    const cb = document.getElementById('prefSkipSolved');
+    if (cb) {
+      cb.checked = !!prefSkipSolved;
+    }
+  } catch (e) {
+    console.warn('loadPracticePrefs failed', e);
+  }
+}
+
+function setPrefSkipSolved(val) {
+  prefSkipSolved = !!val;
+  saveMeta('prefSkipSolved', prefSkipSolved);
+}
+
 // ALL tab selection & pagination state
 let allSelectedIds = new Set();
 let allCurrentPage = 1;
@@ -38,8 +62,23 @@ const feedbackPanel = document.getElementById('feedbackPanel');
 const historyListEl = document.getElementById('historyList');
 const modeSelect = document.getElementById('modeSelect');
 const chapterFilterEl = document.getElementById('chapterFilter');
+const prefSkipSolvedEl = document.getElementById('prefSkipSolved');
+if (prefSkipSolvedEl) {
+  prefSkipSolvedEl.addEventListener('change', () => {
+    setPrefSkipSolved(!!prefSkipSolvedEl.checked);
+  });
+}
 const relatedBox = document.getElementById('relatedBox');
 const themeSelect = document.getElementById('themeSelect');
+const resetBtn = document.getElementById('btnResetProgress');
+if (resetBtn) {
+  resetBtn.addEventListener('click', async () => {
+    const scopeEl = document.getElementById('resetScope');
+    const scope = scopeEl ? scopeEl.value : 'all';
+    await resetProgress(scope);
+  });
+}
+
 
 // Tabs
 document.querySelectorAll('.tab-button').forEach(btn => {
@@ -632,6 +671,14 @@ async function pickQuestion() {
   } else if (currentMode === 'chapter' && currentChapter) {
     const chap = currentChapter.toLowerCase();
     filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
+  }
+
+  // Prefer unsolved questions if enabled (except in 'new' mode which is already unsolved)
+  if (prefSkipSolved && currentMode !== 'new') {
+    const unsolved = filtered.filter(q => !q.timesSeen);
+    if (unsolved.length) {
+      filtered = unsolved;
+    }
   }
 
   if (!filtered.length) filtered = all;
@@ -2559,6 +2606,45 @@ function startExamTimer() {
   examTimerId = setInterval(tick, 1000);
 }
 
+
+async function resetProgress(scope) {
+  if (!db) return;
+  if (!confirm('Reset progress for selected questions? This keeps questions but clears your practice history.')) return;
+  const tx = db.transaction(['questions','answers'], 'readwrite');
+  const qStore = tx.objectStore('questions');
+  const aStore = tx.objectStore('answers');
+  const allReq = qStore.getAll();
+  const all = await new Promise(res => {
+    allReq.onsuccess = e => res(e.target.result || []);
+    allReq.onerror = () => res([]);
+  });
+  const now = new Date().toISOString();
+  for (const q of all) {
+    const everWrong = (q.timesWrong || 0) > 0;
+    if (scope === 'wrong' && !everWrong) continue;
+    q.timesSeen = 0;
+    q.timesWrong = 0;
+    q.lastSeenAt = null;
+    q.dueAt = now;
+    const putReq = qStore.put(q);
+    // clear answers for this question
+    const idx = aStore.index('by_question');
+    const ansList = await new Promise(res => {
+      const r = idx.getAll(q.id);
+      r.onsuccess = e => res(e.target.result || []);
+      r.onerror = () => res([]);
+    });
+    for (const a of ansList) {
+      aStore.delete(a.id);
+    }
+  }
+  alert('Progress reset completed.');
+  historyStack = [];
+  loadNextQuestion(true);
+  updateStatsBar();
+  updateHistoryList();
+}
+
 // Initial DB open
 openDB().then(() => {
   loadTheme();
@@ -2566,6 +2652,7 @@ openDB().then(() => {
   refreshCloudInfo();
   loadGitHubConfigIntoUI();
   refreshChapterOptions();
+  loadPracticePrefs();
   loadNextQuestion(true);
   buildFlashcardPool();
 }).catch(err => {
@@ -2746,6 +2833,15 @@ const modeSelect = document.getElementById('modeSelect');
 const chapterFilterEl = document.getElementById('chapterFilter');
 const relatedBox = document.getElementById('relatedBox');
 const themeSelect = document.getElementById('themeSelect');
+const resetBtn = document.getElementById('btnResetProgress');
+if (resetBtn) {
+  resetBtn.addEventListener('click', async () => {
+    const scopeEl = document.getElementById('resetScope');
+    const scope = scopeEl ? scopeEl.value : 'all';
+    await resetProgress(scope);
+  });
+}
+
 
 // Tabs
 document.querySelectorAll('.tab-button').forEach(btn => {
@@ -3163,6 +3259,14 @@ async function pickQuestion() {
   } else if (currentMode === 'chapter' && currentChapter) {
     const chap = currentChapter.toLowerCase();
     filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
+  }
+
+  // Prefer unsolved questions if enabled (except in 'new' mode which is already unsolved)
+  if (prefSkipSolved && currentMode !== 'new') {
+    const unsolved = filtered.filter(q => !q.timesSeen);
+    if (unsolved.length) {
+      filtered = unsolved;
+    }
   }
 
   if (!filtered.length) filtered = all;

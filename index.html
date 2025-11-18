@@ -64,7 +64,11 @@
                   <option value="chapter">By chapter</option>
                 </select>
                 <select id="chapterSelect" style="display:none; max-width:220px;"></select>
-                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;">
+                <input id="chapterFilter" placeholder="Chapter (e.g. Ch45 Burns)" style="display:none; max-width:200px;"><br>
+                <label class="small-label" style="margin-top:4px; display:inline-block;">
+                  <input type="checkbox" id="prefSkipSolved" checked>
+                  Prefer unsolved questions (skip solved when possible)
+                </label>
               </div>
               <div>
                 <label class="small-label">Quick actions</label><br>
@@ -415,9 +419,28 @@
       </div>
 
       <div class="card">
+        <h2>Progress & reset</h2>
+        <p class="muted tiny">
+          Reset only affects your local progress (times seen, wrong count, due dates, answers). Questions themselves stay saved.
+        </p>
+        <div class="settings-grid">
+          <label>
+            <span class="small-label">Reset scope</span>
+            <select id="resetScope">
+              <option value="all">All questions</option>
+              <option value="wrong">Only questions ever answered wrong</option>
+            </select>
+          </label>
+        </div>
+        <div class="btn-row-main">
+          <button id="btnResetProgress" class="danger">Reset selected progress…</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.1.0</strong><br>
+          Version: <strong>4.3.1</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
           Engine: spaced repetition + weakness clustering + tags + flashcards.
         </p>
@@ -475,12 +498,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.1.0";
+  window.APP_VERSION = "4.3.1";
 </script>
-<script src="app.js?v=4.1.0"></script>
+<script src="app.js?v=4.3.1"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.1.0').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.3.1').catch(()=>{});
   }
 </script>
 </body>
