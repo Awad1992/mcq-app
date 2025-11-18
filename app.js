@@ -960,35 +960,14 @@ function handleImportSimple() {
       if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
       const tx = db.transaction('questions', 'readwrite');
       const store = tx.objectStore('questions');
-      arr.forEach(q => {
-        const obj = {
-          text: q.text,
-          chapter: q.chapter || '',
-          source: q.source || '',
-          explanation: q.explanation || '',
-          choices: q.choices || [],
-          timesSeen: q.timesSeen || 0,
-          timesCorrect: q.timesCorrect || 0,
-          timesWrong: q.timesWrong || 0,
-          lastSeenAt: q.lastSeenAt || null,
-          createdAt: q.createdAt || new Date().toISOString(),
-          flagged: !!q.flagged,
-          maintenance: !!q.maintenance,
-          active: q.active !== false,
-          tags: Array.isArray(q.tags) ? q.tags : [],
-          pinned: !!q.pinned,
-          imageUrl: q.imageUrl || '',
-          imageData: q.imageData || '',
-          srEase: q.srEase || 2.5,
-          srInterval: q.srInterval || 0,
-          srReps: q.srReps || 0,
-          dueAt: q.dueAt || null
-        };
-        if (q.id != null) obj.id = q.id;
+      const normalized = normalizeImportedQuestions(arr);
+      normalized.forEach(q => {
+        const obj = Object.assign({}, q);
+        if (obj.id == null) delete obj.id;
         store.put(obj);
       });
       tx.oncomplete = () => {
-        alert('Imported ' + arr.length + ' questions.');
+        alert('Imported ' + normalized.length + ' questions.');
         loadNextQuestion(true);
       };
     } catch (err) {
@@ -1019,41 +998,114 @@ async function handleImportFromUrl() {
     }
     const tx = db.transaction('questions', 'readwrite');
     const store = tx.objectStore('questions');
-    arr.forEach(q => {
-      const obj = {
-        text: q.text,
-        chapter: q.chapter || '',
-        source: q.source || '',
-        explanation: q.explanation || '',
-        choices: q.choices || [],
-        timesSeen: q.timesSeen || 0,
-        timesCorrect: q.timesCorrect || 0,
-        timesWrong: q.timesWrong || 0,
-        lastSeenAt: q.lastSeenAt || null,
-        createdAt: q.createdAt || new Date().toISOString(),
-        flagged: !!q.flagged,
-        maintenance: !!q.maintenance,
-        active: q.active !== false,
-        tags: Array.isArray(q.tags) ? q.tags : [],
-        pinned: !!q.pinned,
-        imageUrl: q.imageUrl || '',
-        imageData: q.imageData || '',
-        srEase: q.srEase || 2.5,
-        srInterval: q.srInterval || 0,
-        srReps: q.srReps || 0,
-        dueAt: q.dueAt || null
-      };
-      if (q.id != null) obj.id = q.id;
+    const normalized = normalizeImportedQuestions(arr);
+    normalized.forEach(q => {
+      const obj = Object.assign({}, q);
+      if (obj.id == null) delete obj.id;
       store.put(obj);
     });
     tx.oncomplete = () => {
-      alert('Imported ' + arr.length + ' questions from URL.');
+      alert('Imported ' + normalized.length + ' questions from URL.');
       loadNextQuestion(true);
     };
   } catch (err) {
     alert('Error importing from URL: ' + err.message);
   }
 }
+}
+
+
+function normalizeImportedQuestions(rawArr) {
+  if (!Array.isArray(rawArr)) return [];
+  const letters = ['A','B','C','D','E','F','G'];
+  return rawArr.map((q, idx) => {
+    const baseText = q.text || q.question || q.prompt || ('Question ' + (idx + 1));
+    let chapter = q.chapter || q.chapterName || q.topic || '';
+    let source = q.source || q.book || q.reference || '';
+    let explanation = q.explanation || q.explain || q.rationale || q.comment || '';
+
+    // Normalize tags
+    let tags = [];
+    if (Array.isArray(q.tags)) tags = q.tags;
+    else if (Array.isArray(q.categories)) tags = q.categories;
+    else if (typeof q.tags === 'string') tags = q.tags.split(/[,;]+/).map(s => s.trim()).filter(Boolean);
+
+    // Build choices
+    let choices = [];
+    if (Array.isArray(q.choices) && q.choices.length) {
+      // If already in {text,isCorrect} form, reuse
+      const looksStructured = q.choices.every(ch => typeof ch === 'object' && 'text' in ch);
+      if (looksStructured) {
+        choices = q.choices.map(ch => ({
+          text: ch.text,
+          isCorrect: !!ch.isCorrect
+        }));
+      }
+    }
+    if (!choices.length) {
+      // Try options / answers as plain strings
+      let opts = null;
+      if (Array.isArray(q.options)) opts = q.options;
+      else if (Array.isArray(q.answers)) opts = q.answers;
+      else if (Array.isArray(q.choices)) opts = q.choices;
+      if (opts && opts.length) {
+        // Determine correct index
+        let correctIdx = null;
+        if (typeof q.correctIndex === 'number') correctIdx = q.correctIndex;
+        else if (typeof q.answerIndex === 'number') correctIdx = q.answerIndex;
+        else if (typeof q.correct === 'number') correctIdx = q.correct;
+        else if (typeof q.correct === 'string') {
+          const letterIdx = letters.indexOf(q.correct.toUpperCase());
+          if (letterIdx >= 0 && letterIdx < opts.length) correctIdx = letterIdx;
+          else {
+            const byText = opts.findIndex(o => String(o).trim() === q.correct.trim());
+            if (byText >= 0) correctIdx = byText;
+          }
+        }
+        choices = opts.map((opt, i) => ({
+          text: typeof opt === 'string' ? opt : (opt.text || String(opt)),
+          isCorrect: (correctIdx !== null ? i === correctIdx : !!(opt.isCorrect))
+        }));
+        // If still no true isCorrect, default first as correct
+        if (!choices.some(c => c.isCorrect) && choices.length) {
+          choices[0].isCorrect = true;
+        }
+      }
+    }
+
+    // Fallback if still empty
+    if (!choices.length) {
+      choices = [{
+        text: 'Option A',
+        isCorrect: true
+      }];
+    }
+
+    return {
+      text: baseText,
+      chapter,
+      source,
+      explanation,
+      choices,
+      timesSeen: q.timesSeen || 0,
+      timesCorrect: q.timesCorrect || 0,
+      timesWrong: q.timesWrong || 0,
+      lastSeenAt: q.lastSeenAt || null,
+      createdAt: q.createdAt || new Date().toISOString(),
+      flagged: !!q.flagged,
+      maintenance: !!q.maintenance,
+      active: q.active !== false,
+      tags,
+      pinned: !!q.pinned,
+      imageUrl: q.imageUrl || '',
+      imageData: q.imageData || '',
+      srEase: q.srEase || 2.5,
+      srInterval: q.srInterval || 0,
+      srReps: q.srReps || 0,
+      dueAt: q.dueAt || null,
+      id: q.id != null ? q.id : undefined
+    };
+  });
 }
 
 // Export questions only
@@ -3421,35 +3473,14 @@ function handleImportSimple() {
       if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
       const tx = db.transaction('questions', 'readwrite');
       const store = tx.objectStore('questions');
-      arr.forEach(q => {
-        const obj = {
-          text: q.text,
-          chapter: q.chapter || '',
-          source: q.source || '',
-          explanation: q.explanation || '',
-          choices: q.choices || [],
-          timesSeen: q.timesSeen || 0,
-          timesCorrect: q.timesCorrect || 0,
-          timesWrong: q.timesWrong || 0,
-          lastSeenAt: q.lastSeenAt || null,
-          createdAt: q.createdAt || new Date().toISOString(),
-          flagged: !!q.flagged,
-          maintenance: !!q.maintenance,
-          active: q.active !== false,
-          tags: Array.isArray(q.tags) ? q.tags : [],
-          pinned: !!q.pinned,
-          imageUrl: q.imageUrl || '',
-          imageData: q.imageData || '',
-          srEase: q.srEase || 2.5,
-          srInterval: q.srInterval || 0,
-          srReps: q.srReps || 0,
-          dueAt: q.dueAt || null
-        };
-        if (q.id != null) obj.id = q.id;
+      const normalized = normalizeImportedQuestions(arr);
+      normalized.forEach(q => {
+        const obj = Object.assign({}, q);
+        if (obj.id == null) delete obj.id;
         store.put(obj);
       });
       tx.oncomplete = () => {
-        alert('Imported ' + arr.length + ' questions.');
+        alert('Imported ' + normalized.length + ' questions.');
         loadNextQuestion(true);
       };
     } catch (err) {
