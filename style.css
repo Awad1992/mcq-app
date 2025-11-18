@@ -695,3 +695,34 @@ body.theme-night .modal-body {
   max-height: 60vh;
   overflow-y: auto;
 }
+
+.all-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.all-selected-indicator {
+  font-size: 12px;
+  color: #444;
+}
+
+.all-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.all-bulk-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.all-bulk-actions button {
+  font-size: 11px;
+  padding: 3px 6px;
+}

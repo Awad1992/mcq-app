@@ -12,7 +12,7 @@
 <div class="app" id="appRoot">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.1</span></h1>
+      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.2</span></h1>
       <div class="subtitle">Local bank + spaced repetition + weak‑spot engine + dashboard + flashcards + exam sim</div>
     </div>
     <div class="chips">
@@ -235,17 +235,7 @@
             <label class="small-label">Range / chapter</label><br>
             <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
             <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
-            <select id="allChapterExact" style="min-width:160px;">
-              <option value="">All chapters</option>
-            </select>
-          </div>
-          <div>
-            <label class="small-label">Last N added</label><br>
-            <input id="allLastN" type="number" min="0" placeholder="e.g. 50" style="width:100px;">
-          </div>
-          <div>
-            <label class="small-label">Range select</label><br>
-            <label class="tiny"><input id="allRangeMode" type="checkbox"> enable first+last range</label>
+            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;">
           </div>
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>

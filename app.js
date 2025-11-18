@@ -13,8 +13,14 @@ let currentMode = 'due';
 let currentChapter = '';
 let lastResult = null;
 let lastSelectedIndex = null;
-let lastAllRowIndex = null;
 let historyStack = [];
+
+// ALL tab selection & pagination state
+let allSelectedIds = new Set();
+let allCurrentPage = 1;
+let allTotalPages = 1;
+const ALL_PAGE_SIZE = 50;
+let allRangeAnchorIndex = null;
 let lastActivityAt = null;
 let currentTheme = 'light';
 
@@ -134,17 +140,54 @@ document.getElementById('btnAllReload').addEventListener('click', reloadAllQuest
 document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
 document.getElementById('btnAllDeleteDups').addEventListener('click', deleteDuplicateClusters);
 document.getElementById('allSelectAll').addEventListener('change', e => {
-  document.querySelectorAll('#allTableBody input[type="checkbox"].row-select').forEach(ch => {
+  const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
+  boxes.forEach(ch => {
+    const id = parseInt(ch.getAttribute('data-id'), 10);
     ch.checked = e.target.checked;
+    if (e.target.checked) {
+      allSelectedIds.add(id);
+    } else {
+      allSelectedIds.delete(id);
+    }
   });
+  updateAllSelectedCount();
 });
 document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
-document.getElementById('allFilter').addEventListener('change', reloadAllQuestionsTable);
-document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
-document.getElementById('rangeFrom').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
-document.getElementById('rangeTo').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
-document.getElementById('allChapterExact').addEventListener('change', reloadAllQuestionsTable);
-document.getElementById('allLastN').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+document.getElementById('allFilter').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('allSort').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('rangeFrom').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+document.getElementById('rangeTo').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+document.getElementById('allChapterExact').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+const allLastNInput = document.getElementById('allLastN');
+if (allLastNInput) {
+  allLastNInput.addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+}
+const prevBtn = document.getElementById('allPrevPage');
+if (prevBtn) {
+  prevBtn.addEventListener('click', () => {
+    if (allCurrentPage > 1) {
+      allCurrentPage--;
+      reloadAllQuestionsTable();
+    }
+  });
+}
+const nextBtn = document.getElementById('allNextPage');
+if (nextBtn) {
+  nextBtn.addEventListener('click', () => {
+    if (allCurrentPage < allTotalPages) {
+      allCurrentPage++;
+      reloadAllQuestionsTable();
+    }
+  });
+}
+const bulkChapBtn = document.getElementById('allBulkSetChapter');
+if (bulkChapBtn) {
+  bulkChapBtn.addEventListener('click', bulkSetChapterForSelected);
+}
+const bulkTagBtn = document.getElementById('allBulkAddTag');
+if (bulkTagBtn) {
+  bulkTagBtn.addEventListener('click', bulkAddTagForSelected);
+}
 
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
@@ -1203,6 +1246,7 @@ btnEditSave.addEventListener('click', async () => {
   };
 });
 
+
 async function reloadAllQuestionsTable() {
   const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
   const filter = document.getElementById('allFilter').value;
@@ -1210,25 +1254,13 @@ async function reloadAllQuestionsTable() {
   const tbody = document.getElementById('allTableBody');
   const rangeFrom = parseInt(document.getElementById('rangeFrom').value || '0', 10);
   const rangeTo = parseInt(document.getElementById('rangeTo').value || '0', 10);
-  const lastN = parseInt(document.getElementById('allLastN')?.value || '0', 10);
+  const lastNEl = document.getElementById('allLastN');
+  const lastN = lastNEl ? parseInt(lastNEl.value || '0', 10) : 0;
   tbody.innerHTML = '';
-  lastAllRowIndex = null;
+  allRangeAnchorIndex = null;
 
   const all = await getAllQuestions();
   const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
-
-  const chapSelect = document.getElementById('allChapterExact');
-  let chapExact = '';
-  if (chapSelect && chapSelect.tagName.toLowerCase() === 'select') {
-    const prevVal = chapSelect.value;
-    const chapters = Array.from(new Set(all.map(q => q.chapter || '').filter(x => x))).sort((a, b) => a.localeCompare(b));
-    chapSelect.innerHTML = '<option value="">All chapters</option>' +
-      chapters.map(c => `<option value="${c.toLowerCase()}">${c}</option>`).join('');
-    if (prevVal && chapSelect.querySelector(`option[value="${prevVal}"]`)) {
-      chapSelect.value = prevVal;
-    }
-    chapExact = chapSelect.value;
-  }
 
   // duplicate clusters
   const dupMap = new Map();
@@ -1245,6 +1277,7 @@ async function reloadAllQuestionsTable() {
 
   let arr = all;
 
+  // search
   if (searchVal) {
     arr = arr.filter(q => {
       const s = (q.text || '') + ' ' + (q.chapter || '') + ' ' + (q.source || '') + ' ' + (Array.isArray(q.tags) ? q.tags.join(' ') : '');
@@ -1252,6 +1285,7 @@ async function reloadAllQuestionsTable() {
     });
   }
 
+  // ID range
   if (rangeFrom && rangeTo && rangeTo >= rangeFrom) {
     arr = arr.filter(q => q.id >= rangeFrom && q.id <= rangeTo);
   } else if (rangeFrom && !rangeTo) {
@@ -1260,16 +1294,20 @@ async function reloadAllQuestionsTable() {
     arr = arr.filter(q => q.id <= rangeTo);
   }
 
+  // chapter exact (keep input, case-insensitive)
+  const chapInput = document.getElementById('allChapterExact');
+  const chapExact = chapInput ? chapInput.value.toLowerCase().trim() : '';
   if (chapExact) {
     arr = arr.filter(q => (q.chapter || '').toLowerCase() === chapExact);
   }
 
+  // filter modes
   if (filter === 'flagged') {
     arr = arr.filter(q => q.flagged);
   } else if (filter === 'wrong') {
-    arr = arr.filter(q => q.timesWrong > 0);
+    arr = arr.filter(q => (q.timesWrong || 0) > 0);
   } else if (filter === 'maintenance') {
-    arr = arr.filter(q => q.maintenance);
+    arr = arr.filter(q => q.maintenance === true);
   } else if (filter === 'inactive') {
     arr = arr.filter(q => q.active === false);
   } else if (filter === 'weak') {
@@ -1280,6 +1318,7 @@ async function reloadAllQuestionsTable() {
     arr = arr.filter(q => q.pinned);
   }
 
+  // sorting
   if (sortVal === 'created_desc') {
     arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
   } else if (sortVal === 'created_asc') {
@@ -1294,77 +1333,127 @@ async function reloadAllQuestionsTable() {
     arr.sort((a, b) => (a.text || '').localeCompare(b.text || ''));
   }
 
+  // last N
   if (lastN && lastN > 0) {
     arr = arr.slice(0, lastN);
   }
 
+  const total = arr.length;
+  allTotalPages = Math.max(1, Math.ceil(total / ALL_PAGE_SIZE));
+  if (allCurrentPage < 1) allCurrentPage = 1;
+  if (allCurrentPage > allTotalPages) allCurrentPage = allTotalPages;
+
+  const startIdx = (allCurrentPage - 1) * ALL_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + ALL_PAGE_SIZE, total);
+  const pageItems = arr.slice(startIdx, endIdx);
+
+  const pageInfoEl = document.getElementById('allPageInfo');
+  if (pageInfoEl) {
+    pageInfoEl.textContent = `Page ${allCurrentPage} / ${allTotalPages} (total ${total})`;
+  }
+
   const nowIso = new Date().toISOString();
 
-  arr.forEach(q => {
+  const boxesMeta = [];
+
+  pageItems.forEach((q, indexOnPage) => {
     const tr = document.createElement('tr');
     const tagsStr = Array.isArray(q.tags) ? q.tags.join(', ') : '';
     const metaBits = [];
     if (q.flagged) metaBits.push('<span class="pill pill-flag">Flag</span>');
     if (q.maintenance) metaBits.push('<span class="pill pill-maint">Maint</span>');
-    if (q.pinned) metaBits.push('<span class="pill pill-pin">Pin</span>');
+    if (weakSet.has(q.id)) metaBits.push('<span class="pill pill-weak">Weak</span>');
     if (dupSet.has(q.id)) metaBits.push('<span class="pill pill-dup">Dup</span>');
-    if (q.active === false) metaBits.push('<span class="pill pill-wrong">Inactive</span>');
-    if (q.imageData || q.imageUrl) metaBits.push('📷');
+    if (q.pinned) metaBits.push('<span class="pill pill-pin">Pin</span>');
+    if (q.dueAt && q.dueAt <= nowIso) metaBits.push('<span class="pill pill-due">Due</span>');
 
     const dueLabel = q.dueAt ? fmtTime(q.dueAt) : '–';
     tr.innerHTML = `
-      <td><input type="checkbox" class="row-select" data-id="${q.id}"></td>
-      <td>${q.id}</td>
-      <td>${(q.text || '').slice(0, 120)}${q.text && q.text.length > 120 ? '…' : ''}</td>
-      <td>${q.chapter || ''}</td>
-      <td>${tagsStr}</td>
-      <td>${metaBits.join(' ')}</td>
-      <td>${q.timesSeen || 0}</td>
-      <td>${q.timesWrong || 0}</td>
-      <td>${dueLabel}</td>
-      <td><button class="pill-btn btn-edit" data-id="${q.id}">Edit</button></td>
+      <td><input type="checkbox" class="row-select" data-id="\${q.id}"></td>
+      <td>\${q.id}</td>
+      <td>\${(q.text || '').slice(0, 120)}\${q.text && q.text.length > 120 ? '…' : ''}</td>
+      <td>\${q.chapter || ''}</td>
+      <td>\${tagsStr}</td>
+      <td>\${metaBits.join(' ')}</td>
+      <td>\${q.timesSeen || 0}</td>
+      <td>\${q.timesWrong || 0}</td>
+      <td>\${dueLabel}</td>
+      <td><button class="pill-btn btn-edit" data-id="\${q.id}">Edit</button></td>
     `;
     const cb = tr.querySelector('.row-select');
     if (cb) {
+      const id = q.id;
+      if (allSelectedIds.has(id)) {
+        cb.checked = true;
+      }
       cb.addEventListener('change', () => {
         const rangeModeEl = document.getElementById('allRangeMode');
         const rangeMode = !!(rangeModeEl && rangeModeEl.checked);
-
-        if (!rangeMode) {
-          // simple behavior: each checkbox independent
-          if (!cb.checked) {
-            lastAllRowIndex = null;
-          } else {
-            const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
-            const thisIndex = boxes.indexOf(cb);
-            lastAllRowIndex = thisIndex;
-          }
-          return;
-        }
-
-        // range mode: first+last select all between
-        if (!cb.checked) {
-          lastAllRowIndex = null;
-          return;
-        }
         const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
         const thisIndex = boxes.indexOf(cb);
-        if (thisIndex === -1) {
-          lastAllRowIndex = thisIndex;
+
+        if (!rangeMode || thisIndex === -1) {
+          if (cb.checked) {
+            allSelectedIds.add(id);
+          } else {
+            allSelectedIds.delete(id);
+          }
+          allRangeAnchorIndex = thisIndex;
+          updateAllSelectedCount();
           return;
         }
-        if (lastAllRowIndex == null || lastAllRowIndex === thisIndex) {
-          lastAllRowIndex = thisIndex;
+
+        // range mode
+        if (allRangeAnchorIndex == null || allRangeAnchorIndex === thisIndex) {
+          // first anchor click behaves like normal
+          if (cb.checked) {
+            allSelectedIds.add(id);
+          } else {
+            allSelectedIds.delete(id);
+          }
+          allRangeAnchorIndex = thisIndex;
+          updateAllSelectedCount();
           return;
         }
-        const startIdx = Math.min(lastAllRowIndex, thisIndex);
-        const endIdx = Math.max(lastAllRowIndex, thisIndex);
-        for (let i = startIdx; i <= endIdx; i++) {
-          boxes[i].checked = true;
+
+        const start = Math.min(allRangeAnchorIndex, thisIndex);
+        const end = Math.max(allRangeAnchorIndex, thisIndex);
+
+        let allAlreadySelected = true;
+        for (let i = start; i <= end; i++) {
+          const rowCb = boxes[i];
+          if (!rowCb) continue;
+          const rid = parseInt(rowCb.getAttribute('data-id'), 10);
+          if (!allSelectedIds.has(rid)) {
+            allAlreadySelected = false;
+            break;
+          }
         }
-        lastAllRowIndex = thisIndex;
+
+        if (allAlreadySelected) {
+          // unselect whole range
+          for (let i = start; i <= end; i++) {
+            const rowCb = boxes[i];
+            if (!rowCb) continue;
+            const rid = parseInt(rowCb.getAttribute('data-id'), 10);
+            rowCb.checked = false;
+            allSelectedIds.delete(rid);
+          }
+        } else {
+          // select whole range
+          for (let i = start; i <= end; i++) {
+            const rowCb = boxes[i];
+            if (!rowCb) continue;
+            const rid = parseInt(rowCb.getAttribute('data-id'), 10);
+            rowCb.checked = true;
+            allSelectedIds.add(rid);
+          }
+        }
+        allRangeAnchorIndex = thisIndex;
+        updateAllSelectedCount();
       });
     }
+
     tr.addEventListener('click', (e) => {
       if (e.target.tagName.toLowerCase() === 'input' || e.target.classList.contains('btn-edit')) return;
       const anySelected = !!document.querySelector('#allTableBody input[type="checkbox"].row-select:checked');
@@ -1394,17 +1483,82 @@ async function reloadAllQuestionsTable() {
       };
     });
   });
+
+  updateAllSelectedCount();
+}
+
+
+
+function updateAllSelectedCount() {
+  const el = document.getElementById('allSelectedCount');
+  if (el) el.textContent = allSelectedIds.size.toString();
+  const allSelectAll = document.getElementById('allSelectAll');
+  const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
+  if (allSelectAll && boxes.length) {
+    const allOnThisPageSelected = boxes.every(cb => allSelectedIds.has(parseInt(cb.getAttribute('data-id'), 10)));
+    allSelectAll.checked = allOnThisPageSelected && boxes.length > 0;
+  }
+}
+
+async function bulkSetChapterForSelected() {
+  if (!allSelectedIds.size) return;
+  const newChap = prompt('New chapter name for selected questions:');
+  if (!newChap) return;
+  const ids = Array.from(allSelectedIds);
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  ids.forEach(id => {
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const q = req.result;
+      if (!q) return;
+      q.chapter = newChap;
+      store.put(q);
+    };
+  });
+  tx.oncomplete = () => {
+    reloadAllQuestionsTable();
+  };
+}
+
+async function bulkAddTagForSelected() {
+  if (!allSelectedIds.size) return;
+  const tag = prompt('Tag to add to selected questions:');
+  if (!tag) return;
+  const trimmed = tag.trim();
+  if (!trimmed) return;
+  const ids = Array.from(allSelectedIds);
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  ids.forEach(id => {
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const q = req.result;
+      if (!q) return;
+      if (!Array.isArray(q.tags)) q.tags = [];
+      if (!q.tags.includes(trimmed)) {
+        q.tags.push(trimmed);
+        store.put(q);
+      }
+    };
+  });
+  tx.oncomplete = () => {
+    reloadAllQuestionsTable();
+  };
 }
 
 async function deleteSelectedAll() {
-  const checked = Array.from(document.querySelectorAll('#allTableBody input[type="checkbox"].row-select:checked'));
-  if (!checked.length) return;
-  if (!confirm('Delete ' + checked.length + ' question(s)?')) return;
-  const ids = checked.map(ch => parseInt(ch.getAttribute('data-id'), 10));
+  const count = allSelectedIds.size;
+  if (!count) return;
+  if (!confirm('Delete ' + count + ' question(s)?')) return;
+  const ids = Array.from(allSelectedIds);
   const tx = db.transaction('questions', 'readwrite');
   const store = tx.objectStore('questions');
   ids.forEach(id => store.delete(id));
   tx.oncomplete = () => {
+    allSelectedIds = new Set();
+    allRangeAnchorIndex = null;
+    updateAllSelectedCount();
     reloadAllQuestionsTable();
     loadNextQuestion(true);
   };
