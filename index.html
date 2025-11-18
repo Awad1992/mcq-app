@@ -27,6 +27,10 @@
         <option value="calm">🌿 Calm</option>
       </select>
     </div>
+    <div class="chips">
+      <button id="btnBackupQuick" class="chip chip-flag">Backup</button>
+    </div>
+
   </header>
 
   <nav class="tabs">
@@ -89,18 +93,6 @@
           </div>
 
           <div class="col-side">
-            <div class="side-block card">
-              <div class="small-label">Quick import / export</div>
-              <input type="file" id="fileInput" accept=".json">
-              <div class="btn-row-tight">
-                <button id="btnImport">Import</button>
-                <button id="btnExport">Export</button>
-              </div>
-              <div class="muted tiny">
-                JSON file with questions, choices, correct answer, explanation, chapter, tags, images.
-              </div>
-            </div>
-
             <div class="card side-card">
               <div class="small-label">Recent history</div>
               <div class="history-list" id="historyList"></div>
@@ -109,6 +101,7 @@
         </div>
       </div>
     </section>
+
 
     <!-- FLASHCARDS TAB -->
     <section class="tab-content" id="tab-flashcards">
@@ -283,7 +276,22 @@
           </table>
         </div>
       </div>
-    </section>
+    
+      <div class="card">
+        <div class="side-block">
+          <div class="small-label">Import / export questions</div>
+          <input type="file" id="fileInput" accept=".json">
+          <div class="btn-row-tight">
+            <button id="btnImport">Import</button>
+            <button id="btnExport">Export</button>
+            <button id="btnClearImportFile" class="ghost">Clear file</button>
+          </div>
+          <div class="muted tiny">
+            JSON file with questions, choices, correct answer, explanation, chapter, tags, images.
+          </div>
+        </div>
+      </div>
+</section>
 
     <!-- BACKUP & CLOUD TAB -->
     <section class="tab-content" id="tab-backup">
@@ -297,6 +305,7 @@
             <button id="btnBackupExport" class="primary">Export full backup</button>
             <input type="file" id="backupFileInput" accept=".json">
             <button id="btnBackupImport">Import backup</button>
+            <button id="btnBackupClearFile" class="ghost">Clear file</button>
           </div>
           <div class="backup-status">
             <div>Last activity: <span id="lastActivityLabel">–</span></div>

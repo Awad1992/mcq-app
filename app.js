@@ -147,6 +147,26 @@ document.getElementById('allChapterExact').addEventListener('input', debounce(re
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
 document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
+const quickBackupBtn = document.getElementById('btnBackupQuick');
+if (quickBackupBtn) {
+  quickBackupBtn.addEventListener('click', exportFullBackup);
+}
+
+// Import clear buttons
+const clearImportBtn = document.getElementById('btnClearImportFile');
+if (clearImportBtn) {
+  clearImportBtn.addEventListener('click', () => {
+    const fi = document.getElementById('fileInput');
+    if (fi) fi.value = '';
+  });
+}
+const clearBackupFileBtn = document.getElementById('btnBackupClearFile');
+if (clearBackupFileBtn) {
+  clearBackupFileBtn.addEventListener('click', () => {
+    const fi = document.getElementById('backupFileInput');
+    if (fi) fi.value = '';
+  });
+}
 
 // Cloud sync controls
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
