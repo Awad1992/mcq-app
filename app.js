@@ -2408,3 +2408,23 @@ document.getElementById('btnBuilderImportSelected')?.addEventListener('click', b
 
 // Practice controlsPro v4.1
 // IndexedDB + 
+
+// Global app init: open IndexedDB then prime UI
+openDB().then(() => {
+  try {
+    // initial dashboard + practice + all-questions + backup labels
+    reloadAllQuestionsTable();
+  } catch (e) { console.warn('reloadAllQuestionsTable failed on init', e); }
+  try {
+    refreshBackupLabels();
+  } catch (e) { console.warn('refreshBackupLabels failed on init', e); }
+  try {
+    renderDashboard();
+  } catch (e) { console.warn('renderDashboard failed on init', e); }
+  try {
+    loadNextQuestion(true);
+  } catch (e) { console.warn('loadNextQuestion failed on init', e); }
+}).catch(err => {
+  console.error('Failed to open local database.', err);
+  alert('Failed to open local database.');
+});
