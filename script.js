@@ -217,8 +217,24 @@ function applyFilters(q) {
 function renderQuestionsTable() {
     const tbody = document.querySelector("#questionsTable tbody");
     tbody.innerHTML = "";
-    const filtered = state.questions.filter(applyFilters);
+
+    const lastNInput = document.getElementById("filterLastN");
+    const lastN = lastNInput ? parseInt(lastNInput.value, 10) || 0 : 0;
+
+    let filtered = state.questions.filter(applyFilters);
+
+    // Default sort by ID ascending
     filtered.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+
+    // If Last N added is requested -> sort by createdAt desc and slice
+    if (lastN > 0) {
+        filtered.sort((a, b) => {
+            const aC = a.createdAt || "";
+            const bC = b.createdAt || "";
+            return bC.localeCompare(aC);
+        });
+        filtered = filtered.slice(0, lastN);
+    }
 
     for (const q of filtered) {
         const tr = document.createElement("tr");
@@ -413,7 +429,7 @@ function showCurrentPracticeQuestion() {
         document.getElementById("practiceOptions").innerHTML = "";
         document.getElementById("practiceFeedback").textContent = "";
         document.getElementById("practiceMeta").textContent =
-            `Score: ${computeSessionScore()} / ${s.questions.length}`;
+            `Total questions: ${s.questions.length}`;
         return;
     }
     const q = s.questions[s.currentIndex];
@@ -449,17 +465,6 @@ function onPracticeAnswer(q, chosenId) {
     }
 }
 
-function computeSessionScore() {
-    if (!state.practiceSession) return 0;
-    let score = 0;
-    for (const q of state.practiceSession.questions) {
-        if ((q.timesAnswered || 0) > 0 && (q.timesCorrect || 0) === q.timesAnswered) {
-            // "perfect" during this session is not tracked separately, but OK – this is approximate
-        }
-    }
-    return score;
-}
-
 // Init
 function init() {
     loadState();
@@ -488,7 +493,7 @@ function init() {
     document.getElementById("resetFormBtn").addEventListener("click", () => clearForm());
 
     // Filters
-    ["filterSearch", "filterTopic", "filterDifficulty", "filterFlagged", "filterAnswered"].forEach(id => {
+    ["filterSearch", "filterTopic", "filterDifficulty", "filterFlagged", "filterAnswered", "filterLastN"].forEach(id => {
         const el = document.getElementById(id);
         el.addEventListener("input", renderQuestionsTable);
         el.addEventListener("change", renderQuestionsTable);
