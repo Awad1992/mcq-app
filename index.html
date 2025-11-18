@@ -84,9 +84,11 @@
             <div id="feedbackPanel" class="feedback-panel"></div>
 
             <div class="btn-row-main">
-              <button class="primary" id="btnSubmit">Submit</button>
               <button id="btnPrev">Previous</button>
+              <button class="primary" id="btnSubmit">Submit</button>
               <button id="btnNext">Next</button>
+            </div>
+            <div class="btn-row-main">
               <button class="ghost" id="btnFlag">Flag</button>
               <button class="ghost" id="btnMaint">Maint</button>
             </div>
@@ -243,7 +245,7 @@
             <label class="small-label">Range / chapter</label><br>
             <input id="rangeFrom" type="number" min="1" placeholder="From ID" style="width:90px;">
             <input id="rangeTo" type="number" min="1" placeholder="To ID" style="width:90px;">
-            <input id="allChapterExact" placeholder="Chapter exact (case‑insensitive)" style="min-width:160px;">
+            <select id="allChapterExact" style="min-width:180px;"><option value="">All chapters</option></select>
           </div>
 <div>
   <label class="small-label">Last N added</label><br>

@@ -13,6 +13,7 @@ let currentMode = 'due';
 let currentChapter = '';
 let lastResult = null;
 let lastSelectedIndex = null;
+let lastAllRowIndex = null;
 let historyStack = [];
 let lastActivityAt = null;
 let currentTheme = 'light';
@@ -142,14 +143,15 @@ document.getElementById('allFilter').addEventListener('change', reloadAllQuestio
 document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
 document.getElementById('rangeFrom').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
 document.getElementById('rangeTo').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
-document.getElementById('allChapterExact').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+document.getElementById('allChapterExact').addEventListener('change', reloadAllQuestionsTable);
+document.getElementById('allLastN').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
 
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
 document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
 const quickBackupBtn = document.getElementById('btnBackupQuick');
 if (quickBackupBtn) {
-  quickBackupBtn.addEventListener('click', exportFullBackup);
+  quickBackupBtn.addEventListener('click', cloudUpload);
 }
 
 // Import clear buttons
@@ -538,7 +540,7 @@ async function updateHistoryList() {
   });
 
   allAns.sort((a, b) => (b.answeredAt || '').localeCompare(a.answeredAt || ''));
-  const recent = allAns.slice(0, 60);
+  const recent = allAns.slice(0, 30);
 
   const qMap = {};
   await Promise.all(recent.map(a => new Promise(r => {
@@ -1227,9 +1229,24 @@ async function reloadAllQuestionsTable() {
   const chapExact = document.getElementById('allChapterExact').value.toLowerCase().trim();
   const lastN = parseInt(document.getElementById('allLastN').value || '0', 10);
   tbody.innerHTML = '';
+  lastAllRowIndex = null;
 
   const all = await getAllQuestions();
+  const chapSelect = document.getElementById('allChapterExact');
+  if (chapSelect && chapSelect.tagName.toLowerCase() === 'select') {
+    const prevVal = chapSelect.value;
+    const chapters = Array.from(new Set(all.map(q => q.chapter || '').filter(x => x))).sort((a, b) => a.localeCompare(b));
+    chapSelect.innerHTML = '<option value="">All chapters</option>' +
+      chapters.map(c => `<option value="${c.toLowerCase()}">${c}</option>`).join('');
+    if (prevVal) {
+      chapSelect.value = prevVal;
+      if (chapSelect.value !== prevVal) {
+        chapSelect.value = '';
+      }
+    }
+  }
   const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
+
 
   // duplicate clusters
   const dupMap = new Map();
@@ -1326,17 +1343,32 @@ if (lastN > 0) {
       <td>${dueLabel}</td>
       <td><button class="pill-btn btn-edit" data-id="${q.id}">Edit</button></td>
     `;
-    tr.addEventListener('click', (e) => {
-      if (e.target.tagName.toLowerCase() === 'input' || e.target.classList.contains('btn-edit')) return;
-      const anySelected = !!document.querySelector('#allTableBody input[type="checkbox"].row-select:checked');
-      if (anySelected) return;
-      currentQuestion = q;
-      lastResult = null;
-      lastSelectedIndex = null;
-      feedbackPanel.innerHTML = '';
-      renderQuestion();
-      document.querySelector('.tab-button[data-tab="home"]').click();
-    });
+    const cb = tr.querySelector('.row-select');
+    if (cb) {
+      cb.addEventListener('change', () => {
+        if (!cb.checked) {
+          lastAllRowIndex = null;
+          return;
+        }
+        const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
+        const thisIndex = boxes.indexOf(cb);
+        if (thisIndex === -1) {
+          lastAllRowIndex = thisIndex;
+          return;
+        }
+        if (lastAllRowIndex == null || lastAllRowIndex === thisIndex) {
+          lastAllRowIndex = thisIndex;
+          return;
+        }
+        const startIdx = Math.min(lastAllRowIndex, thisIndex);
+        const endIdx = Math.max(lastAllRowIndex, thisIndex);
+        for (let i = startIdx; i <= endIdx; i++) {
+          boxes[i].checked = true;
+        }
+        lastAllRowIndex = thisIndex;
+      });
+    }
+    // Row click in ALL tab no longer navigates to Practice
     tbody.appendChild(tr);
   });
 
