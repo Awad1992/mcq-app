@@ -329,6 +329,11 @@ button:disabled {
   color: #5e35b1;
 }
 
+.pill-dup {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
 .table-wrapper {
   overflow-x: auto;
   margin-top: 0.5rem;
@@ -390,10 +395,21 @@ button:disabled {
   width: 100%;
 }
 
-.divider {
-  margin: 0.5rem 0;
-  border: none;
-  border-top: 1px dashed #eee;
+.settings-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.range-row {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.range-row input {
+  width: 76px;
 }
 
 @media (max-width: 768px) {

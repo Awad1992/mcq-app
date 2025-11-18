@@ -1,7 +1,7 @@
 {
-  "name": "MCQ Study App Ultra Pro",
-  "short_name": "MCQ UltraPro",
-  "start_url": ".",
+  "name": "MCQ Study App Ultra‑Pro",
+  "short_name": "MCQ Ultra‑Pro",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",

@@ -1,7 +1,7 @@
-// MCQ Study App Ultra Pro v4.1
-// DB + UI + backup + GitHub sync + maintenance-tag + auto-backup + duplicates tools
+// MCQ Study App Ultra‑Pro v4.2
+// DB + UI + backup + GitHub sync + maintenance tag + smart filters
 
-const DB_NAME = 'mcqdb_pro_v41';
+const DB_NAME = 'mcqdb_pro_v34'; // keep same DB so old data stays
 const DB_VERSION = 2;
 
 let db = null;
@@ -14,9 +14,7 @@ let lastResult = null;
 let lastSelectedIndex = null;
 let historyStack = [];
 let lastActivityAt = null;
-
-let avoidRepeats = false;
-let seenThisSession = new Set();
+let allowDuplicatesInPractice = true;
 
 const questionPanel = document.getElementById('questionPanel');
 const feedbackPanel = document.getElementById('feedbackPanel');
@@ -40,6 +38,7 @@ document.querySelectorAll('.tab-button').forEach(btn => {
       refreshCloudInfo();
     } else if (tab === 'settings') {
       loadGitHubConfigIntoUI();
+      loadPracticeConfigIntoUI();
     }
   });
 });
@@ -59,14 +58,6 @@ modeSelect.addEventListener('change', () => {
 chapterFilterEl.addEventListener('change', () => {
   currentChapter = chapterFilterEl.value.trim();
   loadNextQuestion(true);
-});
-
-// Session options
-document.getElementById('avoidRepeats').addEventListener('change', (e) => {
-  avoidRepeats = e.target.checked;
-  if (!avoidRepeats) {
-    seenThisSession.clear();
-  }
 });
 
 // Quick filter buttons
@@ -98,13 +89,13 @@ document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceF
 // Import / Export (home)
 document.getElementById('btnImport').addEventListener('click', handleImportSimple);
 document.getElementById('btnExport').addEventListener('click', exportQuestionsOnly);
-document.getElementById('btnImportUrl').addEventListener('click', handleImportFromUrl);
+document.getElementById('btnImportFromUrl').addEventListener('click', handleImportFromUrl);
 
 // All questions tab controls
 document.getElementById('btnAllReload').addEventListener('click', reloadAllQuestionsTable);
 document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
-document.getElementById('btnAllSelectDup').addEventListener('click', selectAllDuplicates);
-document.getElementById('btnAllDedup').addEventListener('click', autoDeduplicate);
+document.getElementById('btnAllCleanDuplicates').addEventListener('click', cleanDuplicates);
+document.getElementById('btnAllSelectRange').addEventListener('click', selectRangeAll);
 document.getElementById('allSelectAll').addEventListener('change', e => {
   document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
     ch.checked = e.target.checked;
@@ -113,26 +104,26 @@ document.getElementById('allSelectAll').addEventListener('change', e => {
 document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
 document.getElementById('allFilter').addEventListener('change', reloadAllQuestionsTable);
 document.getElementById('allSort').addEventListener('change', reloadAllQuestionsTable);
-document.getElementById('allIdFrom').addEventListener('input', debounce(reloadAllQuestionsTable, 300));
-document.getElementById('allIdTo').addEventListener('input', debounce(reloadAllQuestionsTable, 300));
-document.getElementById('allChapterExact').addEventListener('input', debounce(reloadAllQuestionsTable, 300));
-document.getElementById('allContains').addEventListener('input', debounce(reloadAllQuestionsTable, 300));
 
 // Backup tab controls
 document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
 document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
-document.getElementById('btnRestoreAutoBackup').addEventListener('click', restoreAutoBackup);
 
 // Cloud sync controls
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
 document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
 
-// Settings tab – GitHub
+// Settings tab – GitHub + practice
 document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
 document.getElementById('btnClearGitHub').addEventListener('click', () => {
   localStorage.removeItem('mcq_github_config');
   loadGitHubConfigIntoUI();
   refreshCloudInfo();
+});
+const allowDupToggleEl = document.getElementById('allowDuplicatesToggle');
+allowDupToggleEl.addEventListener('change', () => {
+  allowDuplicatesInPractice = !!allowDupToggleEl.checked;
+  savePracticeConfig();
 });
 
 // --- IndexedDB setup ---
@@ -157,6 +148,7 @@ function openDB() {
     req.onsuccess = (e) => {
       db = e.target.result;
       loadMeta();
+      loadPracticeConfig();
       resolve(db);
     };
     req.onerror = (e) => reject(e.target.error);
@@ -171,6 +163,30 @@ function loadMeta() {
     lastActivityAt = req.result ? req.result.value : null;
     refreshBackupLabels();
   };
+}
+
+// Practice config (allow duplicates)
+function loadPracticeConfig() {
+  try {
+    const raw = localStorage.getItem('mcq_practice_config');
+    if (raw) {
+      const obj = JSON.parse(raw);
+      allowDuplicatesInPractice = obj.allowDuplicates !== false;
+    } else {
+      allowDuplicatesInPractice = true;
+    }
+  } catch {
+    allowDuplicatesInPractice = true;
+  }
+  if (allowDupToggleEl) {
+    allowDupToggleEl.checked = !!allowDuplicatesInPractice;
+  }
+}
+
+function savePracticeConfig() {
+  localStorage.setItem('mcq_practice_config', JSON.stringify({
+    allowDuplicates: !!allowDuplicatesInPractice
+  }));
 }
 
 // Helpers
@@ -188,12 +204,9 @@ function debounce(fn, ms) {
   };
 }
 
-function normalizeQuestionText(txt) {
-  if (!txt) return '';
-  return txt
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
+function normalizeText(t) {
+  if (!t) return '';
+  return t.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 // --- Stats ---
@@ -222,7 +235,7 @@ async function updateStatsBar() {
     <div>Answered: <strong>${s.answered}</strong></div>
     <div>Wrong ≥1: <strong>${s.withWrong}</strong></div>
     <div>Flagged: <strong>${s.flagged}</strong></div>
-    <div>Maintenance-tag: <strong>${s.maintenance}</strong></div>
+    <div>Maintenance: <strong>${s.maintenance}</strong></div>
   `;
 }
 
@@ -249,16 +262,23 @@ async function pickQuestion() {
     filtered = filtered.filter(q => (q.chapter || '').toLowerCase() === chap);
   }
 
-  if (!filtered.length) filtered = all.filter(q => q.active !== false);
+  if (!filtered.length) filtered = all;
 
-  // Avoid repeats in this session if requested
-  if (avoidRepeats) {
-    let pool = filtered.filter(q => !seenThisSession.has(q.id));
-    if (!pool.length) {
-      // All used in this session → reset pool but keep seen set (user can toggle off if wants)
-      pool = filtered;
+  // optional dedupe in practice
+  if (!allowDuplicatesInPractice) {
+    const seen = new Set();
+    const dedup = [];
+    for (const q of filtered) {
+      const key = normalizeText(q.text);
+      if (!key) {
+        dedup.push(q);
+        continue;
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dedup.push(q);
     }
-    filtered = pool;
+    filtered = dedup;
   }
 
   filtered.sort((a, b) => {
@@ -369,7 +389,6 @@ async function updateHistoryList() {
 async function loadNextQuestion(resetHistory) {
   if (resetHistory) {
     historyStack = [];
-    seenThisSession.clear();
   } else if (currentQuestion && currentQuestion.id != null) {
     historyStack.push(currentQuestion.id);
   }
@@ -442,7 +461,6 @@ async function submitAnswer() {
   tx.oncomplete = () => {
     currentQuestion = q;
     lastResult = isCorrect;
-    seenThisSession.add(q.id);
     showFeedback(correctIdx, selectedIdx, q.explanation);
     updateStatsBar();
     updateHistoryList();
@@ -508,8 +526,31 @@ async function toggleMaintenanceFlag() {
   };
 }
 
-// Import helpers
-async function importQuestionsArray(arr) {
+// Simple import (questions only)
+function handleImportSimple() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) {
+    alert('اختر ملف JSON أولاً.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      await importQuestionsArray(data);
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function importQuestionsArray(data) {
+  let arr = data;
+  if (!Array.isArray(arr) && data.questions) {
+    arr = data.questions;
+  }
+  if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
   const tx = db.transaction('questions', 'readwrite');
   const store = tx.objectStore('questions');
   arr.forEach(q => {
@@ -531,43 +572,17 @@ async function importQuestionsArray(arr) {
     if (q.id != null) obj.id = q.id;
     store.put(obj);
   });
-  return new Promise((resolve) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
-  });
-}
-
-// Simple import (questions only)
-function handleImportSimple() {
-  const file = document.getElementById('fileInput').files[0];
-  if (!file) {
-    alert('اختر ملف JSON أولاً.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      let arr = data;
-      if (!Array.isArray(arr) && data.questions) {
-        arr = data.questions;
-      }
-      if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
-      await importQuestionsArray(arr);
-      alert('Imported ' + arr.length + ' questions.');
-      loadNextQuestion(true);
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
+  tx.oncomplete = () => {
+    alert('Imported ' + arr.length + ' questions.');
+    loadNextQuestion(true);
   };
-  reader.readAsText(file);
 }
 
 // Import from URL
 async function handleImportFromUrl() {
-  const url = document.getElementById('importUrlInput').value.trim();
+  const url = document.getElementById('remoteJsonUrl').value.trim();
   if (!url) {
-    alert('أدخل رابط JSON أولاً.');
+    alert('ضع رابط JSON أولاً.');
     return;
   }
   try {
@@ -576,25 +591,10 @@ async function handleImportFromUrl() {
       alert('HTTP error: ' + res.status);
       return;
     }
-    const text = await res.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      alert('المحتوى ليس JSON صحيحاً.');
-      return;
-    }
-    let arr = data;
-    if (!Array.isArray(arr) && data.questions) arr = data.questions;
-    if (!Array.isArray(arr)) {
-      alert('JSON يجب أن يكون مصفوفة أو {questions:[...]}');
-      return;
-    }
-    await importQuestionsArray(arr);
-    alert('Imported ' + arr.length + ' questions from URL.');
-    loadNextQuestion(true);
+    const data = await res.json();
+    await importQuestionsArray(data);
   } catch (err) {
-    alert('فشل التحميل من الرابط.');
+    alert('Fetch/parse error: ' + err.message);
   }
 }
 
@@ -677,7 +677,7 @@ async function buildBackupObject() {
   const backup = {
     meta: {
       exportedAt,
-      appVersion: window.APP_VERSION || '4.1.0',
+      appVersion: window.APP_VERSION || '4.2.0',
       totalQuestions: questions.length,
       totalAnswers: answers.length,
       lastActivityAt: metaObj.lastActivityAt || null
@@ -770,6 +770,7 @@ async function importBackupObject(backup) {
   questions.forEach(q => {
     const id = q.id;
     if (id != null && byId.has(id)) {
+      // Merge: prefer local stats
       const local = byId.get(id);
       const merged = Object.assign({}, q, {
         timesSeen: local.timesSeen || q.timesSeen || 0,
@@ -827,72 +828,27 @@ async function importBackupObject(backup) {
   }
 }
 
-// Auto-backup to browser storage
-async function autoBackup() {
-  try {
-    const backup = await buildBackupObject();
-    const exportedAt = backup.meta.exportedAt;
-    localStorage.setItem('mcq_auto_backup', JSON.stringify(backup));
-    saveMeta('lastAutoBackupAt', exportedAt);
-    refreshBackupLabels();
-  } catch (e) {
-    // silent
-  }
-}
-
-function restoreAutoBackup() {
-  const raw = localStorage.getItem('mcq_auto_backup');
-  if (!raw) {
-    alert('No auto-backup found in this browser.');
-    return;
-  }
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    alert('Auto-backup is corrupted.');
-    return;
-  }
-  importBackupObject(data).then(() => {
-    alert('Auto-backup restored.');
-    loadNextQuestion(true);
-  }).catch(() => {
-    alert('Failed to restore auto-backup.');
-  });
-}
-
 // Backup labels
 function refreshBackupLabels() {
   const lastActEl = document.getElementById('lastActivityLabel');
   const lastBackupEl = document.getElementById('lastBackupLabel');
-  const lastAutoEl = document.getElementById('lastAutoBackupLabel');
-
   const tx = db.transaction('meta', 'readonly');
   const store = tx.objectStore('meta');
   const req1 = store.get('lastActivityAt');
   const req2 = store.get('lastBackupAt');
-  const req3 = store.get('lastAutoBackupAt');
-
   req1.onsuccess = () => {
     lastActEl.textContent = fmtTime(req1.result ? req1.result.value : null);
   };
   req2.onsuccess = () => {
     lastBackupEl.textContent = fmtTime(req2.result ? req2.result.value : null);
   };
-  req3.onsuccess = () => {
-    lastAutoEl.textContent = fmtTime(req3.result ? req3.result.value : null);
-  };
 }
 
-// --- All Questions table + duplicates tools ---
+// --- All Questions table ---
 async function reloadAllQuestionsTable() {
   const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
   const filter = document.getElementById('allFilter').value;
   const sortVal = document.getElementById('allSort').value;
-  const idFromVal = document.getElementById('allIdFrom').value.trim();
-  const idToVal = document.getElementById('allIdTo').value.trim();
-  const chapExact = document.getElementById('allChapterExact').value.toLowerCase().trim();
-  const containsWord = document.getElementById('allContains').value.toLowerCase().trim();
   const tbody = document.getElementById('allTableBody');
   tbody.innerHTML = '';
 
@@ -903,13 +859,12 @@ async function reloadAllQuestionsTable() {
     req.onsuccess = e => res(e.target.result || []);
   });
 
-  // Prepare duplicates map
-  const dupMap = new Map();
+  // Build duplicate map
+  const dupMap = {};
   all.forEach(q => {
-    const k = normalizeQuestionText(q.text);
-    if (!k) return;
-    if (!dupMap.has(k)) dupMap.set(k, []);
-    dupMap.get(k).push(q);
+    const key = normalizeText(q.text);
+    if (!key) return;
+    dupMap[key] = (dupMap[key] || 0) + 1;
   });
 
   let arr = all;
@@ -931,31 +886,8 @@ async function reloadAllQuestionsTable() {
     arr = arr.filter(q => q.active === false);
   } else if (filter === 'duplicates') {
     arr = arr.filter(q => {
-      const k = normalizeQuestionText(q.text);
-      const list = dupMap.get(k) || [];
-      return list.length > 1;
-    });
-  }
-
-  if (idFromVal || idToVal) {
-    const from = idFromVal ? parseInt(idFromVal, 10) : null;
-    const to = idToVal ? parseInt(idToVal, 10) : null;
-    arr = arr.filter(q => {
-      if (q.id == null) return false;
-      if (from != null && q.id < from) return false;
-      if (to != null && q.id > to) return false;
-      return true;
-    });
-  }
-
-  if (chapExact) {
-    arr = arr.filter(q => (q.chapter || '').toLowerCase().trim() === chapExact);
-  }
-
-  if (containsWord) {
-    arr = arr.filter(q => {
-      const s = ((q.text || '') + ' ' + (q.explanation || '')).toLowerCase();
-      return s.includes(containsWord);
+      const key = normalizeText(q.text);
+      return key && dupMap[key] > 1;
     });
   }
 
@@ -970,10 +902,8 @@ async function reloadAllQuestionsTable() {
   }
 
   arr.forEach(q => {
-    const norm = normalizeQuestionText(q.text);
-    const dupList = dupMap.get(norm) || [];
-    const isDup = dupList.length > 1;
-
+    const key = normalizeText(q.text);
+    const isDup = key && dupMap[key] > 1;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input type="checkbox" data-id="${q.id}"></td>
@@ -984,20 +914,16 @@ async function reloadAllQuestionsTable() {
         ${q.flagged ? '<span class="pill pill-flag">Flag</span>' : ''}
         ${q.maintenance ? '<span class="pill pill-maint">Maint</span>' : ''}
         ${q.active === false ? '<span class="pill pill-wrong">Inactive</span>' : ''}
-        ${isDup ? '<span class="pill pill-wrong">Repeated</span>' : ''}
+        ${isDup ? '<span class="pill pill-dup">Dup</span>' : ''}
       </td>
       <td>${q.timesSeen || 0}</td>
       <td>${q.timesWrong || 0}</td>
       <td>${q.lastSeenAt ? fmtTime(q.lastSeenAt) : ''}</td>
     `;
-
     tr.addEventListener('click', (e) => {
       if (e.target.tagName.toLowerCase() === 'input') return;
-      const anySelected = document.querySelector('#allTableBody input[type="checkbox"]:checked');
-      if (anySelected) {
-        // keep selection, do not navigate
-        return;
-      }
+      const anySelected = document.querySelectorAll('#allTableBody input[type="checkbox"]:checked').length > 0;
+      if (anySelected) return; // do not navigate if selection active
       currentQuestion = q;
       lastResult = null;
       lastSelectedIndex = null;
@@ -1007,12 +933,6 @@ async function reloadAllQuestionsTable() {
     });
     tbody.appendChild(tr);
   });
-
-  // store duplicates info on tbody dataset for selectAllDuplicates / autoDeduplicate
-  tbody.dataset.dupMap = JSON.stringify(
-    Array.from(dupMap.entries()).filter(([k, list]) => list.length > 1)
-      .map(([k, list]) => ({ key: k, ids: list.map(q => q.id) }))
-  );
 }
 
 async function deleteSelectedAll() {
@@ -1029,59 +949,66 @@ async function deleteSelectedAll() {
   };
 }
 
-// Select all duplicates in current table view
-function selectAllDuplicates() {
-  const tbody = document.getElementById('allTableBody');
-  const dupInfoRaw = tbody.dataset.dupMap || '[]';
-  let dupInfo;
-  try {
-    dupInfo = JSON.parse(dupInfoRaw);
-  } catch {
-    dupInfo = [];
-  }
-  if (!dupInfo.length) {
-    alert('No repeated questions detected.');
+// Select range in All Questions
+function selectRangeAll() {
+  const fromVal = parseInt(document.getElementById('allRangeFrom').value, 10);
+  const toVal = parseInt(document.getElementById('allRangeTo').value, 10);
+  if (isNaN(fromVal) || isNaN(toVal)) {
+    alert('ضع قيم صحيحة لـ From / To.');
     return;
   }
-  const dupIds = new Set();
-  dupInfo.forEach(g => g.ids.forEach(id => dupIds.add(id)));
+  const min = Math.min(fromVal, toVal);
+  const max = Math.max(fromVal, toVal);
   document.querySelectorAll('#allTableBody input[type="checkbox"]').forEach(ch => {
     const id = parseInt(ch.getAttribute('data-id'), 10);
-    if (dupIds.has(id)) ch.checked = true;
+    if (id >= min && id <= max) ch.checked = true;
   });
 }
 
-// Auto-deduplicate: keep one copy per repeated group
-async function autoDeduplicate() {
-  const tbody = document.getElementById('allTableBody');
-  const dupInfoRaw = tbody.dataset.dupMap || '[]';
-  let dupInfo;
-  try {
-    dupInfo = JSON.parse(dupInfoRaw);
-  } catch {
-    dupInfo = [];
-  }
-  if (!dupInfo.length) {
-    alert('No repeated questions to deduplicate.');
-    return;
-  }
-  if (!confirm('Auto-delete duplicates (keep 1 per group)?')) return;
-
-  const idsToDelete = [];
-  dupInfo.forEach(g => {
-    if (!g.ids || g.ids.length <= 1) return;
-    const sorted = [...g.ids].sort((a, b) => a - b);
-    // keep the first one (smallest id), delete the rest
-    sorted.slice(1).forEach(id => idsToDelete.push(id));
+// Clean duplicates: keep one copy of each text, delete others
+async function cleanDuplicates() {
+  const tx = db.transaction('questions', 'readonly');
+  const store = tx.objectStore('questions');
+  const all = await new Promise(res => {
+    const req = store.getAll();
+    req.onsuccess = e => res(e.target.result || []);
   });
 
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  idsToDelete.forEach(id => store.delete(id));
-  tx.oncomplete = () => {
-    alert('Deleted ' + idsToDelete.length + ' duplicate questions.');
+  const groups = new Map();
+  all.forEach(q => {
+    const key = normalizeText(q.text);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(q);
+  });
+
+  const idsToDelete = [];
+  groups.forEach(list => {
+    if (list.length <= 1) return;
+    list.sort((a, b) => {
+      const ca = a.createdAt || '';
+      const cb = b.createdAt || '';
+      if (ca === cb) return (a.id || 0) - (b.id || 0);
+      return ca.localeCompare(cb);
+    });
+    for (let i = 1; i < list.length; i++) {
+      idsToDelete.push(list[i].id);
+    }
+  });
+
+  if (!idsToDelete.length) {
+    alert('No duplicates found.');
+    return;
+  }
+  if (!confirm('Will delete ' + idsToDelete.length + ' duplicate question(s) (keep 1 copy each). Continue?')) return;
+
+  const txDel = db.transaction('questions', 'readwrite');
+  const storeDel = txDel.objectStore('questions');
+  idsToDelete.forEach(id => storeDel.delete(id));
+  txDel.oncomplete = () => {
     reloadAllQuestionsTable();
     loadNextQuestion(true);
+    updateStatsBar();
   };
 }
 
@@ -1237,14 +1164,20 @@ async function cloudDownload() {
   refreshBackupLabels();
 }
 
-// Initial DB open + auto-backup timer
+// Initial DB open
 openDB().then(() => {
   refreshBackupLabels();
   refreshCloudInfo();
   loadGitHubConfigIntoUI();
+  loadPracticeConfigIntoUI();
   loadNextQuestion(true);
-  setInterval(autoBackup, 60000);
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');
 });
+
+function loadPracticeConfigIntoUI() {
+  if (allowDupToggleEl) {
+    allowDupToggleEl.checked = !!allowDuplicatesInPractice;
+  }
+}

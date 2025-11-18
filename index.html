@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Ultra Pro v4.1</title>
+  <title>MCQ Study App Ultra‑Pro v4.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=4.1.0">
-  <link rel="stylesheet" href="style.css?v=4.1.0">
+  <link rel="manifest" href="manifest.json?v=4.2.0">
+  <link rel="stylesheet" href="style.css?v=4.2.0">
 </head>
 <body>
 <div class="app">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Ultra Pro <span class="ver">v4.1</span></h1>
-      <div class="subtitle">Local bank + history + flags + maintenance-tag + smart backup + GitHub sync</div>
+      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.2</span></h1>
+      <div class="subtitle">Local bank + history + flags + maintenance tag + smart filters + GitHub sync</div>
     </div>
     <div class="chips">
       <span class="chip">Offline</span>
       <span class="chip chip-ok">Tracks wrong</span>
-      <span class="chip chip-flag">Flags / Maint</span>
+      <span class="chip chip-flag">Flags</span>
       <span class="chip chip-sync" id="syncStatus">No cloud sync</span>
     </div>
   </header>
@@ -58,13 +58,6 @@
                 <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
                 <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
               </div>
-              <div>
-                <label class="small-label">Session options</label><br>
-                <label class="tiny">
-                  <input type="checkbox" id="avoidRepeats">
-                  Avoid repeats this session
-                </label>
-              </div>
             </div>
 
             <div id="questionPanel" class="question-panel"></div>
@@ -75,12 +68,12 @@
               <button id="btnPrev">Previous</button>
               <button id="btnNext">Next</button>
               <button class="ghost" id="btnFlag">Flag</button>
-              <button class="ghost" id="btnMaint">Maintenance-tag</button>
+              <button class="ghost" id="btnMaint">Maintenance</button>
             </div>
           </div>
 
           <div class="col-side">
-            <div class="side-block card">
+            <div class="side-block">
               <div class="small-label">Import / Export (local file)</div>
               <input type="file" id="fileInput" accept=".json">
               <div class="btn-row-tight">
@@ -90,14 +83,16 @@
               <div class="muted tiny">
                 JSON file with questions, choices, correct answer, explanation, chapter.
               </div>
-              <hr class="divider">
+            </div>
+
+            <div class="side-card card">
               <div class="small-label">Import from URL</div>
-              <input id="importUrlInput" placeholder="https://.../questions.json">
+              <input id="remoteJsonUrl" placeholder="https://...mcq.json">
               <div class="btn-row-tight">
-                <button id="btnImportUrl">Import URL</button>
+                <button id="btnImportFromUrl">Load from URL</button>
               </div>
               <div class="muted tiny">
-                URL must return JSON (array or {questions:[...]}). CORS rules apply.
+                Must be a public JSON URL (subject to CORS rules).
               </div>
             </div>
 
@@ -116,7 +111,7 @@
         <div class="row-controls">
           <div>
             <label class="small-label">Search (text / chapter / source)</label><br>
-            <input id="allSearch" placeholder="Free text" style="min-width:220px;">
+            <input id="allSearch" placeholder="Text / chapter / source" style="min-width:220px;">
           </div>
           <div>
             <label class="small-label">Filter</label><br>
@@ -124,9 +119,9 @@
               <option value="all">All</option>
               <option value="flagged">Flagged only</option>
               <option value="wrong">Wrong ≥ 1</option>
-              <option value="maintenance">Maintenance-tag only</option>
+              <option value="maintenance">Maintenance only</option>
               <option value="inactive">Inactive</option>
-              <option value="duplicates">Repeated questions</option>
+              <option value="duplicates">Duplicates</option>
             </select>
           </div>
           <div>
@@ -138,27 +133,18 @@
               <option value="wrong_desc">Most wrong</option>
             </select>
           </div>
+          <div>
+            <label class="small-label">ID range (select)</label><br>
+            <div class="range-row">
+              <input id="allRangeFrom" type="number" placeholder="From #">
+              <input id="allRangeTo" type="number" placeholder="To #">
+              <button id="btnAllSelectRange">Select</button>
+            </div>
+          </div>
           <div class="all-actions">
             <button id="btnAllReload">Reload</button>
-            <button id="btnAllSelectDup" class="ghost">Select all duplicates</button>
-            <button id="btnAllDedup" class="ghost">Auto-deduplicate</button>
+            <button id="btnAllCleanDuplicates">Clean duplicates</button>
             <button id="btnAllDelete" class="danger">Delete selected</button>
-          </div>
-        </div>
-
-        <div class="row-controls" style="margin-top:0.5rem;">
-          <div>
-            <label class="small-label">ID range</label><br>
-            <input id="allIdFrom" placeholder="From" style="width:80px;"> –
-            <input id="allIdTo" placeholder="To" style="width:80px;">
-          </div>
-          <div>
-            <label class="small-label">Exact chapter</label><br>
-            <input id="allChapterExact" placeholder="Exact (case-insensitive)">
-          </div>
-          <div>
-            <label class="small-label">Contains word</label><br>
-            <input id="allContains" placeholder="In question / explanation">
           </div>
         </div>
 
@@ -197,16 +183,7 @@
           </div>
           <div class="backup-status">
             <div>Last activity: <span id="lastActivityLabel">–</span></div>
-            <div>Last manual backup: <span id="lastBackupLabel">–</span></div>
-            <div>Last auto-backup: <span id="lastAutoBackupLabel">–</span></div>
-          </div>
-        </div>
-        <div class="row-controls" style="margin-top:0.4rem;">
-          <div>
-            <button id="btnRestoreAutoBackup" class="ghost">Restore last auto-backup</button>
-          </div>
-          <div class="muted tiny">
-            Auto-backup runs every ~60 seconds into this browser only (no download).
+            <div>Last local backup: <span id="lastBackupLabel">–</span></div>
           </div>
         </div>
       </div>
@@ -229,6 +206,17 @@
 
     <!-- SETTINGS TAB -->
     <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h2>Practice settings</h2>
+        <label class="settings-inline">
+          <input type="checkbox" id="allowDuplicatesToggle">
+          <span>Allow showing duplicate questions in practice (same text asked more than once)</span>
+        </label>
+        <p class="muted tiny">
+          When disabled, only one copy of questions with identical text will be used in random practice.
+        </p>
+      </div>
+
       <div class="card">
         <h2>GitHub settings</h2>
         <div class="settings-grid">
@@ -260,10 +248,9 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.1.0</strong><br>
+          Version: <strong>4.2.0</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
-          Safe backup: Importing an older backup will warn you if it is older than your last activity.<br>
-          Auto-backup: every 60 seconds into browser storage.
+          Safe backup: Importing an older backup will warn you if it is older than your last activity.
         </p>
       </div>
     </section>
@@ -272,12 +259,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.1.0";
+  window.APP_VERSION = "4.2.0";
 </script>
-<script src="app.js?v=4.1.0"></script>
+<script src="app.js?v=4.2.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.1.0').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.2.0').catch(()=>{});
   }
 </script>
 </body>
