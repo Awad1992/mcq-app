@@ -1346,6 +1346,22 @@ if (lastN > 0) {
     const cb = tr.querySelector('.row-select');
     if (cb) {
       cb.addEventListener('change', () => {
+        const rangeModeEl = document.getElementById('allRangeMode');
+        const rangeMode = !!(rangeModeEl && rangeModeEl.checked);
+
+        if (!rangeMode) {
+          // Simple behavior: just remember last index, no auto-range
+          if (!cb.checked) {
+            lastAllRowIndex = null;
+          } else {
+            const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
+            const thisIndex = boxes.indexOf(cb);
+            lastAllRowIndex = thisIndex;
+          }
+          return;
+        }
+
+        // Range mode: first+last select all between
         if (!cb.checked) {
           lastAllRowIndex = null;
           return;
