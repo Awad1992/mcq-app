@@ -329,11 +329,6 @@ button:disabled {
   color: #5e35b1;
 }
 
-.pill-dup {
-  background: #ffecb3;
-  color: #f57c00;
-}
-
 .table-wrapper {
   overflow-x: auto;
   margin-top: 0.5rem;
@@ -392,7 +387,13 @@ button:disabled {
 }
 
 .settings-grid label input {
-  width: auto;
+  width: 100%;
+}
+
+.divider {
+  margin: 0.5rem 0;
+  border: none;
+  border-top: 1px dashed #eee;
 }
 
 @media (max-width: 768px) {
