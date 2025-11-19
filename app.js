@@ -1651,58 +1651,70 @@ function loadGitHubConfigIntoUI() {
 
 // --- جزء إصلاح وحفظ الإعدادات (استبدل الكود القديم بهذا) ---
 
-function saveGitHubConfigFromUI() {
-  console.log("Saving settings..."); // للمراقبة
+// =========================================
+// 🛠️ FIX: GitHub Settings Save (Final)
+// =========================================
 
-  // 1. جلب العناصر
+function saveGitHubConfigFromUI() {
+  // 1. تعريف العناصر
+  const btn = document.getElementById('btnSaveGitHub');
   const tokenEl = document.getElementById('ghTokenInput');
   const repoEl = document.getElementById('ghRepoInput');
   const fileEl = document.getElementById('ghFileInput');
 
-  // حماية: إذا لم يجد العناصر
-  if (!tokenEl || !repoEl || !fileEl) {
-    alert('❌ Error: Settings inputs not found in HTML.');
+  // 2. فحص وجود العناصر
+  if (!btn || !tokenEl || !repoEl || !fileEl) {
+    alert("Error: Settings elements not found!");
     return;
   }
 
+  // 3. جلب القيم
   const token = tokenEl.value.trim();
   const repo = repoEl.value.trim() || 'Awad1992/mcq-data';
   const filename = fileEl.value.trim() || 'mcq_backup.json';
 
-  // 2. التحقق من التوكن
+  // 4. التحقق من صحة البيانات
   if (!token) {
-    alert('❌ Error: Token field is empty!\nPlease paste your GitHub Token (usually starts with ghp_ or github_pat_).');
+    alert("⚠️ Please enter your GitHub Token.");
     return;
   }
-  
-  // تنبيه إذا قام المستخدم بوضع رابط موقع بدلاً من التوكن
-  if (token.startsWith('http')) {
-    alert('⚠️ Warning: It looks like you pasted a website Link (http...).\nPlease paste the TOKEN CODE itself (starts with ghp_...).');
-    // لن نوقف العملية، ربما هو توكن غريب، لكن وجب التنبيه
+  if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+    // تنبيه بسيط لكن نسمح له بالاستمرار
+    if(!confirm("⚠️ Token usually starts with 'ghp_' or 'github_pat_'.\nAre you sure this is the correct token?")) return;
   }
 
-  // 3. عملية الحفظ
+  // 5. الحفظ الفعلي
   try {
     const cfg = { token, repo, filename };
     localStorage.setItem('mcq_github_config', JSON.stringify(cfg));
     
-    // تحديث الواجهة
+    // تحديث الحالة فوراً
     refreshCloudInfo();
+
+    // 6. رسالة نجاح بصرية
+    const oldText = btn.textContent;
+    btn.textContent = "Saved! ✅";
+    btn.style.backgroundColor = "#2e7d32";
+    btn.style.color = "white";
     
-    // 4. رسالة نجاح واضحة (Pop-up)
-    alert('✅ Settings Saved Successfully!\n\nReady to Sync with:\nRepo: ' + repo);
-    
+    setTimeout(() => {
+      btn.textContent = oldText;
+      btn.style.backgroundColor = "";
+      btn.style.color = "";
+    }, 2000);
+
+    alert("✅ Settings Saved Successfully!");
+
   } catch (e) {
-    alert('❌ System Error saving to LocalStorage: ' + e.message);
+    alert("❌ Save Failed: " + e.message);
   }
 }
 
-// ربط الزر بالقوة (Override)
-const btnSaveGitHubFix = document.getElementById('btnSaveGitHub');
-if (btnSaveGitHubFix) {
-  btnSaveGitHubFix.onclick = saveGitHubConfigFromUI; // نستخدم onclick لضمان العمل
+// ربط الزر بشكل مباشر وقوي
+const btnSaveFix = document.getElementById('btnSaveGitHub');
+if (btnSaveFix) {
+  btnSaveFix.onclick = saveGitHubConfigFromUI;
 }
-
 function refreshCloudInfo() {
   const cfg = loadGitHubConfig();
   const el = document.getElementById('cloudInfo');
@@ -1917,29 +1929,45 @@ openDB().then(() => {
   console.error(err);
   alert('Failed to open local database.');
 });
-// --- Force Update Logic (New Feature) ---
-const btnForceUpdate = document.getElementById('btnForceUpdate');
-if (btnForceUpdate) {
-  btnForceUpdate.addEventListener('click', async () => {
-    if (!confirm('Update App? This will refresh the page to get the latest version.')) return;
-    
-    btnForceUpdate.textContent = 'Updating...';
-    
-    // 1. Unregister Service Worker
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
+// =========================================
+// 🛠️ FIX: Force Update Button (Logic)
+// =========================================
+
+const btnUpdateFix = document.getElementById('btnForceUpdate');
+
+if (btnUpdateFix) {
+  btnUpdateFix.onclick = async function() {
+    // 1. تأكيد من المستخدم
+    if (!confirm("🔄 Refresh App?\nThis will clear cache and fetch the latest version.")) return;
+
+    // 2. تغيير النص ليعرف المستخدم أن شيئاً يحدث
+    btnUpdateFix.textContent = "Updating...";
+    btnUpdateFix.style.backgroundColor = "red";
+
+    try {
+      // 3. حذف الـ Service Worker (المسؤول عن الكاش العنيد)
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
       }
-    }
 
-    // 2. Clear All Caches
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map(key => caches.delete(key)));
-    }
+      // 4. حذف ملفات الكاش
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(key => caches.delete(key)));
+      }
 
-    // 3. Force Reload from Server
-    window.location.reload(true);
-  });
+      // 5. رسالة سريعة قبل إعادة التحميل
+      alert("✅ Cache Cleared! App will reload now.");
+
+      // 6. إعادة تحميل إجبارية
+      window.location.reload(true);
+
+    } catch (err) {
+      alert("Error updating: " + err.message);
+      window.location.reload();
+    }
+  };
 }
