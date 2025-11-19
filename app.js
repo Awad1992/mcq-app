@@ -1,4 +1,3 @@
-
 // MCQ Study App Ultra-Pro v4.1
 // IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
 
@@ -1081,7 +1080,9 @@ function handleImportSimple() {
     }
   };
   reader.readAsText(file);
+}
 
+// Import from URL
 async function handleImportFromUrl() {
   const input = document.getElementById('fileUrlInput');
   const url = (input && input.value || '').trim();
@@ -1118,7 +1119,6 @@ async function handleImportFromUrl() {
   } catch (err) {
     alert('Error importing from URL: ' + err.message);
   }
-}
 }
 
 
@@ -1337,71 +1337,6 @@ async function handleBackupImport() {
     }
   };
   reader.readAsText(file);
-}
-
-
-function handleImportFromUrl() {
-  const urlInput = document.getElementById('fileUrlInput');
-  const url = (urlInput?.value || '').trim();
-  if (!url) {
-    alert('أدخل رابط JSON أولاً.');
-    return;
-  }
-  fetch(url)
-    .then(resp => {
-      if (!resp.ok) {
-        throw new Error('HTTP status ' + resp.status);
-      }
-      return resp.text();
-    })
-    .then(text => {
-      try {
-        const data = JSON.parse(text);
-        let arr = data;
-        if (!Array.isArray(arr) && data.questions) {
-          arr = data.questions;
-        }
-        if (!Array.isArray(arr)) throw new Error('JSON should be array or {questions:[]}');
-        const tx = db.transaction('questions', 'readwrite');
-        const store = tx.objectStore('questions');
-        arr.forEach(q => {
-          const obj = {
-            text: q.text,
-            chapter: q.chapter || '',
-            source: q.source || '',
-            explanation: q.explanation || '',
-            choices: q.choices || [],
-            timesSeen: q.timesSeen || 0,
-            timesCorrect: q.timesCorrect || 0,
-            timesWrong: q.timesWrong || 0,
-            lastSeenAt: q.lastSeenAt || null,
-            createdAt: q.createdAt || new Date().toISOString(),
-            flagged: !!q.flagged,
-            maintenance: !!q.maintenance,
-            active: q.active !== false,
-            tags: Array.isArray(q.tags) ? q.tags : [],
-            pinned: !!q.pinned,
-            imageUrl: q.imageUrl || '',
-            imageData: q.imageData || '',
-            srEase: q.srEase || 2.5,
-            srInterval: q.srInterval || 0,
-            srReps: q.srReps || 0,
-            dueAt: q.dueAt || null
-          };
-          if (q.id != null) obj.id = q.id;
-          store.put(obj);
-        });
-        tx.oncomplete = () => {
-          alert('Imported ' + arr.length + ' questions from URL.');
-          loadNextQuestion(true);
-        };
-      } catch (err) {
-        alert('Error: ' + err.message);
-      }
-    })
-    .catch(err => {
-      alert('Error: ' + err.message);
-    });
 }
 
 
@@ -2658,135 +2593,4 @@ openDB().then(() => {
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');
-});});
-
-// All tab subview toggle (bank vs builder)
-(function () {
-  const bankView = document.getElementById('allViewBank');
-  const builderView = document.getElementById('allViewBuilder');
-  const subnavBtns = document.querySelectorAll('.subnav-btn');
-  subnavBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.getAttribute('data-allview');
-      subnavBtns.forEach(b => b.classList.remove('subnav-btn-active'));
-      btn.classList.add('subnav-btn-active');
-      if (target === 'builder') {
-        if (bankView) bankView.style.display = 'none';
-        if (builderView) builderView.style.display = 'block';
-      } else {
-        if (bankView) bankView.style.display = 'block';
-        if (builderView) builderView.style.display = 'none';
-      }
-    });
-  });
-})();
-
-// Builder helpers: prompt + preview + import
-let builderPreviewCache = [];
-
-function makeBuilderPrompt() {
-  const src = (document.getElementById('builderSourceText')?.value || '').trim();
-  const num = parseInt(document.getElementById('builderNumQuestions')?.value || '0', 10) || 10;
-  const outEl = document.getElementById('builderPromptOut');
-  if (!outEl) return;
-  if (!src) {
-    outEl.value = 'Paste source text first.';
-    return;
-  }
-  const corePrompt = `You are an expert ICU / Internal Medicine board-exam question generator. Use ONLY the following source text (any language) to create ${num} difficult, board-level MCQs in advanced academic English. Follow strictly this JSON schema: an array of objects with fields id (int), text, chapter, source, explanation, choices[{text,isCorrect}], tags, optional difficulty and images. Questions, choices, explanations, tags, chapter, and source MUST ALL be in ENGLISH. Do NOT add any keys outside this schema. Output ONLY a JSON array, nothing else.`;
-  outEl.value = corePrompt + "\n\nSOURCE TEXT:\n\n" + src;
-}
-
-async function builderPreviewFromJson() {
-  const raw = (document.getElementById('builderJsonInput')?.value || '').trim();
-  const previewEl = document.getElementById('builderPreview');
-  if (!previewEl) return;
-  if (!raw) {
-    previewEl.textContent = 'Paste JSON first.';
-    return;
-  }
-  try {
-    const data = JSON.parse(raw);
-    if (!Array.isArray(data)) throw new Error('JSON must be an array of questions.');
-    builderPreviewCache = data;
-    let html = '<table class="q-table tiny"><thead><tr><th><input type="checkbox" id="builderSelectAll"></th><th>ID</th><th>Text</th><th>Chapter</th><th>Tags</th></tr></thead><tbody>';
-    data.forEach((q, idx) => {
-      const tagsStr = Array.isArray(q.tags) ? q.tags.join(', ') : '';
-      const txt = (q.text || '').slice(0, 120) + ((q.text || '').length > 120 ? '…' : '');
-      html += `<tr>
-        <td><input type="checkbox" class="builder-row-select" data-idx="${idx}" checked></td>
-        <td>${q.id ?? idx + 1}</td>
-        <td>${txt}</td>
-        <td>${q.chapter || ''}</td>
-        <td>${tagsStr}</td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
-    previewEl.innerHTML = html;
-    const selAll = document.getElementById('builderSelectAll');
-    if (selAll) {
-      selAll.addEventListener('change', e => {
-        document.querySelectorAll('.builder-row-select').forEach(ch => {
-          ch.checked = e.target.checked;
-        });
-      });
-    }
-  } catch (err) {
-    previewEl.textContent = 'Error: ' + err.message;
-  }
-}
-
-async function builderImportSelected() {
-  if (!builderPreviewCache || !builderPreviewCache.length) {
-    alert('No preview data to import.');
-    return;
-  }
-  const checks = Array.from(document.querySelectorAll('.builder-row-select'));
-  const selected = checks
-    .map((ch, idx) => (ch.checked ? idx : -1))
-    .filter(i => i >= 0)
-    .map(i => builderPreviewCache[i]);
-  if (!selected.length) {
-    alert('No questions selected.');
-    return;
-  }
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  selected.forEach((q, idx) => {
-    const obj = {
-      text: q.text,
-      chapter: q.chapter || '',
-      source: q.source || '',
-      explanation: q.explanation || '',
-      choices: q.choices || [],
-      timesSeen: q.timesSeen || 0,
-      timesCorrect: q.timesCorrect || 0,
-      timesWrong: q.timesWrong || 0,
-      lastSeenAt: q.lastSeenAt || null,
-      createdAt: q.createdAt || new Date().toISOString(),
-      flagged: !!q.flagged,
-      maintenance: !!q.maintenance,
-      active: q.active !== false,
-      tags: Array.isArray(q.tags) ? q.tags : [],
-      pinned: !!q.pinned,
-      imageUrl: q.imageUrl || '',
-      imageData: q.imageData || '',
-      srEase: q.srEase || 2.5,
-      srInterval: q.srInterval || 0,
-      srReps: q.srReps || 0,
-      dueAt: q.dueAt || null
-    };
-    if (q.id != null) obj.id = q.id;
-    store.put(obj);
-  });
-  tx.oncomplete = () => {
-    alert('Imported ' + selected.length + ' questions into bank.');
-    reloadAllQuestionsTable();
-    loadNextQuestion(true);
-  };
-}
-
-// Hook builder buttons
-document.getElementById('btnBuilderMakePrompt')?.addEventListener('click', makeBuilderPrompt);
-document.getElementById('btnBuilderPreview')?.addEventListener('click', builderPreviewFromJson);
-document.getElementById('btnBuilderImportSelected')?.addEventListener('click', builderImportSelected);
+});
