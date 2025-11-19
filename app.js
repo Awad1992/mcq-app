@@ -2,6 +2,11 @@
 // MCQ Study App Ultra-Pro v4.1
 // IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
 
+// Optional: hard-coded GitHub token override for cloud backup.
+// If you prefer not to use the in-app Settings for the token, put your
+// personal GitHub PAT here. Leave as empty string to keep using Settings.
+const HARDCODED_GITHUB_TOKEN = '';
+
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
 
@@ -2064,15 +2069,24 @@ async function deleteDuplicateClusters() {
 function loadGitHubConfig() {
   try {
     const raw = localStorage.getItem('mcq_github_config');
-    if (!raw) return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
+    const base = {
+      token: HARDCODED_GITHUB_TOKEN || '',
+      repo: 'Awad1992/mcq-data',
+      filename: 'mcq_backup.json'
+    };
+    if (!raw) return base;
     const obj = JSON.parse(raw);
     return {
-      token: obj.token || '',
-      repo: obj.repo || 'Awad1992/mcq-data',
-      filename: obj.filename || 'mcq_backup.json'
+      token: HARDCODED_GITHUB_TOKEN || obj.token || base.token,
+      repo: obj.repo || base.repo,
+      filename: obj.filename || base.filename
     };
   } catch {
-    return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
+    return {
+      token: HARDCODED_GITHUB_TOKEN || '',
+      repo: 'Awad1992/mcq-data',
+      filename: 'mcq_backup.json'
+    };
   }
 }
 
