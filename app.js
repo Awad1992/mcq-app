@@ -590,19 +590,6 @@ async function getAllQuestions() {
 }
 
 async function getStats() {
-  // describe exam source for later summary
-  if (poolType === 'all') {
-    currentExamSourceLabel = 'All active';
-  } else if (poolType === 'weak') {
-    currentExamSourceLabel = 'Weakness focus';
-  } else if (poolType === 'flagged') {
-    currentExamSourceLabel = 'Flagged';
-  } else if (poolType === 'chapter' && chap) {
-    currentExamSourceLabel = `Chapter: ${chap}`;
-  } else {
-    currentExamSourceLabel = 'Custom pool';
-  }
-
   const all = await getAllQuestions();
   const nowIso = new Date().toISOString();
   const dueCount = all.filter(q => isDue(q, nowIso)).length;
@@ -617,6 +604,7 @@ async function getStats() {
   };
   return stats;
 }
+
 
 async function updateStatsBar() {
   const el = document.getElementById('statsBar');
@@ -947,7 +935,7 @@ async function loadNextQuestion(resetHistory) {
 }
 
 // Previous question
-async function goPreviousQuestion() {
+async async function goPreviousQuestion() {
   if (!historyStack.length) return;
   const prevId = historyStack.pop();
 
@@ -1080,6 +1068,15 @@ async function submitAnswer() {
     updateHistoryList();
     refreshBackupLabels();
   };
+  tx.onerror = () => {
+    // Even if DB write fails, still show feedback so UX is not blocked
+    try {
+      showFeedback(correctIdx, selectedIdx, q.explanation);
+    } catch (e) {
+      console.error('submitAnswer fallback error', e);
+    }
+  };
+
 }
 
 function showFeedback(correctIdx, selectedIdx, explanation) {
