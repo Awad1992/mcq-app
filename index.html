@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Ultra-Pro 4.2</title>
+  <title>MCQ Study App Ultra-Pro 4.4</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=4.3.2">
-  <link rel="stylesheet" href="style.css?v=4.3.2">
+  <link rel="manifest" href="manifest.json?v=4.4.0">
+  <link rel="stylesheet" href="style.css?v=4.4.0">
 </head>
 <body>
 <div class="app" id="appRoot">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.2</span></h1>
-      <div class="subtitle">Local bank + spaced repetition + weak‑spot engine + dashboard + flashcards + exam sim</div>
+      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.4</span></h1>
+      <div class="subtitle">Local bank + Spaced Repetition + Notes + Strikethrough + Smart Guessing</div>
     </div>
     <div class="chips">
       <span class="chip">Offline</span>
@@ -82,14 +82,26 @@
             </div>
 
             <div id="questionPanel" class="question-panel"></div>
+
+            <div class="notes-area-container">
+              <label class="small-label">My Study Notes (Auto-saved)</label>
+              <textarea id="userNoteArea" class="notes-textarea" placeholder="Type your key takeaway or memory hook here..."></textarea>
+              <div id="saveNoteStatus" class="save-note-status"></div>
+            </div>
+
             <div id="feedbackPanel" class="feedback-panel"></div>
 
             <div class="btn-row-main">
               <button class="primary" id="btnSubmit">Submit</button>
-              <button id="btnPrev">Previous</button>
-              <button id="btnNext">Next</button>
-              <button class="ghost" id="btnFlag">Flag</button>
-              <button class="ghost" id="btnMaint">Maint</button>
+              <label style="font-size:0.8rem; margin-left: 8px; cursor:pointer; color:#555;">
+                <input type="checkbox" id="guessCheck"> I'm guessing (Don't count as full correct)
+              </label>
+            </div>
+            <div class="btn-row-main" style="margin-top:1rem; border-top:1px solid #eee; padding-top:0.5rem;">
+               <button id="btnPrev">Previous</button>
+               <button id="btnNext">Next</button>
+               <button class="ghost" id="btnFlag">Flag</button>
+               <button class="ghost" id="btnMaint">Maint</button>
             </div>
           </div>
 
@@ -431,7 +443,7 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.3.2</strong><br>
+          Version: <strong>4.4.0</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
           Engine: spaced repetition + weakness clustering + tags + flashcards.
         </p>
@@ -488,12 +500,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.3.2";
+  window.APP_VERSION = "4.4.0";
 </script>
-<script src="app.js?v=4.3.2"></script>
+<script src="app.js?v=4.4.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.3.2').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.4.0').catch(()=>{});
   }
 </script>
 </body>
