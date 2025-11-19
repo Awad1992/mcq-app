@@ -5,7 +5,10 @@
 // Optional: hard-coded GitHub token override for cloud backup.
 // If you prefer not to use the in-app Settings for the token, put your
 // personal GitHub PAT here. Leave as empty string to keep using Settings.
-const HARDCODED_GITHUB_TOKEN = '';
+// Read GitHub token from optional local config file (config.local.js).
+// Safe place for you to edit without touching app.js.
+const HARDCODED_GITHUB_TOKEN =
+  (window.MCQ_LOCAL_CONFIG && window.MCQ_LOCAL_CONFIG.GITHUB_TOKEN) || '';
 
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
