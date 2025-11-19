@@ -382,6 +382,7 @@
           <div>
             <button id="btnCloudUpload">Upload → GitHub</button>
             <button id="btnCloudDownload">Download ← GitHub</button>
+            <button id="btnCloudTest" class="ghost tiny">Test connection</button>
           </div>
           <div class="muted tiny" id="cloudInfo"></div>
         </div>
@@ -434,6 +435,17 @@
         </div>
         <div class="btn-row-main">
           <button id="btnResetProgress" class="danger">Reset selected progress…</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Cloud debug (local only)</h2>
+        <p class="muted tiny">
+          Quick view of your current cloud setup. This is NOT synced anywhere and is only for troubleshooting on this device.
+        </p>
+        <pre id="cloudDebugInfo" class="tiny" style="white-space:pre-wrap; background:#111; color:#eee; padding:0.5rem; border-radius:4px; max-height:9rem; overflow:auto;"></pre>
+        <div class="btn-row-main">
+          <button id="btnClearCloudError" class="ghost tiny">Clear last error</button>
         </div>
       </div>
 

@@ -3,10 +3,11 @@
 // IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
 
 // Optional: hard-coded GitHub token override for cloud backup.
-// If you prefer not to use the in-app Settings for the token, put your
-// personal GitHub PAT here. Leave as empty string to keep using Settings.
+// WARNING: for any repo hosted on GitHub, you should normally leave the
+// token empty in config.local.js and set your token only via the Settings tab
+// (it stays in this browser's localStorage, not in the repo).
 // Read GitHub token from optional local config file (config.local.js).
-// Safe place for you to edit without touching app.js.
+// Safe place for LOCAL overrides without touching app.js.
 const HARDCODED_GITHUB_TOKEN =
   (window.MCQ_LOCAL_CONFIG && window.MCQ_LOCAL_CONFIG.GITHUB_TOKEN) || '';
 
@@ -86,6 +87,17 @@ if (resetBtn) {
     await resetProgress(scope);
   });
 }
+const cloudDebugBox = document.getElementById('cloudDebugInfo');
+const clearCloudBtn = document.getElementById('btnClearCloudError');
+if (clearCloudBtn) {
+  clearCloudBtn.addEventListener('click', () => {
+    lastCloudError = '';
+    lastCloudErrorAt = null;
+    lastCloudOp = '';
+    renderCloudDebugPanel();
+  });
+}
+
 
 
 // Tabs
@@ -391,6 +403,10 @@ document.getElementById('btnBackupImport').addEventListener('click', handleBacku
 // Cloud sync controls
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
 document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
+const cloudTestBtn = document.getElementById('btnCloudTest');
+if (cloudTestBtn) {
+  cloudTestBtn.addEventListener('click', cloudTestConnection);
+}
 const quickBackupBtn = document.getElementById('btnBackupQuick');
 if (quickBackupBtn) {
   quickBackupBtn.addEventListener('click', cloudUpload);
@@ -1188,12 +1204,9 @@ function normalizeImportedQuestions(rawArr) {
       }
     }
 
-    // Fallback if still empty
+    // If still no usable choices, skip this entry
     if (!choices.length) {
-      choices = [{
-        text: 'Option A',
-        isCorrect: true
-      }];
+      return null;
     }
 
     return {
@@ -1220,7 +1233,7 @@ function normalizeImportedQuestions(rawArr) {
       dueAt: q.dueAt || null,
       id: q.id != null ? q.id : undefined
     };
-  });
+  }).filter(q => q && typeof q.text === 'string' && Array.isArray(q.choices) && q.choices.length);
 }
 
 // Export questions only
@@ -2117,6 +2130,49 @@ function saveGitHubConfigFromUI() {
   alert('GitHub settings saved.');
 }
 
+// --- Cloud debug state (local only, not synced) ---
+let lastCloudError = '';
+let lastCloudErrorAt = null;
+let lastCloudOp = '';
+
+function recordCloudError(where, message) {
+  lastCloudOp = where || '';
+  lastCloudError = message || '';
+  lastCloudErrorAt = new Date().toISOString();
+  renderCloudDebugPanel();
+}
+
+function recordCloudSuccess(where) {
+  lastCloudOp = where || '';
+  lastCloudError = '';
+  lastCloudErrorAt = null;
+  renderCloudDebugPanel();
+}
+
+function renderCloudDebugPanel() {
+  const box = document.getElementById('cloudDebugInfo');
+  if (!box) return;
+  const cfg = loadGitHubConfig();
+  let tokenSource = 'none';
+  if (HARDCODED_GITHUB_TOKEN) {
+    tokenSource = 'config.local.js (HARDCODED_GITHUB_TOKEN)';
+  } else if (cfg.token) {
+    tokenSource = 'browser localStorage (Settings tab)';
+  }
+  const lines = [];
+  lines.push('Token source: ' + tokenSource);
+  lines.push('Repo: ' + (cfg.repo || 'not set'));
+  lines.push('Filename: ' + (cfg.filename || 'not set'));
+  if (lastCloudError) {
+    lines.push('Last error at: ' + (lastCloudErrorAt || '?'));
+    lines.push('Last op: ' + (lastCloudOp || '?'));
+    lines.push('Last error: ' + lastCloudError);
+  } else {
+    lines.push('Last error: none');
+  }
+  box.textContent = lines.join('\n');
+}
+
 function refreshCloudInfo() {
   const cfg = loadGitHubConfig();
   const el = document.getElementById('cloudInfo');
@@ -2124,10 +2180,12 @@ function refreshCloudInfo() {
   if (!cfg.token || !cfg.repo) {
     el.textContent = 'Cloud sync disabled. Add token + repo in Settings.';
     syncStatus.textContent = 'No cloud sync';
+    renderCloudDebugPanel();
     return;
   }
   el.textContent = 'Cloud ready → Repo: ' + cfg.repo + ' · File: ' + cfg.filename;
   syncStatus.textContent = 'Cloud: ready';
+  renderCloudDebugPanel();
 }
 
 // GitHub helper: base64
@@ -2144,6 +2202,7 @@ async function cloudUpload() {
     const cfg = loadGitHubConfig();
     if (!cfg.token || !cfg.repo) {
       alert('Set GitHub token + repo in Settings first.');
+      recordCloudError('upload:init', 'Missing token or repo.');
       return;
     }
     const backup = await buildBackupObject();
@@ -2153,6 +2212,7 @@ async function cloudUpload() {
     const [owner, repoName] = cfg.repo.split('/');
     if (!owner || !repoName) {
       alert('Repo format must be owner/name.');
+      recordCloudError('upload:init', 'Invalid repo format (must be owner/name).');
       return;
     }
     const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
@@ -2187,15 +2247,20 @@ async function cloudUpload() {
 
     if (!res.ok) {
       const txt = await res.text();
-      alert('Upload failed: ' + res.status + ' ' + txt);
+      const msg = 'Upload failed: ' + res.status + ' ' + txt;
+      alert(msg);
+      recordCloudError('upload:put', msg);
       return;
     }
     alert('Cloud backup uploaded to GitHub.');
     refreshBackupLabels();
     refreshCloudInfo();
+    recordCloudSuccess('upload');
   } catch (err) {
     console.error(err);
-    alert('Cloud upload failed: ' + (err && err.message ? err.message : err));
+    const msg = 'Cloud upload failed: ' + (err && err.message ? err.message : err);
+    alert(msg);
+    recordCloudError('upload:catch', msg);
   }
 }
 
@@ -2205,11 +2270,13 @@ async function cloudDownload() {
     const cfg = loadGitHubConfig();
     if (!cfg.token || !cfg.repo) {
       alert('Set GitHub token + repo in Settings first.');
+      recordCloudError('download:init', 'Missing token or repo.');
       return;
     }
     const [owner, repoName] = cfg.repo.split('/');
     if (!owner || !repoName) {
       alert('Repo format must be owner/name.');
+      recordCloudError('download:init', 'Invalid repo format (must be owner/name).');
       return;
     }
     const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
@@ -2217,12 +2284,16 @@ async function cloudDownload() {
       headers: { Authorization: `token ${cfg.token}` }
     });
     if (res.status === 404) {
-      alert('No backup file found in GitHub repo.');
+      const msg = 'No backup file found in GitHub repo.';
+      alert(msg);
+      recordCloudError('download:404', msg);
       return;
     }
     if (!res.ok) {
       const txt = await res.text();
-      alert('Download failed: ' + res.status + ' ' + txt);
+      const msg = 'Download failed: ' + res.status + ' ' + txt;
+      alert(msg);
+      recordCloudError('download:fetch', msg);
       return;
     }
     const info = await res.json();
@@ -2231,19 +2302,70 @@ async function cloudDownload() {
     try {
       data = JSON.parse(contentStr);
     } catch (err) {
-      alert('Invalid JSON in backup file.');
+      const msg = 'Invalid JSON in backup file.';
+      alert(msg);
+      recordCloudError('download:json', msg);
       return;
     }
     await importBackupObject(data);
     alert('Cloud backup downloaded and merged.');
     loadNextQuestion(true);
     refreshBackupLabels();
+    refreshCloudInfo();
+    recordCloudSuccess('download');
   } catch (err) {
     console.error(err);
-    alert('Cloud download failed: ' + (err && err.message ? err.message : err));
+    const msg = 'Cloud download failed: ' + (err && err.message ? err.message : err);
+    alert(msg);
+    recordCloudError('download:catch', msg);
   }
 }
-// --- Dashboard ---
+
+
+
+async function cloudTestConnection() {
+  try {
+    const cfg = loadGitHubConfig();
+    if (!cfg.token || !cfg.repo) {
+      alert('Set GitHub token + repo in Settings first.');
+      recordCloudError('test:init', 'Missing token or repo.');
+      return;
+    }
+    const [owner, repoName] = cfg.repo.split('/');
+    if (!owner || !repoName) {
+      alert('Repo format must be owner/name.');
+      recordCloudError('test:init', 'Invalid repo format (must be owner/name).');
+      return;
+    }
+    const url = `https://api.github.com/repos/${owner}/${repoName}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `token ${cfg.token}` }
+    });
+    if (res.status === 404) {
+      const msg = 'Repo not found (404). Check owner/name or permissions.';
+      alert(msg);
+      recordCloudError('test:404', msg);
+      return;
+    }
+    if (!res.ok) {
+      const txt = await res.text();
+      const msg = 'Test failed: ' + res.status + ' ' + txt;
+      alert(msg);
+      recordCloudError('test:fetch', msg);
+      return;
+    }
+    const msg = 'GitHub repo is reachable and token looks valid for reading.';
+    alert(msg);
+    recordCloudSuccess('test');
+    refreshCloudInfo();
+  } catch (err) {
+    console.error(err);
+    const msg = 'Cloud test failed: ' + (err && err.message ? err.message : err);
+    alert(msg);
+    recordCloudError('test:catch', msg);
+  }
+}
+
 async function renderDashboard() {
   const all = await getAllQuestions();
   const weak = computeWeakQuestions(all);
