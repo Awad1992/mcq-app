@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Ultra-Pro 4.1</title>
+  <title>MCQ Study App Ultra-Pro 4.2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=4.3.1">
-  <link rel="stylesheet" href="style.css?v=4.3.1">
+  <link rel="manifest" href="manifest.json?v=4.3.2">
+  <link rel="stylesheet" href="style.css?v=4.3.2">
 </head>
 <body>
 <div class="app" id="appRoot">
@@ -42,7 +42,6 @@
 
   <main class="tab-container">
 
-    <!-- PRACTICE TAB -->
     <section class="tab-content active" id="tab-home">
       <div class="card">
         <div class="stats-row" id="statsBar"></div>
@@ -104,7 +103,6 @@
       </div>
     </section>
 
-    <!-- FLASHCARDS TAB -->
     <section class="tab-content" id="tab-flashcards">
       <div class="card">
         <div class="row-controls">
@@ -142,7 +140,6 @@
       </div>
     </section>
 
-    <!-- EXAM SIM TAB -->
     <section class="tab-content" id="tab-exam">
       <div class="card">
         <h2>Exam Simulation</h2>
@@ -192,7 +189,6 @@
       </div>
     </section>
 
-    <!-- DASHBOARD TAB -->
     <section class="tab-content" id="tab-dashboard">
       <div class="card">
         <h2>Study dashboard</h2>
@@ -204,7 +200,6 @@
       </div>
     </section>
 
-    <!-- ALL QUESTIONS TAB -->
     <section class="tab-content" id="tab-all">
       <div class="subnav">
         <button class="subnav-btn subnav-btn-active" data-allview="bank">Question bank</button>
@@ -313,9 +308,7 @@
             <button id="allNextPage">Next &gt;</button>
           </div>
         </div>
-            </div> <!-- end allViewBank -->
-
-      <div id="allViewBuilder" style="display:none;">
+            </div> <div id="allViewBuilder" style="display:none;">
         <div class="card">
           <h2>Build questions from text / file</h2>
           <p class="muted tiny">
@@ -352,7 +345,6 @@
 
     </section>
 
-    <!-- BACKUP & CLOUD TAB -->
     <section class="tab-content" id="tab-backup">
       <div class="card">
         <h2>Local backup</h2>
@@ -388,7 +380,6 @@
       </div>
     </section>
 
-    <!-- SETTINGS TAB -->
     <section class="tab-content" id="tab-settings">
       <div class="card">
         <h2>GitHub settings</h2>
@@ -440,7 +431,7 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.3.1</strong><br>
+          Version: <strong>4.3.2</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
           Engine: spaced repetition + weakness clustering + tags + flashcards.
         </p>
@@ -450,7 +441,6 @@
   </main>
 </div>
 
-<!-- Edit / add question modal -->
 <div id="editModal" class="modal hidden">
   <div class="modal-backdrop" id="editModalBackdrop"></div>
   <div class="modal-body">
@@ -498,12 +488,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.3.1";
+  window.APP_VERSION = "4.3.2";
 </script>
-<script src="app.js?v=4.3.1"></script>
+<script src="app.js?v=4.3.2"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.3.1').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.3.2').catch(()=>{});
   }
 </script>
 </body>
