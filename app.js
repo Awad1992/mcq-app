@@ -1,5 +1,5 @@
-// MCQ Study App Ultra-Pro v4.4.1
-// Fixes: GitHub Sync Freezing, Arabic Encoding, Loading Indicators
+// MCQ Study App Ultra-Pro v4.5
+// Added: Focus Mode, Smart Search Buttons, GitHub Fix retained
 
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
@@ -77,6 +77,21 @@ if (resetBtn) {
     await resetProgress(scope);
   });
 }
+
+// Focus Mode Logic
+const btnFocusMode = document.getElementById('btnFocusMode');
+const btnExitFocus = document.getElementById('btnExitFocus');
+if(btnFocusMode) {
+  btnFocusMode.addEventListener('click', () => {
+    document.body.classList.add('focus-mode');
+  });
+}
+if(btnExitFocus) {
+  btnExitFocus.addEventListener('click', () => {
+    document.body.classList.remove('focus-mode');
+  });
+}
+
 
 // Notes logic
 const userNoteArea = document.getElementById('userNoteArea');
@@ -723,6 +738,8 @@ function renderQuestion() {
     questionPanel.innerHTML = '<div class="muted">No questions yet. Import JSON to start.</div>';
     relatedBox.innerHTML = 'No related questions yet.';
     if (userNoteArea) userNoteArea.value = '';
+    const searchTools = document.getElementById('searchTools');
+    if (searchTools) searchTools.innerHTML = '';
     return;
   }
   const q = currentQuestion;
@@ -783,6 +800,38 @@ function renderQuestion() {
   // Reset guess check
   const guessCheck = document.getElementById('guessCheck');
   if (guessCheck) guessCheck.checked = false;
+
+  // --- SMART SEARCH GENERATION ---
+  const searchTools = document.getElementById('searchTools');
+  if (searchTools) {
+    let term = '';
+    // Strategy: Try Tags first, then Chapter, then first 6 words of text
+    if (q.tags && q.tags.length > 0) {
+      term = q.tags[0];
+    } else if (q.chapter) {
+      term = q.chapter.replace(/Ch\d+\s*/i, ''); // Remove 'Ch45' prefix
+    } else {
+      term = (q.text || '').split(' ').slice(0, 5).join(' ');
+    }
+    
+    // Clean term
+    term = term.replace(/[^\w\s]/gi, '').trim();
+    
+    if(term) {
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(term + ' medical')}`;
+      const uptodateUrl = `https://www.uptodate.com/contents/search?search=${encodeURIComponent(term)}`;
+      const pubmedUrl = `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(term)}`;
+
+      searchTools.innerHTML = `
+        <span class="tiny muted" style="margin-right:4px;">Quick Refs:</span>
+        <a href="${googleUrl}" target="_blank" class="search-btn">Google</a>
+        <a href="${uptodateUrl}" target="_blank" class="search-btn">UpToDate</a>
+        <a href="${pubmedUrl}" target="_blank" class="search-btn">PubMed</a>
+      `;
+    } else {
+      searchTools.innerHTML = '';
+    }
+  }
 
   renderRelated();
 }
