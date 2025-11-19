@@ -2096,13 +2096,16 @@ function saveGitHubConfig(cfg) {
 
 function loadGitHubConfigIntoUI() {
   const cfg = loadGitHubConfig();
-  document.getElementById('ghTokenInput').value = cfg.token;
+  const tokenInput = document.getElementById('ghTokenInput');
+  tokenInput.value = HARDCODED_GITHUB_TOKEN ? '*** using HARDCODED TOKEN ***' : (cfg.token || '');
+  tokenInput.readOnly = !!HARDCODED_GITHUB_TOKEN;
   document.getElementById('ghRepoInput').value = cfg.repo;
   document.getElementById('ghFileInput').value = cfg.filename;
 }
 
 function saveGitHubConfigFromUI() {
-  const token = document.getElementById('ghTokenInput').value.trim();
+  const rawToken = document.getElementById('ghTokenInput').value.trim();
+  const token = HARDCODED_GITHUB_TOKEN || rawToken;
   const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
   const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
   const cfg = { token, repo, filename };
@@ -2134,98 +2137,109 @@ function decodeBase64(str) {
 
 // Cloud upload
 async function cloudUpload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
-    return;
-  }
-  const backup = await buildBackupObject();
-  const contentStr = JSON.stringify(backup, null, 2);
-  const contentB64 = encodeBase64(contentStr);
-
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-
-  let existingSha = null;
   try {
-    const getRes = await fetch(url, {
-      headers: { Authorization: `token ${cfg.token}` }
-    });
-    if (getRes.status === 200) {
-      const info = await getRes.json();
-      existingSha = info.sha;
+    const cfg = loadGitHubConfig();
+    if (!cfg.token || !cfg.repo) {
+      alert('Set GitHub token + repo in Settings first.');
+      return;
     }
+    const backup = await buildBackupObject();
+    const contentStr = JSON.stringify(backup, null, 2);
+    const contentB64 = encodeBase64(contentStr);
+
+    const [owner, repoName] = cfg.repo.split('/');
+    if (!owner || !repoName) {
+      alert('Repo format must be owner/name.');
+      return;
+    }
+    const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+
+    let existingSha = null;
+    try {
+      const getRes = await fetch(url, {
+        headers: { Authorization: `token ${cfg.token}` }
+      });
+      if (getRes.status === 200) {
+        const info = await getRes.json();
+        existingSha = info.sha;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    const body = {
+      message: 'MCQ backup ' + new Date().toISOString(),
+      content: contentB64
+    };
+    if (existingSha) body.sha = existingSha;
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${cfg.token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      alert('Upload failed: ' + res.status + ' ' + txt);
+      return;
+    }
+    alert('Cloud backup uploaded to GitHub.');
+    refreshBackupLabels();
+    refreshCloudInfo();
   } catch (err) {
     console.error(err);
+    alert('Cloud upload failed: ' + (err && err.message ? err.message : err));
   }
-
-  const body = {
-    message: 'MCQ backup ' + new Date().toISOString(),
-    content: contentB64
-  };
-  if (existingSha) body.sha = existingSha;
-
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `token ${cfg.token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const txt = await res.text();
-    alert('Upload failed: ' + res.status + ' ' + txt);
-    return;
-  }
-  alert('Backup uploaded to GitHub.');
 }
 
-// Cloud download
+
 async function cloudDownload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
-    return;
-  }
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `token ${cfg.token}` }
-  });
-  if (res.status === 404) {
-    alert('No backup file found in GitHub repo.');
-    return;
-  }
-  if (!res.ok) {
-    const txt = await res.text();
-    alert('Download failed: ' + res.status + ' ' + txt);
-    return;
-  }
-  const info = await res.json();
-  const contentStr = decodeBase64(info.content);
-  let data = null;
   try {
-    data = JSON.parse(contentStr);
+    const cfg = loadGitHubConfig();
+    if (!cfg.token || !cfg.repo) {
+      alert('Set GitHub token + repo in Settings first.');
+      return;
+    }
+    const [owner, repoName] = cfg.repo.split('/');
+    if (!owner || !repoName) {
+      alert('Repo format must be owner/name.');
+      return;
+    }
+    const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `token ${cfg.token}` }
+    });
+    if (res.status === 404) {
+      alert('No backup file found in GitHub repo.');
+      return;
+    }
+    if (!res.ok) {
+      const txt = await res.text();
+      alert('Download failed: ' + res.status + ' ' + txt);
+      return;
+    }
+    const info = await res.json();
+    const contentStr = decodeBase64(info.content);
+    let data = null;
+    try {
+      data = JSON.parse(contentStr);
+    } catch (err) {
+      alert('Invalid JSON in backup file.');
+      return;
+    }
+    await importBackupObject(data);
+    alert('Cloud backup downloaded and merged.');
+    loadNextQuestion(true);
+    refreshBackupLabels();
   } catch (err) {
-    alert('Invalid JSON in backup file.');
-    return;
+    console.error(err);
+    alert('Cloud download failed: ' + (err && err.message ? err.message : err));
   }
-  await importBackupObject(data);
-  alert('Cloud backup downloaded and merged.');
-  loadNextQuestion(true);
-  refreshBackupLabels();
 }
-
 // --- Dashboard ---
 async function renderDashboard() {
   const all = await getAllQuestions();
