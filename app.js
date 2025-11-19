@@ -1083,33 +1083,7 @@ function handleImportSimple() {
   reader.readAsText(file);
 
 
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error('HTTP ' + resp.status + ' while fetching URL');
-    }
-    const data = await resp.json();
-    let arr = data;
-    if (!Array.isArray(arr) && data.questions) {
-      arr = data.questions;
-    }
-    if (!Array.isArray(arr)) {
-      throw new Error('JSON should be array or {questions:[]}');
-    }
-    const tx = db.transaction('questions', 'readwrite');
-    const store = tx.objectStore('questions');
-    const normalized = normalizeImportedQuestions(arr);
-    normalized.forEach(q => {
-      const obj = Object.assign({}, q);
-      if (obj.id == null) delete obj.id;
-      store.put(obj);
-    });
-    tx.oncomplete = () => {
-      alert('Imported ' + normalized.length + ' questions from URL.');
-      refreshChapterOptions();
-      loadNextQuestion(true);
-    };
-  } catch (err) {
+   catch (err) {
     alert('Error importing from URL: ' + err.message);
   }
 }
