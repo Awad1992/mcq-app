@@ -1,3 +1,4 @@
+/* MCQ Study App Ultra-Pro v4.4 - Style */
 
 *,
 *::before,
@@ -287,6 +288,7 @@ button:disabled {
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.5rem;
+  align-items: center;
 }
 
 .btn-row-tight {
@@ -309,6 +311,7 @@ button:disabled {
 .q-text {
   font-size: 0.9rem;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .tag-chapter {
@@ -321,40 +324,137 @@ button:disabled {
   margin-right: 0.2rem;
 }
 
+.choice-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
 .choice {
+  flex: 1;
   display: flex;
   align-items: flex-start;
   gap: 0.4rem;
-  padding: 0.15rem 0.25rem;
+  padding: 0.35rem 0.5rem;
   border-radius: 0.35rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.choice:hover {
+  background: #f9f9f9;
+}
+
+body.theme-dark .choice:hover {
+  background: #1e293b;
+}
+
+.choice.strikethrough {
+  text-decoration: line-through;
+  opacity: 0.5;
+  background-color: #f0f0f0;
+}
+
+body.theme-dark .choice.strikethrough {
+  background-color: #1f2937;
+  color: #6b7280;
+}
+
+.btn-strike {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  color: #888;
+  border: 1px solid #eee;
+  background: #fff;
+  cursor: pointer;
+  margin-top: 0.2rem;
+}
+
+body.theme-dark .btn-strike {
+  background: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
 }
 
 .choice input {
-  margin-top: 0.18rem;
+  margin-top: 0.25rem;
 }
 
 .choice.correct.show {
   background: #e8f5e9;
+  border-color: #c8e6c9;
 }
 
 .choice.wrong.show {
   background: #ffebee;
+  border-color: #ffcdd2;
 }
 
 body.theme-dark .choice.correct.show,
 body.theme-night .choice.correct.show {
   background: #064e3b;
+  border-color: #065f46;
 }
 
 body.theme-dark .choice.wrong.show,
 body.theme-night .choice.wrong.show {
   background: #7f1d1d;
+  border-color: #991b1b;
 }
 
 .feedback-panel {
-  margin-top: 0.4rem;
-  font-size: 0.8rem;
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.75rem;
+  background: #fafafa;
+  border-radius: 0.5rem;
+  border-left: 4px solid #ccc;
+}
+
+body.theme-dark .feedback-panel {
+  background: #1e293b;
+  border-left-color: #4b5563;
+}
+
+.feedback-correct {
+  border-left-color: #2e7d32;
+}
+
+.feedback-wrong {
+  border-left-color: #c62828;
+}
+
+/* Notes Area */
+.notes-area-container {
+  margin-top: 1rem;
+  border-top: 1px dashed #ddd;
+  padding-top: 0.5rem;
+}
+
+.notes-textarea {
+  width: 100%;
+  font-size: 0.85rem;
+  min-height: 60px;
+  margin-top: 0.25rem;
+  resize: vertical;
+  background: #fff9c4; /* Light yellow note look */
+  color: #333;
+  border: 1px solid #fbc02d;
+}
+
+body.theme-dark .notes-textarea {
+  background: #422006;
+  color: #fef3c7;
+  border-color: #a16207;
+}
+
+.save-note-status {
+  font-size: 0.7rem;
+  color: #2e7d32;
+  margin-top: 0.1rem;
+  height: 1rem;
 }
 
 .stats-row {
