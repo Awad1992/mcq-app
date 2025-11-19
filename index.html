@@ -508,12 +508,15 @@
   <button id="btnForceUpdate" class="floating-update-btn" title="Clear Cache & Reload">↻ Update App</button>
 
   <script>
-    window.APP_VERSION = "4.6.0";
+    window.APP_VERSION = "4.6.1"; /* تحديث الرقم هنا */
   </script>
-  <script src="app.js?v=4.6.0"></script>
+  
+  <script src="app.js?v=4.6.1"></script>
+  
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js?v=4.6.0').catch(()=>{});
+      // تحديث الرقم هنا أيضاً مهم جداً
+      navigator.serviceWorker.register('./service-worker.js?v=4.6.1').catch(()=>{});
     }
   </script>
 </body>
