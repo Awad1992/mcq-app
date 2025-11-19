@@ -1,13 +1,12 @@
-
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open('mcq-ultra-v431').then((cache) => {
+    caches.open('mcq-ultra-v432').then((cache) => { // Changed version to v432
       return cache.addAll([
         './',
         './index.html',
-        './style.css?v=4.3.1',
-        './app.js?v=4.3.1',
-        './manifest.json?v=4.3.1'
+        './style.css?v=4.3.2',
+        './app.js?v=4.3.2',
+        './manifest.json?v=4.3.2'
       ]);
     })
   );
