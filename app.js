@@ -1,5 +1,5 @@
-// MCQ Study App Ultra-Pro v4.1
-// IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
+// MCQ Study App Ultra-Pro v4.3.3
+// Fixes: Chapter dropdown refresh issue
 
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
@@ -90,6 +90,7 @@ document.querySelectorAll('.tab-button').forEach(btn => {
 
     if (tab === 'all') {
       reloadAllQuestionsTable();
+      refreshChapterOptions(); // Ensure chapters are updated in filter
     } else if (tab === 'backup') {
       refreshBackupLabels();
       refreshCloudInfo();
@@ -97,6 +98,8 @@ document.querySelectorAll('.tab-button').forEach(btn => {
       loadGitHubConfigIntoUI();
     } else if (tab === 'dashboard') {
       renderDashboard();
+    } else if (tab === 'home') {
+      refreshChapterOptions(); // Refresh chapters when going back to home
     }
   });
 });
@@ -222,6 +225,7 @@ async function builderImportSelected() {
   });
   tx.oncomplete = () => {
     alert('Imported ' + selected.length + ' questions into bank.');
+    refreshChapterOptions(); // Force refresh chapters
     reloadAllQuestionsTable();
     loadNextQuestion(true);
   };
@@ -262,6 +266,7 @@ modeSelect.addEventListener('change', () => {
   currentMode = modeSelect.value;
   const chapterSelect = document.getElementById('chapterSelect');
   if (currentMode === 'chapter') {
+    refreshChapterOptions(); // Force refresh when selecting chapter mode
     if (chapterSelect) chapterSelect.style.display = 'inline-block';
   } else {
     if (chapterSelect) {
@@ -504,6 +509,8 @@ function refreshChapterOptions() {
 
       function fillSelect(sel) {
         if (!sel) return;
+        // Keep selected value if possible
+        const oldVal = sel.value; 
         sel.innerHTML = '';
         const optAll = document.createElement('option');
         optAll.value = '';
@@ -515,6 +522,9 @@ function refreshChapterOptions() {
           opt.textContent = ch;
           sel.appendChild(opt);
         });
+        if (cachedChapters.includes(oldVal)) {
+            sel.value = oldVal;
+        }
       }
 
       fillSelect(practiceSel);
@@ -1425,7 +1435,7 @@ async function importBackupObject(backup) {
         srEase: q.srEase || 2.5,
         srInterval: q.srInterval || 0,
         srReps: q.srReps || 0,
-        dueAt: q.dueAt || null
+        dueAt: local.dueAt || q.dueAt || null
       };
       qs.put(obj);
     }
@@ -1642,6 +1652,7 @@ btnEditSave.addEventListener('click', async () => {
 
   tx.oncomplete = () => {
     closeEditModal();
+    refreshChapterOptions(); // Refresh dropdown after editing/adding
     reloadAllQuestionsTable();
     loadNextQuestion(true);
   };
