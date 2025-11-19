@@ -1,5 +1,5 @@
-// MCQ Study App Ultra-Pro v4.5
-// Added: Focus Mode, Smart Search Buttons, GitHub Fix retained
+// MCQ Study App Ultra-Pro v4.6
+// Base Version: Contains All Features (Notes Filter, GitHub Fix, Focus, SRS)
 
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
@@ -1650,14 +1650,31 @@ function loadGitHubConfigIntoUI() {
 }
 
 function saveGitHubConfigFromUI() {
+  const btn = document.getElementById('btnSaveGitHub');
+  const originalText = btn.textContent;
+  
   try {
     const token = document.getElementById('ghTokenInput').value.trim();
     const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
     const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
+    
+    if(!token) {
+      alert('Token is empty!');
+      return;
+    }
+    
     const cfg = { token, repo, filename };
     saveGitHubConfig(cfg);
     refreshCloudInfo();
-    alert('GitHub settings saved successfully.');
+    
+    // Visual Feedback
+    btn.textContent = "Saved! ✅";
+    btn.style.background = "#2e7d32";
+    setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = "";
+    }, 2000);
+    
   } catch (e) {
     alert('Error saving settings: ' + e.message);
   }
