@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Study App Ultra-Pro 4.5</title>
+  <title>MCQ Study App Ultra-Pro 4.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=4.5.0">
-  <link rel="stylesheet" href="style.css?v=4.5.0">
+  <link rel="manifest" href="manifest.json?v=4.6.0">
+  <link rel="stylesheet" href="style.css?v=4.6.0">
 </head>
 <body>
 <div class="app" id="appRoot">
   <header class="top-bar">
     <div>
-      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.5</span></h1>
-      <div class="subtitle">Local bank + Spaced Repetition + Focus Mode + Smart Search</div>
+      <h1>MCQ Study App Ultra‑Pro <span class="ver">v4.6</span></h1>
+      <div class="subtitle">Local bank + Spaced Repetition + Focus + Notes Filter + GitHub Fix</div>
     </div>
     <div class="chips">
       <span class="chip">Offline</span>
@@ -82,7 +82,6 @@
             </div>
 
             <div id="questionPanel" class="question-panel"></div>
-            
             <div id="searchTools" class="search-tools"></div>
 
             <div class="notes-area-container">
@@ -236,7 +235,7 @@
             <label class="small-label">Filter</label><br>
             <select id="allFilter">
               <option value="all">All</option>
-              <option value="flagged">Flagged only</option>
+              <option value="notes">With Notes Only 📝</option> <option value="flagged">Flagged only</option>
               <option value="wrong">Wrong ≥ 1</option>
               <option value="maintenance">Maintenance only</option>
               <option value="inactive">Inactive</option>
@@ -450,7 +449,7 @@
       <div class="card">
         <h2>App info</h2>
         <p class="muted tiny">
-          Version: <strong>4.5.0</strong><br>
+          Version: <strong>4.6.0</strong><br>
           Storage: IndexedDB (local), plus optional GitHub JSON sync.<br>
           Engine: spaced repetition + weakness clustering + tags + flashcards.
         </p>
@@ -507,12 +506,12 @@
 </div>
 
 <script>
-  window.APP_VERSION = "4.5.0";
+  window.APP_VERSION = "4.6.0";
 </script>
-<script src="app.js?v=4.5.0"></script>
+<script src="app.js?v=4.6.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js?v=4.5.0').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js?v=4.6.0').catch(()=>{});
   }
 </script>
 </body>
