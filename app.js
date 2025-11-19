@@ -2660,22 +2660,6 @@ openDB().then(() => {
   alert('Failed to open local database.');
 });
 
-// Practice controlsPro v4.1
-// IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
-
-const DB_NAME = 'mcqdb_ultra_v41';
-const DB_VERSION = 3;
-
-let db = null;
-
-let currentQuestion = null;
-let currentChoices = [];
-let currentMode = 'due';
-let currentChapter = '';
-let lastResult = null;
-let lastSelectedIndex = null;
-let historyStack = [];
-
 // ALL tab selection & pagination state
 let allSelectedIds = new Set();
 let allCurrentPage = 1;
