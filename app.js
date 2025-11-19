@@ -1894,3 +1894,29 @@ openDB().then(() => {
   console.error(err);
   alert('Failed to open local database.');
 });
+// --- Force Update Logic (New Feature) ---
+const btnForceUpdate = document.getElementById('btnForceUpdate');
+if (btnForceUpdate) {
+  btnForceUpdate.addEventListener('click', async () => {
+    if (!confirm('Update App? This will refresh the page to get the latest version.')) return;
+    
+    btnForceUpdate.textContent = 'Updating...';
+    
+    // 1. Unregister Service Worker
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+      }
+    }
+
+    // 2. Clear All Caches
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+    }
+
+    // 3. Force Reload from Server
+    window.location.reload(true);
+  });
+}
