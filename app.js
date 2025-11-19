@@ -1649,35 +1649,58 @@ function loadGitHubConfigIntoUI() {
   if(elFile) elFile.value = cfg.filename;
 }
 
+// --- جزء إصلاح وحفظ الإعدادات (استبدل الكود القديم بهذا) ---
+
 function saveGitHubConfigFromUI() {
-  const btn = document.getElementById('btnSaveGitHub');
-  const originalText = btn.textContent;
+  console.log("Saving settings..."); // للمراقبة
+
+  // 1. جلب العناصر
+  const tokenEl = document.getElementById('ghTokenInput');
+  const repoEl = document.getElementById('ghRepoInput');
+  const fileEl = document.getElementById('ghFileInput');
+
+  // حماية: إذا لم يجد العناصر
+  if (!tokenEl || !repoEl || !fileEl) {
+    alert('❌ Error: Settings inputs not found in HTML.');
+    return;
+  }
+
+  const token = tokenEl.value.trim();
+  const repo = repoEl.value.trim() || 'Awad1992/mcq-data';
+  const filename = fileEl.value.trim() || 'mcq_backup.json';
+
+  // 2. التحقق من التوكن
+  if (!token) {
+    alert('❌ Error: Token field is empty!\nPlease paste your GitHub Token (usually starts with ghp_ or github_pat_).');
+    return;
+  }
   
+  // تنبيه إذا قام المستخدم بوضع رابط موقع بدلاً من التوكن
+  if (token.startsWith('http')) {
+    alert('⚠️ Warning: It looks like you pasted a website Link (http...).\nPlease paste the TOKEN CODE itself (starts with ghp_...).');
+    // لن نوقف العملية، ربما هو توكن غريب، لكن وجب التنبيه
+  }
+
+  // 3. عملية الحفظ
   try {
-    const token = document.getElementById('ghTokenInput').value.trim();
-    const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
-    const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
-    
-    if(!token) {
-      alert('Token is empty!');
-      return;
-    }
-    
     const cfg = { token, repo, filename };
-    saveGitHubConfig(cfg);
+    localStorage.setItem('mcq_github_config', JSON.stringify(cfg));
+    
+    // تحديث الواجهة
     refreshCloudInfo();
     
-    // Visual Feedback
-    btn.textContent = "Saved! ✅";
-    btn.style.background = "#2e7d32";
-    setTimeout(() => {
-        btn.textContent = originalText;
-        btn.style.background = "";
-    }, 2000);
+    // 4. رسالة نجاح واضحة (Pop-up)
+    alert('✅ Settings Saved Successfully!\n\nReady to Sync with:\nRepo: ' + repo);
     
   } catch (e) {
-    alert('Error saving settings: ' + e.message);
+    alert('❌ System Error saving to LocalStorage: ' + e.message);
   }
+}
+
+// ربط الزر بالقوة (Override)
+const btnSaveGitHubFix = document.getElementById('btnSaveGitHub');
+if (btnSaveGitHubFix) {
+  btnSaveGitHubFix.onclick = saveGitHubConfigFromUI; // نستخدم onclick لضمان العمل
 }
 
 function refreshCloudInfo() {
