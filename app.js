@@ -1,5 +1,5 @@
-// MCQ Study App Ultra-Pro v4.3.3
-// Fixes: Chapter dropdown refresh issue
+// MCQ Study App Ultra-Pro v4.4
+// Added: Notes (auto-save), Strikethrough (visual exclude), Guess Mode (SRS penalty)
 
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
@@ -78,6 +78,13 @@ if (resetBtn) {
   });
 }
 
+// Notes logic
+const userNoteArea = document.getElementById('userNoteArea');
+const saveNoteStatus = document.getElementById('saveNoteStatus');
+if (userNoteArea) {
+  userNoteArea.addEventListener('input', debounce(saveCurrentNote, 1000));
+}
+
 
 // Tabs
 document.querySelectorAll('.tab-button').forEach(btn => {
@@ -90,7 +97,7 @@ document.querySelectorAll('.tab-button').forEach(btn => {
 
     if (tab === 'all') {
       reloadAllQuestionsTable();
-      refreshChapterOptions(); // Ensure chapters are updated in filter
+      refreshChapterOptions();
     } else if (tab === 'backup') {
       refreshBackupLabels();
       refreshCloudInfo();
@@ -99,7 +106,7 @@ document.querySelectorAll('.tab-button').forEach(btn => {
     } else if (tab === 'dashboard') {
       renderDashboard();
     } else if (tab === 'home') {
-      refreshChapterOptions(); // Refresh chapters when going back to home
+      refreshChapterOptions();
     }
   });
 });
@@ -225,7 +232,7 @@ async function builderImportSelected() {
   });
   tx.oncomplete = () => {
     alert('Imported ' + selected.length + ' questions into bank.');
-    refreshChapterOptions(); // Force refresh chapters
+    refreshChapterOptions();
     reloadAllQuestionsTable();
     loadNextQuestion(true);
   };
@@ -266,7 +273,7 @@ modeSelect.addEventListener('change', () => {
   currentMode = modeSelect.value;
   const chapterSelect = document.getElementById('chapterSelect');
   if (currentMode === 'chapter') {
-    refreshChapterOptions(); // Force refresh when selecting chapter mode
+    refreshChapterOptions();
     if (chapterSelect) chapterSelect.style.display = 'inline-block';
   } else {
     if (chapterSelect) {
@@ -455,9 +462,6 @@ function openDB() {
       if (!db.objectStoreNames.contains('questions')) {
         const store = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
         store.createIndex('by_chapter', 'chapter', { unique: false });
-      } else {
-        const store = req.transaction.objectStore('questions');
-        // later versions: ensure fields exist logically; JS side handles defaults
       }
       if (!db.objectStoreNames.contains('answers')) {
         const ans = db.createObjectStore('answers', { keyPath: 'id', autoIncrement: true });
@@ -509,8 +513,7 @@ function refreshChapterOptions() {
 
       function fillSelect(sel) {
         if (!sel) return;
-        // Keep selected value if possible
-        const oldVal = sel.value; 
+        const oldVal = sel.value;
         sel.innerHTML = '';
         const optAll = document.createElement('option');
         optAll.value = '';
@@ -522,9 +525,7 @@ function refreshChapterOptions() {
           opt.textContent = ch;
           sel.appendChild(opt);
         });
-        if (cachedChapters.includes(oldVal)) {
-            sel.value = oldVal;
-        }
+        if (cachedChapters.includes(oldVal)) sel.value = oldVal;
       }
 
       fillSelect(practiceSel);
@@ -621,10 +622,12 @@ function nextSpaced(q, correct) {
   q = initSpacedFields(q);
   const now = new Date();
   if (!correct) {
+    // Reset if wrong
     q.srReps = 0;
     q.srInterval = 1;
     q.srEase = Math.max(1.3, q.srEase - 0.2);
   } else {
+    // Correct logic
     q.srReps += 1;
     if (q.srReps === 1) q.srInterval = 1;
     else if (q.srReps === 2) q.srInterval = 3;
@@ -719,6 +722,7 @@ function renderQuestion() {
   if (!currentQuestion) {
     questionPanel.innerHTML = '<div class="muted">No questions yet. Import JSON to start.</div>';
     relatedBox.innerHTML = 'No related questions yet.';
+    if (userNoteArea) userNoteArea.value = '';
     return;
   }
   const q = currentQuestion;
@@ -747,16 +751,58 @@ function renderQuestion() {
   currentChoices.forEach((c, idx) => {
     const letter = letters[idx] || '?';
     const checked = (idx === lastSelectedIndex) ? 'checked' : '';
-    html += `<label class="choice">
-      <input type="radio" name="choice" value="${idx}" ${checked}>
-      <strong>${letter}.</strong> ${c.text || ''}
-    </label>`;
+    html += `
+    <div class="choice-container">
+      <label class="choice" id="choice-${idx}">
+        <input type="radio" name="choice" value="${idx}" ${checked}>
+        <div><strong>${letter}.</strong> ${c.text || ''}</div>
+      </label>
+      <button class="btn-strike" data-idx="${idx}" title="Strike/Unstrike (Exclude)">✕</button>
+    </div>`;
   });
   html += '</div>';
 
   questionPanel.innerHTML = html;
+
+  // Add strike events
+  questionPanel.querySelectorAll('.btn-strike').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent selecting radio
+      const idx = btn.getAttribute('data-idx');
+      const choiceEl = document.getElementById(`choice-${idx}`);
+      if (choiceEl) choiceEl.classList.toggle('strikethrough');
+    });
+  });
+
+  // Load notes
+  if (userNoteArea) {
+    userNoteArea.value = q.userNotes || '';
+    saveNoteStatus.textContent = '';
+  }
+
+  // Reset guess check
+  const guessCheck = document.getElementById('guessCheck');
+  if (guessCheck) guessCheck.checked = false;
+
   renderRelated();
 }
+
+async function saveCurrentNote() {
+  if (!currentQuestion || !userNoteArea) return;
+  const note = userNoteArea.value.trim();
+  if (currentQuestion.userNotes === note) return;
+
+  currentQuestion.userNotes = note;
+  // Save to DB without full re-render
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  store.put(currentQuestion);
+  tx.oncomplete = () => {
+    saveNoteStatus.textContent = 'Note saved.';
+    setTimeout(() => { saveNoteStatus.textContent = ''; }, 2000);
+  };
+}
+
 
 async function renderRelated() {
   const box = relatedBox;
@@ -964,6 +1010,10 @@ async function submitAnswer() {
   const correctIdx = (currentQuestion.choices || []).findIndex(c => c.isCorrect);
   const isCorrect = (selectedIdx === correctIdx);
 
+  // Guess mode
+  const guessCheck = document.getElementById('guessCheck');
+  const isGuessing = guessCheck ? guessCheck.checked : false;
+
   const now = new Date().toISOString();
   lastActivityAt = now;
   saveMeta('lastActivityAt', now);
@@ -977,8 +1027,15 @@ async function submitAnswer() {
   q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
   q.timesWrong = (q.timesWrong || 0) + (!isCorrect ? 1 : 0);
   q.lastSeenAt = now;
-  // spaced repetition
-  nextSpaced(q, isCorrect);
+
+  // Spaced Repetition Logic Modification
+  if (isGuessing && isCorrect) {
+      // Penalize guess: treat as if wrong to see it again soon
+      nextSpaced(q, false);
+  } else {
+      nextSpaced(q, isCorrect);
+  }
+  
   qStore.put(q);
 
   aStore.add({
@@ -1652,7 +1709,6 @@ btnEditSave.addEventListener('click', async () => {
 
   tx.oncomplete = () => {
     closeEditModal();
-    refreshChapterOptions(); // Refresh dropdown after editing/adding
     reloadAllQuestionsTable();
     loadNextQuestion(true);
   };
@@ -2006,589 +2062,32 @@ async function deleteDuplicateClusters() {
   };
 }
 
-// --- GitHub config + cloud sync ---
-function loadGitHubConfig() {
-  try {
-    const raw = localStorage.getItem('mcq_github_config');
-    if (!raw) return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
-    const obj = JSON.parse(raw);
-    return {
-      token: obj.token || '',
-      repo: obj.repo || 'Awad1992/mcq-data',
-      filename: obj.filename || 'mcq_backup.json'
+// --- IndexedDB setup ---
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('questions')) {
+        const store = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('by_chapter', 'chapter', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('answers')) {
+        const ans = db.createObjectStore('answers', { keyPath: 'id', autoIncrement: true });
+        ans.createIndex('by_question', 'questionId', { unique: false });
+        ans.createIndex('by_time', 'answeredAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
     };
-  } catch {
-    return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
-  }
-}
-
-function saveGitHubConfig(cfg) {
-  localStorage.setItem('mcq_github_config', JSON.stringify(cfg));
-}
-
-function loadGitHubConfigIntoUI() {
-  const cfg = loadGitHubConfig();
-  document.getElementById('ghTokenInput').value = cfg.token;
-  document.getElementById('ghRepoInput').value = cfg.repo;
-  document.getElementById('ghFileInput').value = cfg.filename;
-}
-
-function saveGitHubConfigFromUI() {
-  const token = document.getElementById('ghTokenInput').value.trim();
-  const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
-  const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
-  const cfg = { token, repo, filename };
-  saveGitHubConfig(cfg);
-  refreshCloudInfo();
-  alert('GitHub settings saved.');
-}
-
-function refreshCloudInfo() {
-  const cfg = loadGitHubConfig();
-  const el = document.getElementById('cloudInfo');
-  const syncStatus = document.getElementById('syncStatus');
-  if (!cfg.token || !cfg.repo) {
-    el.textContent = 'Cloud sync disabled. Add token + repo in Settings.';
-    syncStatus.textContent = 'No cloud sync';
-    return;
-  }
-  el.textContent = 'Cloud ready → Repo: ' + cfg.repo + ' · File: ' + cfg.filename;
-  syncStatus.textContent = 'Cloud: ready';
-}
-
-// GitHub helper: base64
-function encodeBase64(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function decodeBase64(str) {
-  return decodeURIComponent(escape(atob(str)));
-}
-
-// Cloud upload
-async function cloudUpload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
-    return;
-  }
-  const backup = await buildBackupObject();
-  const contentStr = JSON.stringify(backup, null, 2);
-  const contentB64 = encodeBase64(contentStr);
-
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-
-  let existingSha = null;
-  try {
-    const getRes = await fetch(url, {
-      headers: { Authorization: `token ${cfg.token}` }
-    });
-    if (getRes.status === 200) {
-      const info = await getRes.json();
-      existingSha = info.sha;
-    }
-  } catch (err) {
-    console.error(err);
-  }
-
-  const body = {
-    message: 'MCQ backup ' + new Date().toISOString(),
-    content: contentB64
-  };
-  if (existingSha) body.sha = existingSha;
-
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `token ${cfg.token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
+    req.onsuccess = (e) => {
+      db = e.target.result;
+      loadMeta();
+      resolve(db);
+    };
+    req.onerror = (e) => reject(e.target.error);
   });
-
-  if (!res.ok) {
-    const txt = await res.text();
-    alert('Upload failed: ' + res.status + ' ' + txt);
-    return;
-  }
-  alert('Backup uploaded to GitHub.');
-}
-
-// Cloud download
-async function cloudDownload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) {
-    alert('Set GitHub token + repo in Settings first.');
-    return;
-  }
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    alert('Repo format must be owner/name.');
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `token ${cfg.token}` }
-  });
-  if (res.status === 404) {
-    alert('No backup file found in GitHub repo.');
-    return;
-  }
-  if (!res.ok) {
-    const txt = await res.text();
-    alert('Download failed: ' + res.status + ' ' + txt);
-    return;
-  }
-  const info = await res.json();
-  const contentStr = decodeBase64(info.content);
-  let data = null;
-  try {
-    data = JSON.parse(contentStr);
-  } catch (err) {
-    alert('Invalid JSON in backup file.');
-    return;
-  }
-  await importBackupObject(data);
-  alert('Cloud backup downloaded and merged.');
-  loadNextQuestion(true);
-  refreshBackupLabels();
-}
-
-// --- Dashboard ---
-async function renderDashboard() {
-  const all = await getAllQuestions();
-  const weak = computeWeakQuestions(all);
-  const dashOverall = document.getElementById('dashOverall');
-  const dashWeakChapters = document.getElementById('dashWeakChapters');
-  const dashWeekly = document.getElementById('dashWeekly');
-
-  const total = all.length;
-  const answered = all.filter(q => q.timesSeen > 0).length;
-  const wrong = all.reduce((s, q) => s + (q.timesWrong || 0), 0);
-  const correct = all.reduce((s, q) => s + (q.timesCorrect || 0), 0);
-  const wrongRate = (wrong + correct) ? (wrong / (wrong + correct) * 100) : 0;
-
-  dashOverall.innerHTML = `
-    <div class="dash-title">Overall</div>
-    <div>Total questions: <strong>${total}</strong></div>
-    <div>Answered at least once: <strong>${answered}</strong></div>
-    <div>Weak questions: <strong>${weak.length}</strong></div>
-    <div>Total correct: <strong>${correct}</strong></div>
-    <div>Total wrong: <strong>${wrong}</strong> (${wrongRate.toFixed(1)}%)</div>
-  `;
-
-  const chapMap = new Map();
-  weak.forEach(q => {
-    const key = q.chapter || 'No chapter';
-    if (!chapMap.has(key)) chapMap.set(key, []);
-    chapMap.get(key).push(q);
-  });
-  let chapHtml = '<div class="dash-title">Weak chapters</div>';
-  if (!chapMap.size) {
-    chapHtml += '<div class="tiny muted">No clear weak chapters yet.</div>';
-  } else {
-    chapMap.forEach((list, chap) => {
-      chapHtml += `<div><strong>${chap}</strong> – ${list.length} weak questions</div>`;
-    });
-  }
-  dashWeakChapters.innerHTML = chapHtml;
-
-  dashWeekly.innerHTML = '<div class="dash-title">Weekly activity</div><div class="tiny muted">Uses answers timestamps (simple text summary).</div>';
-}
-
-// --- Flashcards ---
-async function buildFlashcardPool() {
-  const src = fcSourceEl.value;
-  const chap = fcChapterFilterEl.value.trim().toLowerCase();
-  const all = await getAllQuestions();
-  const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
-  const nowIso = new Date().toISOString();
-  let pool = all.filter(q => q.active !== false);
-  if (src === 'due') {
-    pool = pool.filter(q => isDue(q, nowIso));
-  } else if (src === 'weak') {
-    pool = pool.filter(q => weakSet.has(q.id));
-  } else if (src === 'flagged') {
-    pool = pool.filter(q => q.flagged);
-  } else if (src === 'chapter' && chap) {
-    pool = pool.filter(q => (q.chapter || '').toLowerCase() === chap);
-  }
-  flashcardPool = shuffle(pool);
-  flashcardIndex = -1;
-  nextFlashcard();
-}
-
-function currentFlashcard() {
-  if (flashcardIndex < 0 || flashcardIndex >= flashcardPool.length) return null;
-  return flashcardPool[flashcardIndex];
-}
-
-function renderFlashcard() {
-  const q = currentFlashcard();
-  if (!q) {
-    fcFront.textContent = 'No cards in this pool.';
-    fcBack.style.display = 'none';
-    fcBack.textContent = '';
-    return;
-  }
-  const mode = fcModeEl.value;
-  const letters = ['A','B','C','D','E','F','G'];
-  const correctIdx = (q.choices || []).findIndex(c => c.isCorrect);
-  const correctChoice = correctIdx >= 0 ? q.choices[correctIdx] : null;
-
-  if (mode === 'q-first') {
-    fcFront.innerHTML = `Q#${q.id ?? ''} – ${q.text || ''}`;
-    if (q.imageData || q.imageUrl) {
-      const src = q.imageData || q.imageUrl;
-      fcFront.innerHTML += `<div class="img-preview"><img src="${src}" alt="img"></div>`;
-    }
-    if (!flashcardShowBack) {
-      fcBack.style.display = 'none';
-      fcBack.innerHTML = '';
-    } else {
-      let back = '';
-      if (correctChoice) {
-        back += `<div><strong>Answer:</strong> ${letters[correctIdx]}. ${correctChoice.text || ''}</div>`;
-      }
-      if (q.explanation) {
-        back += `<div style="margin-top:0.25rem;"><strong>Explanation:</strong> ${q.explanation}</div>`;
-      }
-      fcBack.innerHTML = back || 'No answer text.';
-      fcBack.style.display = 'block';
-    }
-  } else {
-    fcFront.innerHTML = '';
-    if (correctChoice) {
-      fcFront.innerHTML = `<div><strong>Key idea:</strong> ${correctChoice.text || ''}</div>`;
-    } else {
-      fcFront.innerHTML = `<div><strong>Key idea:</strong> ${q.explanation || 'No answer text.'}</div>`;
-    }
-    if (!flashcardShowBack) {
-      fcBack.style.display = 'none';
-      fcBack.innerHTML = '';
-    } else {
-      let back = `Q#${q.id ?? ''} – ${q.text || ''}`;
-      if (q.imageData || q.imageUrl) {
-        const src = q.imageData || q.imageUrl;
-        back += `<div class="img-preview"><img src="${src}" alt="img"></div>`;
-      }
-      fcBack.innerHTML = back;
-      fcBack.style.display = 'block';
-    }
-  }
-}
-
-function nextFlashcard() {
-  if (!flashcardPool.length) {
-    flashcardIndex = -1;
-    flashcardShowBack = false;
-    renderFlashcard();
-    return;
-  }
-  flashcardIndex = (flashcardIndex + 1) % flashcardPool.length;
-  flashcardShowBack = false;
-  renderFlashcard();
-}
-
-async function updateSpacedAfterFlashcard(good) {
-  const q = currentFlashcard();
-  if (!q) return;
-  const tx = db.transaction('questions', 'readwrite');
-  const store = tx.objectStore('questions');
-  const req = store.get(q.id);
-  req.onsuccess = e => {
-    const cur = e.target.result;
-    if (!cur) return;
-    nextSpaced(cur, good);
-    store.put(cur);
-  };
-}
-
-// --- Daily challenge ---
-async function startDailyChallenge() {
-  const today = new Date().toISOString().slice(0,10);
-  const key = 'daily_' + today;
-  let ids = [];
-  try {
-    const raw = localStorage.getItem('mcq_daily_ids_' + today);
-    if (raw) {
-      ids = JSON.parse(raw);
-    }
-  } catch {}
-
-  const all = await getAllQuestions();
-  if (!ids.length) {
-    const weak = computeWeakQuestions(all);
-    const flagged = all.filter(q => q.flagged);
-    const highWrong = all.filter(q => (q.timesWrong || 0) >= 2);
-    const mix = shuffle([...weak, ...flagged, ...highWrong, ...all]);
-    const picked = [];
-    const seen = new Set();
-    for (const q of mix) {
-      if (!seen.has(q.id)) {
-        seen.add(q.id);
-        picked.push(q.id);
-      }
-      if (picked.length >= 10) break;
-    }
-    ids = picked;
-    try { localStorage.setItem('mcq_daily_ids_' + today, JSON.stringify(ids)); } catch {}
-  }
-
-  if (!ids.length) {
-    alert('No questions available for daily challenge.');
-    return;
-  }
-
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const firstReq = store.get(ids[0]);
-  firstReq.onsuccess = e => {
-    const q = e.target.result;
-    if (!q) return;
-    historyStack = [];
-    currentQuestion = q;
-    lastResult = null;
-    lastSelectedIndex = null;
-    feedbackPanel.innerHTML = '';
-    renderQuestion();
-    updateStatsBar();
-    updateHistoryList();
-  };
-}
-
-// --- Exam simulation ---
-async function startExam() {
-  const poolType = document.getElementById('examPool').value;
-  const chap = document.getElementById('examChapterFilter').value.trim().toLowerCase();
-  const count = parseInt(document.getElementById('examCount').value || '30', 10);
-  const minutes = parseInt(document.getElementById('examMinutes').value || '60', 10);
-
-  const all = await getAllQuestions();
-  const weakSet = new Set(computeWeakQuestions(all).map(q => q.id));
-  let pool = all.filter(q => q.active !== false);
-  if (poolType === 'weak') {
-    pool = pool.filter(q => weakSet.has(q.id));
-  } else if (poolType === 'flagged') {
-    pool = pool.filter(q => q.flagged);
-  } else if (poolType === 'chapter' && chap) {
-    pool = pool.filter(q => (q.chapter || '').toLowerCase() === chap);
-  }
-  pool = shuffle(pool);
-  if (!pool.length) {
-    alert('No questions available for this pool.');
-    return;
-  }
-  const selected = pool.slice(0, Math.min(count, pool.length));
-  examSession = {
-    ids: selected.map(q => q.id),
-    answers: {},
-    index: 0,
-    startTime: Date.now(),
-    limitMs: minutes * 60 * 1000
-  };
-  document.getElementById('examTotalLabel').textContent = selected.length;
-  document.getElementById('examActiveCard').style.display = 'block';
-  document.getElementById('examResultCard').style.display = 'none';
-  renderExamQuestion();
-  startExamTimer();
-}
-
-async function renderExamQuestion() {
-  if (!examSession) return;
-  const idx = examSession.index;
-  const total = examSession.ids.length;
-  if (idx < 0 || idx >= total) return;
-  document.getElementById('examIndexLabel').textContent = (idx + 1);
-  const qid = examSession.ids[idx];
-  const tx = db.transaction('questions', 'readonly');
-  const store = tx.objectStore('questions');
-  const req = store.get(qid);
-  req.onsuccess = e => {
-    const q = e.target.result;
-    const panel = document.getElementById('examQuestionPanel');
-    if (!q) {
-      panel.innerHTML = '<div class="muted">Question not found.</div>';
-      return;
-    }
-    const letters = ['A','B','C','D','E','F','G'];
-    let html = `<div class="q-text">Q#${q.id ?? ''} – ${q.text || ''}</div>`;
-    if (q.chapter || q.source) {
-      html += '<div class="tag-chapter">';
-      if (q.chapter) html += `<span>${q.chapter}</span>`;
-      if (q.source) html += ` · <span>${q.source}</span>`;
-      html += '</div>';
-    }
-    if (q.imageData || q.imageUrl) {
-      const src = q.imageData || q.imageUrl;
-      html += `<div class="img-preview"><img src="${src}" alt="img"></div>`;
-    }
-    html += '<div style="margin-top:0.4rem;">';
-    (q.choices || []).forEach((c, i) => {
-      const letter = letters[i] || '?';
-      const saved = examSession.answers[qid];
-      const checked = saved === i ? 'checked' : '';
-      html += `<label class="choice">
-        <input type="radio" name="examChoice" value="${i}" ${checked}>
-        <strong>${letter}.</strong> ${c.text || ''}
-      </label>`;
-    });
-    html += '</div>';
-    panel.innerHTML = html;
-  };
-}
-
-function examMove(delta) {
-  if (!examSession) return;
-  const panel = document.getElementById('examQuestionPanel');
-  const radios = panel.querySelectorAll('input[name="examChoice"]');
-  let selected = null;
-  radios.forEach(r => { if (r.checked) selected = parseInt(r.value, 10); });
-  const currentQid = examSession.ids[examSession.index];
-  if (selected !== null) {
-    examSession.answers[currentQid] = selected;
-  }
-  const nextIndex = examSession.index + delta;
-  if (nextIndex < 0 || nextIndex >= examSession.ids.length) return;
-  examSession.index = nextIndex;
-  renderExamQuestion();
-}
-
-async function finishExam() {
-  if (!examSession) return;
-  clearInterval(examTimerId);
-  examTimerId = null;
-
-  // Save last question selection
-  const panel = document.getElementById('examQuestionPanel');
-  const radios = panel.querySelectorAll('input[name="examChoice"]');
-  let selected = null;
-  radios.forEach(r => { if (r.checked) selected = parseInt(r.value, 10); });
-  const currentQid = examSession.ids[examSession.index];
-  if (selected !== null) {
-    examSession.answers[currentQid] = selected;
-  }
-
-  const all = await getAllQuestions();
-  const byId = new Map();
-  all.forEach(q => byId.set(q.id, q));
-
-  let correct = 0;
-  let wrong = 0;
-  let unanswered = 0;
-  const perChapter = new Map();
-
-  examSession.ids.forEach(id => {
-    const q = byId.get(id);
-    if (!q) return;
-    const ans = examSession.answers[id];
-    const correctIdx = (q.choices || []).findIndex(c => c.isCorrect);
-    if (ans == null) {
-      unanswered++;
-      return;
-    }
-    const chap = q.chapter || 'No chapter';
-    if (!perChapter.has(chap)) perChapter.set(chap, { correct:0, wrong:0 });
-    if (ans === correctIdx) {
-      correct++;
-      perChapter.get(chap).correct++;
-    } else {
-      wrong++;
-      perChapter.get(chap).wrong++;
-    }
-  });
-
-  const total = examSession.ids.length;
-  const score = total ? (correct / total * 100) : 0;
-  const durationMs = Date.now() - examSession.startTime;
-  const minutesUsed = durationMs / 60000;
-
-  const summaryEl = document.getElementById('examSummary');
-  summaryEl.innerHTML = `
-    <div>Total questions: <strong>${total}</strong></div>
-    <div>Correct: <strong>${correct}</strong></div>
-    <div>Wrong: <strong>${wrong}</strong></div>
-    <div>Unanswered: <strong>${unanswered}</strong></div>
-    <div>Score: <strong>${score.toFixed(1)}%</strong></div>
-    <div>Time used: <strong>${minutesUsed.toFixed(1)} min</strong></div>
-  `;
-
-  let detailHtml = '<div>Per chapter:</div>';
-  perChapter.forEach((v, chap) => {
-    const t = v.correct + v.wrong;
-    const s = t ? (v.correct / t * 100) : 0;
-    detailHtml += `<div>${chap}: ${v.correct}/${t} correct (${s.toFixed(1)}%)</div>`;
-  });
-  document.getElementById('examDetails').innerHTML = detailHtml;
-
-  document.getElementById('examActiveCard').style.display = 'none';
-  document.getElementById('examResultCard').style.display = 'block';
-  examSession = null;
-}
-
-function startExamTimer() {
-  if (!examSession) return;
-  if (examTimerId) clearInterval(examTimerId);
-  const label = document.getElementById('examTimerLabel');
-  const endTime = examSession.startTime + examSession.limitMs;
-  function tick() {
-    const now = Date.now();
-    const remain = Math.max(0, endTime - now);
-    const m = Math.floor(remain / 60000);
-    const s = Math.floor((remain % 60000) / 1000);
-    label.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    if (remain <= 0) {
-      clearInterval(examTimerId);
-      examTimerId = null;
-      alert('Time is over – finishing exam.');
-      finishExam();
-    }
-  }
-  tick();
-  examTimerId = setInterval(tick, 1000);
-}
-
-
-async function resetProgress(scope) {
-  if (!db) return;
-  if (!confirm('Reset progress for selected questions? This keeps questions but clears your practice history.')) return;
-  const tx = db.transaction(['questions','answers'], 'readwrite');
-  const qStore = tx.objectStore('questions');
-  const aStore = tx.objectStore('answers');
-  const allReq = qStore.getAll();
-  const all = await new Promise(res => {
-    allReq.onsuccess = e => res(e.target.result || []);
-    allReq.onerror = () => res([]);
-  });
-  const now = new Date().toISOString();
-  for (const q of all) {
-    const everWrong = (q.timesWrong || 0) > 0;
-    if (scope === 'wrong' && !everWrong) continue;
-    q.timesSeen = 0;
-    q.timesWrong = 0;
-    q.lastSeenAt = null;
-    q.dueAt = now;
-    const putReq = qStore.put(q);
-    // clear answers for this question
-    const idx = aStore.index('by_question');
-    const ansList = await new Promise(res => {
-      const r = idx.getAll(q.id);
-      r.onsuccess = e => res(e.target.result || []);
-      r.onerror = () => res([]);
-    });
-    for (const a of ansList) {
-      aStore.delete(a.id);
-    }
-  }
-  alert('Progress reset completed.');
-  historyStack = [];
-  loadNextQuestion(true);
-  updateStatsBar();
-  updateHistoryList();
 }
 
 // Initial DB open
