@@ -1,4 +1,4 @@
-/* MCQ Study App Ultra-Pro v4.4 - Style */
+/* MCQ Study App Ultra-Pro v4.5 - Style */
 
 *,
 *::before,
@@ -12,6 +12,7 @@ html, body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f4f5f7;
   color: #111;
+  transition: background 0.3s, color 0.3s;
 }
 
 body.theme-dark {
@@ -32,6 +33,35 @@ body.theme-calm {
 body {
   min-height: 100vh;
 }
+
+/* Focus Mode Styles */
+body.focus-mode .top-bar,
+body.focus-mode .tabs,
+body.focus-mode .col-side,
+body.focus-mode .row-controls, 
+body.focus-mode .notes-area-container,
+body.focus-mode .stats-row {
+  display: none !important;
+}
+
+body.focus-mode .app {
+  padding-top: 2rem;
+  max-width: 900px; 
+}
+
+body.focus-mode .card {
+  box-shadow: none;
+  border: 1px solid #eee;
+}
+body.theme-dark.focus-mode .card {
+  border-color: #333;
+}
+
+body.focus-mode #btnExitFocus {
+  display: inline-block; /* Show exit button only in focus mode */
+}
+
+/* End Focus Mode */
 
 .app {
   max-width: 1120px;
@@ -324,6 +354,7 @@ button:disabled {
   margin-right: 0.2rem;
 }
 
+/* Choices */
 .choice-container {
   display: flex;
   align-items: flex-start;
@@ -426,7 +457,7 @@ body.theme-dark .feedback-panel {
   border-left-color: #c62828;
 }
 
-/* Notes Area */
+/* Notes */
 .notes-area-container {
   margin-top: 1rem;
   border-top: 1px dashed #ddd;
@@ -439,7 +470,7 @@ body.theme-dark .feedback-panel {
   min-height: 60px;
   margin-top: 0.25rem;
   resize: vertical;
-  background: #fff9c4; /* Light yellow note look */
+  background: #fff9c4; 
   color: #333;
   border: 1px solid #fbc02d;
 }
@@ -456,6 +487,37 @@ body.theme-dark .notes-textarea {
   margin-top: 0.1rem;
   height: 1rem;
 }
+
+/* Search Tools */
+.search-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+.search-btn {
+  text-decoration: none;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #f9f9f9;
+  color: #555;
+}
+.search-btn:hover {
+  background: #eee;
+  color: #111;
+}
+body.theme-dark .search-btn {
+  background: #1f2937;
+  border-color: #374151;
+  color: #9ca3af;
+}
+body.theme-dark .search-btn:hover {
+  background: #374151;
+  color: #e5e7eb;
+}
+
 
 .stats-row {
   display: flex;
@@ -790,7 +852,6 @@ body.theme-night .modal-body {
   }
 }
 
-
 .all-table-wrapper {
   max-height: 60vh;
   overflow-y: auto;
@@ -826,7 +887,6 @@ body.theme-night .modal-body {
   font-size: 11px;
   padding: 3px 6px;
 }
-
 
 .subnav {
   display: flex;
