@@ -2920,7 +2920,7 @@ openDB().then(() => {
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');
-});});
+});
 
 // All tab subview toggle (bank vs builder)
 (function () {
