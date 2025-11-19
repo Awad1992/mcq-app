@@ -2920,7 +2920,7 @@ openDB().then(() => {
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');
-});
+});});
 
 // All tab subview toggle (bank vs builder)
 (function () {
@@ -2944,7 +2944,7 @@ openDB().then(() => {
 })();
 
 // Builder helpers: prompt + preview + import
-let builderPreviewCache = [];
+builderPreviewCache = [];
 
 function makeBuilderPrompt() {
   const src = (document.getElementById('builderSourceText')?.value || '').trim();
