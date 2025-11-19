@@ -2,15 +2,6 @@
 // MCQ Study App Ultra-Pro v4.1
 // IndexedDB + spaced repetition + weak-spot engine + dashboard + flashcards + exam sim
 
-// Optional: hard-coded GitHub token override for cloud backup.
-// WARNING: for any repo hosted on GitHub, you should normally leave the
-// token empty in config.local.js and set your token only via the Settings tab
-// (it stays in this browser's localStorage, not in the repo).
-// Read GitHub token from optional local config file (config.local.js).
-// Safe place for LOCAL overrides without touching app.js.
-const HARDCODED_GITHUB_TOKEN =
-  (window.MCQ_LOCAL_CONFIG && window.MCQ_LOCAL_CONFIG.GITHUB_TOKEN) || '';
-
 const DB_NAME = 'mcqdb_ultra_v41';
 const DB_VERSION = 3;
 
@@ -23,6 +14,15 @@ let currentChapter = '';
 let lastResult = null;
 let lastSelectedIndex = null;
 let historyStack = [];
+
+// Session stats (in-memory for current visit only)
+let sessionAnswered = 0;
+let sessionCorrect = 0;
+let sessionWrong = 0;
+
+// Daily 10 session (in-memory helpers)
+let dailyCurrentIndex = 0;
+let dailyTotal = 0;
 
 // Practice preferences
 let prefSkipSolved = true;
@@ -65,6 +65,7 @@ let flashcardShowBack = false;
 // Exam simulation
 let examSession = null;
 let examTimerId = null;
+let currentExamSourceLabel = '';
 
 const questionPanel = document.getElementById('questionPanel');
 const feedbackPanel = document.getElementById('feedbackPanel');
@@ -87,17 +88,6 @@ if (resetBtn) {
     await resetProgress(scope);
   });
 }
-const cloudDebugBox = document.getElementById('cloudDebugInfo');
-const clearCloudBtn = document.getElementById('btnClearCloudError');
-if (clearCloudBtn) {
-  clearCloudBtn.addEventListener('click', () => {
-    lastCloudError = '';
-    lastCloudErrorAt = null;
-    lastCloudOp = '';
-    renderCloudDebugPanel();
-  });
-}
-
 
 
 // Tabs
@@ -336,6 +326,26 @@ document.getElementById('btnNext').addEventListener('click', () => {
 document.getElementById('btnPrev').addEventListener('click', goPreviousQuestion);
 document.getElementById('btnFlag').addEventListener('click', toggleFlag);
 document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceFlag);
+const btnSessionReset = document.getElementById('btnSessionReset');
+if (btnSessionReset) {
+  btnSessionReset.addEventListener('click', () => {
+    sessionAnswered = 0;
+    sessionCorrect = 0;
+    sessionWrong = 0;
+    renderSessionStats();
+  });
+}
+
+
+const btnClearHistory = document.getElementById('btnClearHistory');
+if (btnClearHistory) {
+  btnClearHistory.addEventListener('click', () => {
+    const historyEl = document.getElementById('historyList');
+    if (historyEl) {
+      historyEl.innerHTML = '<div class="muted tiny">History cleared for this view.</div>';
+    }
+  });
+}
 
 // Import / Export (home)
 document.getElementById('btnImport').addEventListener('click', handleImportSimple);
@@ -403,10 +413,6 @@ document.getElementById('btnBackupImport').addEventListener('click', handleBacku
 // Cloud sync controls
 document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
 document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
-const cloudTestBtn = document.getElementById('btnCloudTest');
-if (cloudTestBtn) {
-  cloudTestBtn.addEventListener('click', cloudTestConnection);
-}
 const quickBackupBtn = document.getElementById('btnBackupQuick');
 if (quickBackupBtn) {
   quickBackupBtn.addEventListener('click', cloudUpload);
@@ -584,6 +590,19 @@ async function getAllQuestions() {
 }
 
 async function getStats() {
+  // describe exam source for later summary
+  if (poolType === 'all') {
+    currentExamSourceLabel = 'All active';
+  } else if (poolType === 'weak') {
+    currentExamSourceLabel = 'Weakness focus';
+  } else if (poolType === 'flagged') {
+    currentExamSourceLabel = 'Flagged';
+  } else if (poolType === 'chapter' && chap) {
+    currentExamSourceLabel = `Chapter: ${chap}`;
+  } else {
+    currentExamSourceLabel = 'Custom pool';
+  }
+
   const all = await getAllQuestions();
   const nowIso = new Date().toISOString();
   const dueCount = all.filter(q => isDue(q, nowIso)).length;
@@ -611,6 +630,30 @@ async function updateStatsBar() {
     <div>Weak set: <strong>${s.weak}</strong></div>
     <div>Due now: <strong>${s.due}</strong></div>
   `;
+
+function renderSessionStats() {
+  const el = document.getElementById('sessionStats');
+  if (!el) return;
+  el.textContent =
+    `Session: ${sessionAnswered} answered · ${sessionCorrect} correct · ${sessionWrong} wrong`;
+}
+
+
+function renderDailyProgress() {
+  const el = document.getElementById('dailyProgress');
+  if (!el) return;
+  if (!dailyTotal) {
+    el.textContent = 'Today: 0 / 0 done';
+  } else {
+    const done = Math.min(dailyCurrentIndex, dailyTotal);
+    if (done >= dailyTotal) {
+      el.textContent = `Today: ${dailyTotal} / ${dailyTotal} done ✅`;
+    } else {
+      el.textContent = `Today: ${done} / ${dailyTotal} done`;
+    }
+  }
+}
+
 }
 
 // --- Spaced repetition helpers ---
@@ -1006,6 +1049,32 @@ async function submitAnswer() {
   tx.oncomplete = () => {
     currentQuestion = q;
     lastResult = isCorrect;
+
+    // update in-memory session stats
+    sessionAnswered += 1;
+    if (isCorrect) {
+      sessionCorrect += 1;
+    } else {
+      sessionWrong += 1;
+    }
+    renderSessionStats();
+
+    // if this question is part of today's Daily 10, bump progress
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const raw = localStorage.getItem('mcq_daily_ids_' + today);
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids) && ids.includes(q.id)) {
+          if (dailyTotal === 0) dailyTotal = ids.length;
+          if (dailyCurrentIndex < dailyTotal) {
+            dailyCurrentIndex += 1;
+          }
+          renderDailyProgress();
+        }
+      }
+    } catch {}
+
     showFeedback(correctIdx, selectedIdx, q.explanation);
     updateStatsBar();
     updateHistoryList();
@@ -1204,9 +1273,12 @@ function normalizeImportedQuestions(rawArr) {
       }
     }
 
-    // If still no usable choices, skip this entry
+    // Fallback if still empty
     if (!choices.length) {
-      return null;
+      choices = [{
+        text: 'Option A',
+        isCorrect: true
+      }];
     }
 
     return {
@@ -1233,7 +1305,7 @@ function normalizeImportedQuestions(rawArr) {
       dueAt: q.dueAt || null,
       id: q.id != null ? q.id : undefined
     };
-  }).filter(q => q && typeof q.text === 'string' && Array.isArray(q.choices) && q.choices.length);
+  });
 }
 
 // Export questions only
@@ -2085,24 +2157,15 @@ async function deleteDuplicateClusters() {
 function loadGitHubConfig() {
   try {
     const raw = localStorage.getItem('mcq_github_config');
-    const base = {
-      token: HARDCODED_GITHUB_TOKEN || '',
-      repo: 'Awad1992/mcq-data',
-      filename: 'mcq_backup.json'
-    };
-    if (!raw) return base;
+    if (!raw) return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
     const obj = JSON.parse(raw);
     return {
-      token: HARDCODED_GITHUB_TOKEN || obj.token || base.token,
-      repo: obj.repo || base.repo,
-      filename: obj.filename || base.filename
+      token: obj.token || '',
+      repo: obj.repo || 'Awad1992/mcq-data',
+      filename: obj.filename || 'mcq_backup.json'
     };
   } catch {
-    return {
-      token: HARDCODED_GITHUB_TOKEN || '',
-      repo: 'Awad1992/mcq-data',
-      filename: 'mcq_backup.json'
-    };
+    return { token: '', repo: 'Awad1992/mcq-data', filename: 'mcq_backup.json' };
   }
 }
 
@@ -2112,65 +2175,19 @@ function saveGitHubConfig(cfg) {
 
 function loadGitHubConfigIntoUI() {
   const cfg = loadGitHubConfig();
-  const tokenInput = document.getElementById('ghTokenInput');
-  tokenInput.value = HARDCODED_GITHUB_TOKEN ? '*** using HARDCODED TOKEN ***' : (cfg.token || '');
-  tokenInput.readOnly = !!HARDCODED_GITHUB_TOKEN;
+  document.getElementById('ghTokenInput').value = cfg.token;
   document.getElementById('ghRepoInput').value = cfg.repo;
   document.getElementById('ghFileInput').value = cfg.filename;
 }
 
 function saveGitHubConfigFromUI() {
-  const rawToken = document.getElementById('ghTokenInput').value.trim();
-  const token = HARDCODED_GITHUB_TOKEN || rawToken;
+  const token = document.getElementById('ghTokenInput').value.trim();
   const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
   const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
   const cfg = { token, repo, filename };
   saveGitHubConfig(cfg);
   refreshCloudInfo();
   alert('GitHub settings saved.');
-}
-
-// --- Cloud debug state (local only, not synced) ---
-let lastCloudError = '';
-let lastCloudErrorAt = null;
-let lastCloudOp = '';
-
-function recordCloudError(where, message) {
-  lastCloudOp = where || '';
-  lastCloudError = message || '';
-  lastCloudErrorAt = new Date().toISOString();
-  renderCloudDebugPanel();
-}
-
-function recordCloudSuccess(where) {
-  lastCloudOp = where || '';
-  lastCloudError = '';
-  lastCloudErrorAt = null;
-  renderCloudDebugPanel();
-}
-
-function renderCloudDebugPanel() {
-  const box = document.getElementById('cloudDebugInfo');
-  if (!box) return;
-  const cfg = loadGitHubConfig();
-  let tokenSource = 'none';
-  if (HARDCODED_GITHUB_TOKEN) {
-    tokenSource = 'config.local.js (HARDCODED_GITHUB_TOKEN)';
-  } else if (cfg.token) {
-    tokenSource = 'browser localStorage (Settings tab)';
-  }
-  const lines = [];
-  lines.push('Token source: ' + tokenSource);
-  lines.push('Repo: ' + (cfg.repo || 'not set'));
-  lines.push('Filename: ' + (cfg.filename || 'not set'));
-  if (lastCloudError) {
-    lines.push('Last error at: ' + (lastCloudErrorAt || '?'));
-    lines.push('Last op: ' + (lastCloudOp || '?'));
-    lines.push('Last error: ' + lastCloudError);
-  } else {
-    lines.push('Last error: none');
-  }
-  box.textContent = lines.join('\n');
 }
 
 function refreshCloudInfo() {
@@ -2180,12 +2197,10 @@ function refreshCloudInfo() {
   if (!cfg.token || !cfg.repo) {
     el.textContent = 'Cloud sync disabled. Add token + repo in Settings.';
     syncStatus.textContent = 'No cloud sync';
-    renderCloudDebugPanel();
     return;
   }
   el.textContent = 'Cloud ready → Repo: ' + cfg.repo + ' · File: ' + cfg.filename;
   syncStatus.textContent = 'Cloud: ready';
-  renderCloudDebugPanel();
 }
 
 // GitHub helper: base64
@@ -2198,174 +2213,99 @@ function decodeBase64(str) {
 
 // Cloud upload
 async function cloudUpload() {
+  const cfg = loadGitHubConfig();
+  if (!cfg.token || !cfg.repo) {
+    alert('Set GitHub token + repo in Settings first.');
+    return;
+  }
+  const backup = await buildBackupObject();
+  const contentStr = JSON.stringify(backup, null, 2);
+  const contentB64 = encodeBase64(contentStr);
+
+  const [owner, repoName] = cfg.repo.split('/');
+  if (!owner || !repoName) {
+    alert('Repo format must be owner/name.');
+    return;
+  }
+  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+
+  let existingSha = null;
   try {
-    const cfg = loadGitHubConfig();
-    if (!cfg.token || !cfg.repo) {
-      alert('Set GitHub token + repo in Settings first.');
-      recordCloudError('upload:init', 'Missing token or repo.');
-      return;
-    }
-    const backup = await buildBackupObject();
-    const contentStr = JSON.stringify(backup, null, 2);
-    const contentB64 = encodeBase64(contentStr);
-
-    const [owner, repoName] = cfg.repo.split('/');
-    if (!owner || !repoName) {
-      alert('Repo format must be owner/name.');
-      recordCloudError('upload:init', 'Invalid repo format (must be owner/name).');
-      return;
-    }
-    const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-
-    let existingSha = null;
-    try {
-      const getRes = await fetch(url, {
-        headers: { Authorization: `token ${cfg.token}` }
-      });
-      if (getRes.status === 200) {
-        const info = await getRes.json();
-        existingSha = info.sha;
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    const body = {
-      message: 'MCQ backup ' + new Date().toISOString(),
-      content: contentB64
-    };
-    if (existingSha) body.sha = existingSha;
-
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${cfg.token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
+    const getRes = await fetch(url, {
+      headers: { Authorization: `token ${cfg.token}` }
     });
-
-    if (!res.ok) {
-      const txt = await res.text();
-      const msg = 'Upload failed: ' + res.status + ' ' + txt;
-      alert(msg);
-      recordCloudError('upload:put', msg);
-      return;
+    if (getRes.status === 200) {
+      const info = await getRes.json();
+      existingSha = info.sha;
     }
-    alert('Cloud backup uploaded to GitHub.');
-    refreshBackupLabels();
-    refreshCloudInfo();
-    recordCloudSuccess('upload');
   } catch (err) {
     console.error(err);
-    const msg = 'Cloud upload failed: ' + (err && err.message ? err.message : err);
-    alert(msg);
-    recordCloudError('upload:catch', msg);
   }
+
+  const body = {
+    message: 'MCQ backup ' + new Date().toISOString(),
+    content: contentB64
+  };
+  if (existingSha) body.sha = existingSha;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `token ${cfg.token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    alert('Upload failed: ' + res.status + ' ' + txt);
+    return;
+  }
+  alert('Backup uploaded to GitHub.');
 }
 
-
+// Cloud download
 async function cloudDownload() {
-  try {
-    const cfg = loadGitHubConfig();
-    if (!cfg.token || !cfg.repo) {
-      alert('Set GitHub token + repo in Settings first.');
-      recordCloudError('download:init', 'Missing token or repo.');
-      return;
-    }
-    const [owner, repoName] = cfg.repo.split('/');
-    if (!owner || !repoName) {
-      alert('Repo format must be owner/name.');
-      recordCloudError('download:init', 'Invalid repo format (must be owner/name).');
-      return;
-    }
-    const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `token ${cfg.token}` }
-    });
-    if (res.status === 404) {
-      const msg = 'No backup file found in GitHub repo.';
-      alert(msg);
-      recordCloudError('download:404', msg);
-      return;
-    }
-    if (!res.ok) {
-      const txt = await res.text();
-      const msg = 'Download failed: ' + res.status + ' ' + txt;
-      alert(msg);
-      recordCloudError('download:fetch', msg);
-      return;
-    }
-    const info = await res.json();
-    const contentStr = decodeBase64(info.content);
-    let data = null;
-    try {
-      data = JSON.parse(contentStr);
-    } catch (err) {
-      const msg = 'Invalid JSON in backup file.';
-      alert(msg);
-      recordCloudError('download:json', msg);
-      return;
-    }
-    await importBackupObject(data);
-    alert('Cloud backup downloaded and merged.');
-    loadNextQuestion(true);
-    refreshBackupLabels();
-    refreshCloudInfo();
-    recordCloudSuccess('download');
-  } catch (err) {
-    console.error(err);
-    const msg = 'Cloud download failed: ' + (err && err.message ? err.message : err);
-    alert(msg);
-    recordCloudError('download:catch', msg);
+  const cfg = loadGitHubConfig();
+  if (!cfg.token || !cfg.repo) {
+    alert('Set GitHub token + repo in Settings first.');
+    return;
   }
+  const [owner, repoName] = cfg.repo.split('/');
+  if (!owner || !repoName) {
+    alert('Repo format must be owner/name.');
+    return;
+  }
+  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `token ${cfg.token}` }
+  });
+  if (res.status === 404) {
+    alert('No backup file found in GitHub repo.');
+    return;
+  }
+  if (!res.ok) {
+    const txt = await res.text();
+    alert('Download failed: ' + res.status + ' ' + txt);
+    return;
+  }
+  const info = await res.json();
+  const contentStr = decodeBase64(info.content);
+  let data = null;
+  try {
+    data = JSON.parse(contentStr);
+  } catch (err) {
+    alert('Invalid JSON in backup file.');
+    return;
+  }
+  await importBackupObject(data);
+  alert('Cloud backup downloaded and merged.');
+  loadNextQuestion(true);
+  refreshBackupLabels();
 }
 
-
-
-async function cloudTestConnection() {
-  try {
-    const cfg = loadGitHubConfig();
-    if (!cfg.token || !cfg.repo) {
-      alert('Set GitHub token + repo in Settings first.');
-      recordCloudError('test:init', 'Missing token or repo.');
-      return;
-    }
-    const [owner, repoName] = cfg.repo.split('/');
-    if (!owner || !repoName) {
-      alert('Repo format must be owner/name.');
-      recordCloudError('test:init', 'Invalid repo format (must be owner/name).');
-      return;
-    }
-    const url = `https://api.github.com/repos/${owner}/${repoName}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `token ${cfg.token}` }
-    });
-    if (res.status === 404) {
-      const msg = 'Repo not found (404). Check owner/name or permissions.';
-      alert(msg);
-      recordCloudError('test:404', msg);
-      return;
-    }
-    if (!res.ok) {
-      const txt = await res.text();
-      const msg = 'Test failed: ' + res.status + ' ' + txt;
-      alert(msg);
-      recordCloudError('test:fetch', msg);
-      return;
-    }
-    const msg = 'GitHub repo is reachable and token looks valid for reading.';
-    alert(msg);
-    recordCloudSuccess('test');
-    refreshCloudInfo();
-  } catch (err) {
-    console.error(err);
-    const msg = 'Cloud test failed: ' + (err && err.message ? err.message : err);
-    alert(msg);
-    recordCloudError('test:catch', msg);
-  }
-}
-
+// --- Dashboard ---
 async function renderDashboard() {
   const all = await getAllQuestions();
   const weak = computeWeakQuestions(all);
@@ -2551,6 +2491,58 @@ async function startDailyChallenge() {
     return;
   }
 
+  // initialize progress counters for this daily set
+  dailyTotal = ids.length;
+  dailyCurrentI
+function renderLastExamSummary() {
+  const card = document.getElementById('examLastSummaryCard');
+  const textEl = document.getElementById('examLastSummaryText');
+  const btnRetake = document.getElementById('btnRetakeLastExam');
+  if (!card || !textEl) return;
+  try {
+    const raw = localStorage.getItem('mcq_last_exam_summary');
+    if (!raw) {
+      card.style.display = 'none';
+      if (btnRetake) btnRetake.disabled = true;
+      return;
+    }
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') {
+      card.style.display = 'none';
+      if (btnRetake) btnRetake.disabled = true;
+      return;
+    }
+    const { total, correct, wrong, score, sourceLabel, when } = data;
+    if (!total) {
+      card.style.display = 'none';
+      if (btnRetake) btnRetake.disabled = true;
+      return;
+    }
+    let line = `Last exam: ${correct}/${total} correct (${score.toFixed ? score.toFixed(1) : score}%)`;
+    if (sourceLabel) line += ` · Source: ${sourceLabel}`;
+    if (when) line += ` · Date: ${when}`;
+    textEl.textContent = line;
+    card.style.display = 'block';
+
+    // enable or disable retake based on stored IDs
+    if (btnRetake) {
+      try {
+        const idsRaw = localStorage.getItem('mcq_last_exam_ids');
+        const ids = idsRaw ? JSON.parse(idsRaw) : null;
+        btnRetake.disabled = !(Array.isArray(ids) && ids.length);
+      } catch {
+        btnRetake.disabled = true;
+      }
+    }
+  } catch {
+    card.style.display = 'none';
+    if (btnRetake) btnRetake.disabled = true;
+  }
+}
+
+ndex = 0;
+  renderDailyProgress();
+
   const tx = db.transaction('questions', 'readonly');
   const store = tx.objectStore('questions');
   const firstReq = store.get(ids[0]);
@@ -2569,6 +2561,88 @@ async function startDailyChallenge() {
 }
 
 // --- Exam simulation ---
+
+async function startRetakeLastExam() {
+  if (!db) return;
+  try {
+    const raw = localStorage.getItem('mcq_last_exam_ids');
+    if (!raw) {
+      alert('No stored exam questions to retake.');
+      return;
+    }
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids) || !ids.length) {
+      alert('No stored exam questions to retake.');
+      return;
+    }
+
+    const all = await getAllQuestions();
+    const byId = new Map();
+    all.forEach(q => byId.set(q.id, q));
+    const questions = [];
+    const resolvedIds = [];
+    ids.forEach(id => {
+      const q = byId.get(id);
+      if (q) {
+        questions.push(q);
+        resolvedIds.push(id);
+      }
+    });
+    if (!resolvedIds.length) {
+      alert('Could not find any of the stored exam questions.');
+      return;
+    }
+
+    const now = Date.now();
+    // default duration: 1 minute per question, but not less than 5 minutes total
+    const total = resolvedIds.length;
+    const minutes = Math.max(5, total); 
+    const durationMs = minutes * 60 * 1000;
+
+    examSession = {
+      ids: resolvedIds,
+      index: 0,
+      answers: {},
+      startedAt: now,
+      durationMs
+    };
+
+    document.getElementById('examSummaryCard').style.display = 'none';
+    document.getElementById('examActiveCard').style.display = 'block';
+    document.getElementById('examResultCard').style.display = 'none';
+
+    const totalLabel = document.getElementById('examTotalLabel');
+    if (totalLabel) totalLabel.textContent = String(total);
+
+    renderExamQuestion();
+
+    const endAt = now + durationMs;
+    function tick() {
+      const remain = endAt - Date.now();
+      const timerLabel = document.getElementById('examTimerLabel');
+      if (!timerLabel) return;
+      if (remain <= 0) {
+        clearInterval(examTimerId);
+        examTimerId = null;
+        timerLabel.textContent = '00:00';
+        alert('Time is over – finishing exam.');
+        finishExam();
+        return;
+      }
+      const sec = Math.floor(remain / 1000);
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      timerLabel.textContent = `${mm}:${ss}`;
+    }
+    if (examTimerId) clearInterval(examTimerId);
+    tick();
+    examTimerId = setInterval(tick, 1000);
+  } catch (err) {
+    console.error('Failed to start retake exam', err);
+    alert('Could not start retake exam.');
+  }
+}
+
 async function startExam() {
   const poolType = document.getElementById('examPool').value;
   const chap = document.getElementById('examChapterFilter').value.trim().toLowerCase();
@@ -2732,6 +2806,25 @@ async function finishExam() {
   });
   document.getElementById('examDetails').innerHTML = detailHtml;
 
+  // Persist compact summary + question IDs for dashboard banner and retake
+  try {
+    const when = new Date().toISOString().slice(0,10);
+    const payload = {
+      total,
+      correct,
+      wrong,
+      score,
+      sourceLabel: currentExamSourceLabel,
+      when
+    };
+    localStorage.setItem('mcq_last_exam_summary', JSON.stringify(payload));
+    if (examSession && Array.isArray(examSession.ids)) {
+      localStorage.setItem('mcq_last_exam_ids', JSON.stringify(examSession.ids));
+    }
+  } catch {}
+
+  renderLastExamSummary();
+
   document.getElementById('examActiveCard').style.display = 'none';
   document.getElementById('examResultCard').style.display = 'block';
   examSession = null;
@@ -2808,6 +2901,22 @@ openDB().then(() => {
   loadPracticePrefs();
   loadNextQuestion(true);
   buildFlashcardPool();
+  renderSessionStats();
+
+  // initialize Daily 10 progress from today's stored IDs
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const raw = localStorage.getItem('mcq_daily_ids_' + today);
+    if (raw) {
+      const ids = JSON.parse(raw);
+      if (Array.isArray(ids)) {
+        dailyTotal = ids.length;
+        dailyCurrentIndex = 0;
+      }
+    }
+  } catch {}
+  renderDailyProgress();
+  renderLastExamSummary();
 }).catch(err => {
   console.error(err);
   alert('Failed to open local database.');

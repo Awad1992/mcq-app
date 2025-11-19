@@ -46,6 +46,12 @@
     <section class="tab-content active" id="tab-home">
       <div class="card">
         <div class="stats-row" id="statsBar"></div>
+        <div class="muted tiny" style="margin-top:4px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span id="sessionStats">
+            Session: 0 answered · 0 correct · 0 wrong
+          </span>
+          <button type="button" id="btnSessionReset" class="ghost tiny">Reset session stats</button>
+        </div>
       </div>
 
       <div class="card">
@@ -75,6 +81,10 @@
                 <button class="pill-btn" id="btnQuickWrong">Last wrong</button>
                 <button class="pill-btn" id="btnQuickFlagged">Flagged</button>
                 <button class="pill-btn" id="btnStartDaily">Daily 10</button>
+                <div class="tiny muted" style="margin-top:4px; max-width:260px;">
+                  Daily 10: picks a mixed set once per day and reuses the same 10 questions for that day.
+                  <br><span id="dailyProgress" class="tiny">Today: 0 / 0 done</span>
+                </div>
               </div>
               <div>
                 <label class="small-label">Concept‑link</label><br>
@@ -97,6 +107,10 @@
           <div class="col-side">
             <div class="card side-card">
               <div class="small-label">Recent history</div>
+              <div class="muted tiny" style="margin:4px 0 4px 0;">
+                Shows your latest answered questions (practice, Daily 10, and exams). 
+                <button type="button" id="btnClearHistory" class="ghost tiny" style="margin-left:6px;">Clear on-screen history</button>
+              </div>
               <div class="history-list" id="historyList"></div>
             </div>
           </div>
@@ -167,8 +181,15 @@
           </div>
           <div class="all-actions">
             <button id="btnStartExam" class="primary">Start exam</button>
-            <span class="muted tiny">Results only at the end.</span>
+            <span class="muted tiny">Results only at the end. Exam simulation does not change your practice stats, weak questions, or flagged counters.</span>
           </div>
+        </div>
+      </div>
+
+      <div class="card" id="examLastSummaryCard" style="display:none;">
+        <div class="muted tiny" id="examLastSummaryText">No previous exam recorded.</div>
+        <div class="muted tiny" style="margin-top:4px;">
+          <button type="button" id="btnRetakeLastExam" class="ghost tiny">Retake last exam (same questions)</button>
         </div>
       </div>
 
@@ -176,6 +197,9 @@
         <div class="exam-header">
           <div>Q <span id="examIndexLabel">0</span>/<span id="examTotalLabel">0</span></div>
           <div>Time left: <span id="examTimerLabel">--:--</span></div>
+        </div>
+        <div class="muted tiny" id="examLiveHint" style="margin-top:4px;">
+          Answer all questions first; results and detailed breakdown will show here only after you finish the exam.
         </div>
         <div id="examQuestionPanel" class="question-panel"></div>
         <div class="btn-row-main">
@@ -382,7 +406,6 @@
           <div>
             <button id="btnCloudUpload">Upload → GitHub</button>
             <button id="btnCloudDownload">Download ← GitHub</button>
-            <button id="btnCloudTest" class="ghost tiny">Test connection</button>
           </div>
           <div class="muted tiny" id="cloudInfo"></div>
         </div>
@@ -435,17 +458,6 @@
         </div>
         <div class="btn-row-main">
           <button id="btnResetProgress" class="danger">Reset selected progress…</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Cloud debug (local only)</h2>
-        <p class="muted tiny">
-          Quick view of your current cloud setup. This is NOT synced anywhere and is only for troubleshooting on this device.
-        </p>
-        <pre id="cloudDebugInfo" class="tiny" style="white-space:pre-wrap; background:#111; color:#eee; padding:0.5rem; border-radius:4px; max-height:9rem; overflow:auto;"></pre>
-        <div class="btn-row-main">
-          <button id="btnClearCloudError" class="ghost tiny">Clear last error</button>
         </div>
       </div>
 
