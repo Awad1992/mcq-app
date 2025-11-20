@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v9.2</title>
+  <title>MCQ Ultra-Pro v9.3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=9.2.0">
-  <link rel="stylesheet" href="style.css?v=9.2.0">
+  <link rel="manifest" href="manifest.json?v=9.3.0">
+  <link rel="stylesheet" href="style.css?v=9.3.0">
 </head>
 <body>
 
@@ -16,22 +16,18 @@
   
   <header class="top-bar">
     <div class="brand-area">
-      <div class="logo">🛡️</div>
+      <div class="logo">🩺</div>
       <div>
-        <h1>MCQ Bulletproof <span class="ver">v9.2</span></h1>
+        <h1>MCQ Pro <span class="ver">v9.3</span></h1>
         <div class="xp-wrapper">
-           <span class="xp-text"><span id="userXP">0</span> XP</span>
+           <span class="xp-text">Level: <span id="userRank">Intern</span> (<span id="userXP">0</span> XP)</span>
         </div>
       </div>
     </div>
     <div class="chips">
-      <span class="chip" id="dbStatus">DB: v12</span>
+      <span class="chip" id="dbStatus">DB: Ready</span>
       <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
-      <select id="themeSelect" class="chip chip-theme">
-        <option value="light">☀︎ Light</option>
-        <option value="dark">🌙 Dark</option>
-        <option value="calm">🌿 Calm</option>
-      </select>
+      <button id="themeToggle" class="chip chip-theme">🌗</button>
     </div>
   </header>
 
@@ -47,7 +43,7 @@
   <main class="tab-container">
 
     <section class="tab-content active" id="tab-home">
-      <div class="card">
+      <div class="card main-layout">
         <div class="row">
           <div class="col-main">
             <div class="row-controls">
@@ -59,7 +55,7 @@
                   <option value="wrong">❌ Mistakes</option>
                   <option value="flagged">🚩 Flagged</option>
                   <option value="maintain">🔧 Maintenance</option>
-                  <option value="chapter">📂 Chapter</option>
+                  <option value="chapter">📂 By Chapter</option>
                   <option value="all">🔀 Random</option>
                 </select>
               </div>
@@ -72,7 +68,9 @@
                    <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
                  </label>
               </div>
-              <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
+              <div class="actions-right">
+                 <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
+              </div>
             </div>
 
             <div id="questionPanel" class="question-panel">
@@ -81,7 +79,7 @@
             
             <div id="maintBox" class="maint-box hidden">
                <div class="maint-header">🔧 Report Issue</div>
-               <textarea id="maintNote" class="maint-input" placeholder="Why is this question wrong?"></textarea>
+               <textarea id="maintNote" class="maint-input" placeholder="Describe error..."></textarea>
                <button id="btnSaveMaint" class="tiny-btn">Save Report</button>
             </div>
 
@@ -89,7 +87,7 @@
 
             <div class="notes-container">
               <label class="small-label">Notes 📝 <span id="saveNoteStatus" class="save-status"></span></label>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Your notes..."></textarea>
+              <textarea id="userNoteArea" class="notes-textarea" placeholder="My notes..."></textarea>
             </div>
 
             <div id="feedbackPanel" class="feedback-panel hidden"></div>
@@ -97,6 +95,7 @@
             <div class="btn-row-main">
               <button class="primary-btn large" id="btnSubmit">Submit Answer</button>
               <button class="primary-btn large hidden" id="btnNext">Next →</button>
+              
               <label class="check-label guess-box">
                 <input type="checkbox" id="guessCheck"> Guessing
               </label>
@@ -146,6 +145,12 @@
              <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
              <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
           </div>
+          
+          <div class="io-strip">
+             <input type="file" id="fileInput" accept=".json" class="hidden">
+             <button id="btnImportTrigger" class="secondary-btn">📥 Import JSON</button>
+             <button id="btnExportTrigger" class="secondary-btn">💾 Export JSON</button>
+          </div>
 
           <div class="table-wrapper">
             <table class="q-table">
@@ -167,13 +172,6 @@
              <button id="allPrevPage" class="nav-btn">Prev</button>
              <span id="allPageInfo">1</span>
              <button id="allNextPage" class="nav-btn">Next</button>
-          </div>
-
-          <div class="io-strip">
-             <input type="file" id="fileInput" accept=".json" class="hidden">
-             <button id="btnImportTrigger" class="secondary-btn">📥 Smart Import</button>
-             <button id="btnExportTrigger" class="secondary-btn">💾 Full Export</button>
-             <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
           </div>
       </div>
     </section>
@@ -258,16 +256,18 @@
 <div id="editModal" class="modal hidden">
   <div class="modal-backdrop" id="editModalBackdrop"></div>
   <div class="modal-content">
-     <h3>Edit</h3>
+     <h3>Edit Question</h3>
      <textarea id="editText" class="std-textarea" rows="3"></textarea>
      <div class="row-inputs">
        <input id="editChapter" class="std-input" placeholder="Chapter">
        <input id="editTags" class="std-input" placeholder="Tags">
      </div>
      <label class="check-label warning-text"><input type="checkbox" id="editMaint"> 🔧 Maintenance</label>
-     <textarea id="editExplanation" class="std-textarea" rows="3"></textarea>
+     <textarea id="editExplanation" class="std-textarea" rows="3" placeholder="Explanation"></textarea>
+     
      <div id="editChoicesList"></div>
      <button id="btnAddChoice" class="pill-btn small">+ Choice</button>
+     
      <div class="modal-footer">
         <button id="btnSaveEdit" class="primary-btn">Save</button>
         <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
@@ -275,10 +275,10 @@
   </div>
 </div>
 
-<script src="app.js?v=9.2.0"></script>
+<script src="app.js?v=9.3.0"></script>
 <script>
   if ('serviceWorker' in navigator) {
-     navigator.serviceWorker.register('./service-worker.js?v=9.2.0').catch(()=>{});
+     navigator.serviceWorker.register('./service-worker.js?v=9.3.0').catch(()=>{});
   }
 </script>
 </body>
