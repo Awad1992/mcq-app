@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v9.1</title>
+  <title>MCQ Ultra-Pro v10.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=9.1.0">
-  <link rel="stylesheet" href="style.css?v=9.1.0">
+  <link rel="manifest" href="manifest.json?v=10.1.0">
+  <link rel="stylesheet" href="style.css?v=10.1.0">
 </head>
 <body>
 
@@ -16,16 +16,10 @@
   
   <header class="top-bar">
     <div class="brand-area">
-      <h1>MCQ Ultra-Pro <span class="ver">v9.1</span></h1>
-      <div class="xp-container">
-        <span id="userRank" class="rank-badge">Intern</span>
-        <div class="xp-bar-bg"><div id="xpBarFill" class="xp-bar-fill" style="width:0%"></div></div>
-        <span class="xp-val"><span id="currXP">0</span> XP</span>
-      </div>
+      <h1>MCQ Ultra-Pro <span class="ver">v10.1</span></h1>
     </div>
     <div class="chips">
-      <button id="btnTimeMachine" class="chip chip-time">🕰️ History</button>
-      <span class="chip" id="syncStatus">☁️ Offline</span>
+      <button id="btnHeaderBackup" class="chip chip-sync" onclick="switchTab('backup')">☁️ Backup</button>
       <select id="themeSelect" class="chip chip-theme">
         <option value="light">☀︎ Light</option>
         <option value="dark">🌙 Dark</option>
@@ -44,240 +38,82 @@
   </nav>
 
   <main class="tab-container">
-
     <section class="tab-content active" id="tab-home">
-      <div class="card">
-        <div class="row">
-          <div class="col-main">
+        <div class="card">
             <div class="row-controls">
-              <div>
-                <label class="small-label">Source</label>
-                <select id="modeSelect" class="std-select">
-                  <option value="due">Smart Review (SRS)</option>
-                  <option value="new">New Questions</option>
-                  <option value="wrong">Mistakes</option>
-                  <option value="chapter">Specific Chapter</option>
-                </select>
-                <select id="chapterSelect" class="std-select chapter-list" style="display:none;">
-                  <option value="">Select Chapter...</option>
-                </select>
-              </div>
-              <div class="toggles">
-                 <label class="check-label"><input type="checkbox" id="prefSkipSolved" checked> Skip Solved</label>
-              </div>
-              <div class="all-actions">
-                 <button class="pill-btn" id="btnTTS" title="Read Question">🔊 Speak</button>
-              </div>
+              <select id="modeSelect" class="std-select"><option value="due">Due</option><option value="all">All</option><option value="wrong">Wrong</option><option value="chapter">Chapter</option></select>
+              <select id="chapterSelect" class="std-select" style="display:none;"><option value="">Select Chapter</option></select>
+              <label class="check-label"><input type="checkbox" id="prefSkipSolved" checked> Skip Solved</label>
             </div>
-
             <div id="questionPanel" class="question-panel"></div>
-            
-            <div id="highlighterTools" class="tools-bar hidden">
-               <span class="tiny muted">Highlight:</span>
-               <button class="color-dot yellow" onclick="setHighlight('yellow')"></button>
-               <button class="color-dot green" onclick="setHighlight('green')"></button>
-               <button class="pill-btn small" onclick="clearHighlights()">Clear</button>
-            </div>
-
-            <div class="notes-area-container">
-              <label class="small-label">Notes 📝</label>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Add note..."></textarea>
-              <div id="saveNoteStatus" class="save-status"></div>
-            </div>
-
+            <textarea id="userNoteArea" class="notes-textarea" placeholder="Notes..."></textarea>
+            <div id="saveNoteStatus" class="save-status"></div>
             <div id="feedbackPanel" class="feedback-panel hidden"></div>
-
             <div class="btn-row-main">
-              <button class="primary-btn" id="btnSubmit">Submit Answer</button>
-              <label class="check-label" style="margin-left:15px;">
-                <input type="checkbox" id="guessCheck"> Guessing
-              </label>
-              <button id="btnHighlight" class="ghost-btn">🖍️ Highlight Mode</button>
+              <button class="primary-btn" id="btnSubmit">Submit</button>
+              <button class="nav-btn" id="btnPrev">Previous</button>
+              <button class="nav-btn" id="btnNext">Next</button>
+              <button class="ghost-btn" id="btnFlag">Flag</button>
             </div>
-            
-            <div class="nav-row">
-               <button class="nav-btn" id="btnPrev">Previous</button>
-               <button class="nav-btn" id="btnNext">Next</button>
-               <button class="ghost-btn" id="btnFlag">Flag 🚩</button>
-            </div>
-          </div>
-          
-          <div class="col-side">
-             <div class="card side-card">
-               <div class="small-label">Timer</div>
-               <div id="qTimer" class="timer-box">00s</div>
-             </div>
-             <div class="card side-card">
-               <div class="small-label">Quick Refs</div>
-               <div id="searchTools" class="v-stack"></div>
-             </div>
-          </div>
+            <div id="searchTools" class="v-stack"></div>
         </div>
-      </div>
     </section>
 
     <section class="tab-content" id="tab-library">
-      <div class="subnav">
-         <button class="subnav-btn active" id="viewLib">Bank</button>
-         <button class="subnav-btn" id="viewBuilder">Builder</button>
-      </div>
-
-      <div id="libBankView">
         <div class="card">
-           <div class="row-controls">
-              <input id="allSearch" placeholder="Search..." class="std-input search-box">
-              <select id="allFilter" class="std-select">
-                <option value="all">All</option>
-                <option value="wrong">Errors</option>
-                <option value="notes">Notes</option>
-                <option value="flagged">Flagged</option>
-              </select>
-              <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
-              <button id="btnAllApply" class="primary-btn">Apply</button>
-           </div>
-           
-           <div class="bulk-strip">
-              <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
-              <div class="bulk-actions">
-                 <button id="btnBulkDelete" class="danger-btn small">Delete</button>
-                 <button id="btnBulkReset" class="action-btn small">Reset Stats</button>
-              </div>
-           </div>
-
-           <div class="table-wrapper">
-             <table class="q-table">
-               <thead>
-                 <tr>
-                   <th width="30"><input type="checkbox" id="allSelectAll"></th>
-                   <th class="sortable" data-sort="id" width="50">ID</th>
-                   <th class="sortable" data-sort="text">Question</th>
-                   <th class="sortable" data-sort="chapter" width="120">Chapter</th>
-                   <th class="sortable" data-sort="timesWrong" width="50">Err</th>
-                   <th width="50">Edit</th>
-                 </tr>
-               </thead>
-               <tbody id="allTableBody"></tbody>
-             </table>
-           </div>
-           <div class="all-footer">
-              <button id="allPrevPage" class="nav-btn">Prev</button>
-              <span id="allPageInfo">1/1</span>
-              <button id="allNextPage" class="nav-btn">Next</button>
-           </div>
-        </div>
-      </div>
-
-      <div id="libBuilderView" class="hidden">
-         <div class="card">
-            <div class="builder-layout">
-               <div class="b-col">
-                  <label>Text</label>
-                  <textarea id="builderSource" rows="8" class="std-textarea"></textarea>
-                  <button id="btnGenPrompt" class="action-btn">Generate Prompt</button>
-                  <textarea id="builderPrompt" rows="4" class="std-textarea" readonly></textarea>
-               </div>
-               <div class="b-col">
-                  <label>JSON</label>
-                  <textarea id="builderJson" rows="8" class="std-textarea"></textarea>
-                  <button id="btnImportJson" class="primary-btn">Import & Auto-Fix</button>
-               </div>
+            <div class="io-strip">
+                <input type="file" id="libFileInput" accept=".json" class="hidden">
+                <button id="btnLibImport" class="action-btn">Import</button>
+                <button id="btnLibExport" class="secondary-btn">Export</button>
             </div>
-         </div>
-      </div>
+            <div class="row-controls">
+                <input id="allSearch" class="std-input" placeholder="Search...">
+                <select id="allFilter" class="std-select"><option value="all">All</option><option value="wrong">Wrong</option><option value="flagged">Flagged</option></select>
+                <select id="allChapterSelect" class="std-select chapter-list"><option value="">Chapters</option></select>
+                <button id="btnAllApply" class="primary-btn">Apply</button>
+            </div>
+            <div class="table-wrapper">
+                <table class="q-table">
+                    <thead><tr><th>ID</th><th>Question</th><th>Chapter</th><th>Err</th><th>Edit</th></tr></thead>
+                    <tbody id="allTableBody"></tbody>
+                </table>
+            </div>
+        </div>
     </section>
-
-    <section class="tab-content" id="tab-collections">
-       <div class="card">
-          <h2>My Collections</h2>
-          <div class="row-controls">
-             <input id="newCollName" placeholder="Name..." class="std-input">
-             <button id="btnCreateColl" class="primary-btn">Create</button>
-          </div>
-          <div id="collectionsList" class="coll-grid"></div>
-       </div>
-    </section>
-
-    <section class="tab-content" id="tab-exam">
-       <div class="card center-box">
-          <h2>Exam Simulator</h2>
-          <div class="exam-config">
-             <select id="examChapter" class="std-select chapter-list"><option value="">All</option></select>
-             <input id="examQty" type="number" value="40" class="std-input" style="width:80px">
-             <button id="btnStartExam" class="primary-btn">Start</button>
-          </div>
-       </div>
-       <div id="examUI" class="card hidden">
-          <div class="exam-header">
-             <span id="examProgress">0/0</span>
-             <span id="examTime">00:00</span>
-          </div>
-          <div id="examPanel" class="q-panel"></div>
-          <div class="nav-row">
-             <button id="btnExamPrev" class="nav-btn">Prev</button>
-             <button id="btnExamNext" class="nav-btn">Next</button>
-             <button id="btnExamSubmit" class="danger-btn">Finish</button>
-          </div>
-       </div>
-       <div id="examResults" class="card hidden">
-          <h3>Results</h3>
-          <div id="examScore"></div>
-          <button onclick="location.reload()" class="primary-btn">Close</button>
-       </div>
-    </section>
-
-    <section class="tab-content" id="tab-dashboard">
-       <div class="dashboard-grid">
-          <div class="dash-card">
-             <h3>Total</h3>
-             <div class="big-num" id="dTotal">0</div>
-          </div>
-          <div class="dash-card">
-             <h3>Mastery</h3>
-             <div class="big-num" id="dMastery">0%</div>
-          </div>
-          <div class="dash-card">
-             <h3>Streak</h3>
-             <div class="big-num" id="dStreak">0 🔥</div>
-          </div>
-       </div>
-       <div class="card" style="margin-top:20px;">
-          <h3>Chapter Performance</h3>
-          <div id="chapterStats" class="bars-list"></div>
-       </div>
-    </section>
-
+    
     <section class="tab-content" id="tab-backup">
-      <div class="card warning-border">
-         <h2>Cloud Sync (GitHub)</h2>
-         <div class="row-controls">
-            <button id="btnCloudUpload" class="action-btn">⬆ Upload</button>
-            <button id="btnCloudDownload" class="action-btn">⬇ Download</button>
-         </div>
-         <p class="tiny danger-text">Safeguard: Cannot upload empty DB.</p>
-      </div>
-      <div class="card">
-         <h2>Local</h2>
-         <div class="row-controls">
-            <button id="btnLocalExport" class="secondary-btn">Export JSON</button>
-            <input type="file" id="fileInput" class="hidden">
-            <button id="btnLocalImport" class="secondary-btn">Import JSON</button>
-         </div>
-      </div>
+        <div class="card warning-border">
+            <h2>GitHub Cloud</h2>
+            <div class="sync-status-box">Status: <strong id="ghStatusText">Unknown</strong> <button id="btnTestConn" class="pill-btn small">Test</button></div>
+            <div class="row-controls">
+                <button id="btnCloudUpload" class="action-btn">Upload</button>
+                <button id="btnCloudDownload" class="action-btn">Download</button>
+            </div>
+        </div>
+        <div class="card">
+             <h2>History</h2>
+             <button id="btnTimeMachine" class="pill-btn">Open Time Machine</button>
+             <div class="row-controls" style="margin-top:10px;">
+                 <button id="btnLocalExport" class="secondary-btn">Export Local</button>
+                 <input type="file" id="backupFileInput" accept=".json" class="hidden">
+                 <button id="btnLocalImport" class="secondary-btn">Import Local</button>
+             </div>
+        </div>
     </section>
 
     <section class="tab-content" id="tab-settings">
-       <div class="card">
-          <h3>GitHub Config</h3>
-          <div class="settings-grid">
-             <input type="password" id="ghToken" placeholder="Token" class="std-input">
-             <input id="ghRepo" placeholder="User/Repo" class="std-input">
-             <button id="btnSaveGh" class="primary-btn">Save</button>
-          </div>
-       </div>
-       <div class="card">
-          <h3>Reset</h3>
-          <button id="btnResetAll" class="danger-btn">Factory Reset</button>
-       </div>
+        <div class="card">
+            <h3>Config</h3>
+            <div class="settings-grid">
+                <input type="password" id="ghToken" placeholder="Token">
+                <input id="ghRepo" placeholder="User/Repo">
+                <input id="ghFile" value="mcq_backup.json">
+                <button id="btnSaveGh" class="primary-btn">Save</button>
+            </div>
+        </div>
+        <div class="card">
+             <button id="btnResetAll" class="danger-btn">Factory Reset</button>
+        </div>
     </section>
 
   </main>
@@ -285,29 +121,28 @@
 
 <div id="modalTimeMachine" class="modal hidden">
    <div class="modal-content">
-      <h3>🕰️ Time Machine (Last 10 Auto-Saves)</h3>
+      <h3>Time Machine</h3>
       <div id="snapshotList" class="snap-list"></div>
-      <button class="secondary-btn" onclick="closeModal('modalTimeMachine')">Close</button>
+      <button class="secondary-btn" onclick="document.getElementById('modalTimeMachine').classList.add('hidden')">Close</button>
    </div>
 </div>
 
-<div id="modalEdit" class="modal hidden">
-   <div class="modal-content large">
-      <h3>Edit Question</h3>
-      <textarea id="edtText" class="std-textarea" rows="2"></textarea>
-      <div class="row-inputs">
-         <input id="edtChapter" placeholder="Chapter" class="std-input">
-         <input id="edtTags" placeholder="Tags" class="std-input">
-      </div>
-      <textarea id="edtExpl" class="std-textarea" rows="3"></textarea>
-      <div id="edtChoices"></div>
-      <div class="modal-footer">
-         <button id="btnSaveEdit" class="primary-btn">Save</button>
-         <button class="secondary-btn" onclick="closeModal('modalEdit')">Cancel</button>
-      </div>
-   </div>
+<div id="editModal" class="modal hidden">
+    <div class="modal-content large">
+        <h3>Edit</h3>
+        <textarea id="edtText" class="std-textarea"></textarea>
+        <input id="edtChapter" class="std-input" placeholder="Chapter">
+        <textarea id="edtExpl" class="std-textarea"></textarea>
+        <div id="edtChoices"></div>
+        <div class="modal-footer">
+            <button id="btnSaveEdit" class="primary-btn">Save</button>
+            <button class="secondary-btn" onclick="document.getElementById('editModal').classList.add('hidden')">Cancel</button>
+        </div>
+    </div>
 </div>
 
-<script src="app.js?v=9.1.0"></script>
+<button id="btnForceUpdate" class="floating-update-btn">↻ Reload</button>
+
+<script src="app.js?v=10.1.0"></script>
 </body>
 </html>
