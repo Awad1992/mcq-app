@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#2563eb">
   <link rel="manifest" href="manifest.json?v=13.0.0">
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:,"> <!-- Fix Favicon 404 -->
 </head>
 <body>
 
@@ -129,12 +130,10 @@
       </div>
     </section>
 
-    <!-- 2. LIBRARY (Reorganized Layout) -->
+    <!-- 2. LIBRARY -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
-          
           <div class="library-sticky-header">
-              <!-- Filter Row -->
               <div class="filter-bar">
                  <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
                  <select id="allFilter" class="std-select">
@@ -148,16 +147,17 @@
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
-              <!-- Action Row (Consolidated) -->
+              <!-- Consolidated Action Bar -->
               <div class="row-controls action-area">
-                 <button id="btnScanDup" class="pill-btn">🔍 Duplicates</button>
-                 <span id="dupResult" class="muted small-label"></span>
+                 <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
+                 <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
                  <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
                  
-                 <div class="spacer"></div>
-                 
+                 <div class="spacer" style="flex:1;"></div>
+
                  <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
                  <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
+                 
                  <input type="file" id="fileInput" accept=".json" class="hidden">
                  <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
                  <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
@@ -260,6 +260,7 @@
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghFile" value="mcq_backup.json" class="std-input" style="width:100%; margin-bottom:10px;">
+          
           <button id="btnSaveGh" class="primary-btn">Save Settings</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>

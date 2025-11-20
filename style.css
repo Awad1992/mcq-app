@@ -27,6 +27,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 .tabs { display: flex; gap: 8px; padding: 10px 20px; background: var(--bg); overflow-x: auto; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-button { padding: 8px 20px; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: 600; transition: 0.2s; }
 .tab-button.active { background: var(--primary); color: white; border-color: var(--primary); }
+
 .tab-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
 .tab-content { display: none; animation: fade 0.2s; }
 .tab-content.active { display: block; }
@@ -62,7 +63,7 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
 .q-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.q-table td.wrap-text { white-space: normal; line-height: 1.4; } /* Text Wrap for Question */
+.q-table td.wrap-text { white-space: normal; line-height: 1.4; }
 .tag-maint { background: var(--maint-bg); color: var(--maint-text); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--maint-text); display: inline-block; }
 
 /* UI ELEMENTS */
@@ -77,10 +78,9 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .srs-row { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; }
 .srs-btn { flex: 1; color: white; }
 .again { background: var(--danger); } .hard { background: var(--warning); } .good { background: var(--success); } .easy { background: var(--primary); }
-
-/* ACTION AREA (NEW) */
-.action-area { background: #fff7ed; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.spacer { flex: 1; }
+.dup-bar { background: #fff7ed; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.action-area { background: #fff7ed; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.io-strip { padding: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; background: var(--card); }
 
 /* DASHBOARD */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
@@ -94,5 +94,6 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
+.range-active { background: var(--primary); color: white; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }
