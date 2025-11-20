@@ -2,23 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v5.0 (Ultimate)</title>
+  <title>MCQ Ultra-Pro v5.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=5.0.0">
-  <link rel="stylesheet" href="style.css?v=5.0.0">
+  <link rel="manifest" href="manifest.json?v=5.1.0">
+  <link rel="stylesheet" href="style.css?v=5.1.0">
 </head>
 <body>
+
+<div id="toastContainer" class="toast-container"></div>
+
 <div class="app" id="appRoot">
   
   <header class="top-bar">
     <div>
-      <h1>MCQ Ultra-Pro <span class="ver">v5.0</span></h1>
-      <div class="subtitle">Professional Edition: Full Sort, Filter, Cloud & DB Fix</div>
+      <h1>MCQ Ultra-Pro <span class="ver">v5.1</span></h1>
+      <div class="subtitle">Professional Medical Board Engine</div>
     </div>
     <div class="chips">
-      <span class="chip">System: Online</span>
-      <span class="chip chip-sync" id="syncStatus">Checking Cloud...</span>
+      <span class="chip" id="dbStatus">DB: Ready</span>
+      <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
       <select id="themeSelect" class="chip chip-theme">
         <option value="light">☀︎ Light</option>
         <option value="dark">🌙 Dark</option>
@@ -34,7 +37,7 @@
     <button class="tab-button" data-tab="exam">Exam Sim</button>
     <button class="tab-button" data-tab="dashboard">Dashboard</button>
     <button class="tab-button" data-tab="all">All Questions</button>
-    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
+    <button class="tab-button" data-tab="backup">Backup/Cloud</button>
     <button class="tab-button" data-tab="settings">Settings</button>
   </nav>
 
@@ -42,7 +45,7 @@
 
     <section class="tab-content active" id="tab-home">
       <div class="card">
-        <div class="stats-row" id="statsBar">Initializing Stats...</div>
+        <div class="stats-row" id="statsBar">Loading...</div>
       </div>
 
       <div class="card">
@@ -53,27 +56,27 @@
                 <label class="small-label">Study Mode</label><br>
                 <select id="modeSelect">
                   <option value="due">Spaced Repetition (Due)</option>
-                  <option value="all">All Active Questions</option>
-                  <option value="new">New Questions Only</option>
+                  <option value="all">All Active</option>
+                  <option value="new">New Questions</option>
                   <option value="wrong">Previously Wrong</option>
-                  <option value="flagged">Flagged Only</option>
-                  <option value="weak">Weak Spots (Auto)</option>
-                  <option value="chapter">Specific Chapter</option>
+                  <option value="flagged">Flagged</option>
+                  <option value="weak">Weak Spots</option>
+                  <option value="chapter">By Chapter</option>
                 </select>
                 <select id="chapterSelect" class="chapter-dropdown" style="display:none; max-width:220px;">
                   <option value="">Select Chapter...</option>
                 </select>
               </div>
               
-              <div style="display:flex; align-items:center; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px; margin-top:14px;">
                  <label class="tiny-check" style="cursor:pointer; font-size:0.8rem;">
                    <input type="checkbox" id="prefSkipSolved" checked> Skip Solved
                  </label>
               </div>
 
               <div class="all-actions">
-                <button class="pill-btn" id="btnStartDaily">Start Daily 10</button>
-                <button class="pill-btn" id="btnFocusMode">🧘 Focus Mode</button>
+                <button class="pill-btn" id="btnStartDaily">Daily 10</button>
+                <button class="pill-btn" id="btnFocusMode">🧘 Focus</button>
               </div>
             </div>
 
@@ -81,8 +84,8 @@
             <div id="searchTools" class="search-tools"></div>
 
             <div class="notes-area-container">
-              <label class="small-label">My Notes 📝 (Auto-saved)</label>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Write your takeaways here..."></textarea>
+              <label class="small-label">My Notes 📝</label>
+              <textarea id="userNoteArea" class="notes-textarea" placeholder="Write clinical pearls here..."></textarea>
               <div id="saveNoteStatus" class="save-note-status"></div>
             </div>
 
@@ -91,23 +94,19 @@
             <div class="btn-row-main">
               <button class="primary" id="btnSubmit">Submit Answer</button>
               <label style="margin-left:10px; font-size:0.8rem; cursor:pointer; color:#555;">
-                <input type="checkbox" id="guessCheck"> I'm Guessing (Don't count as mastered)
+                <input type="checkbox" id="guessCheck"> I'm Guessing
               </label>
-              <button id="btnExitFocus" class="danger" style="display:none; margin-left:auto;">Exit Focus ✕</button>
+              <button id="btnExitFocus" class="danger" style="display:none; margin-left:auto;">Exit Focus</button>
             </div>
             
             <div class="btn-row-main" style="border-top:1px solid #eee; margin-top:1rem; padding-top:0.5rem;">
                <button id="btnPrev">Previous</button>
-               <button id="btnNext">Next Question</button>
+               <button id="btnNext">Next</button>
                <button class="ghost" id="btnFlag">Flag 🚩</button>
             </div>
           </div>
 
           <div class="col-side">
-            <div class="card side-card">
-               <div class="small-label">Concept Link</div>
-               <div id="relatedBox" class="related-box tiny muted">No related questions found.</div>
-            </div>
             <div class="card side-card">
                <div class="small-label">Session History</div>
                <div class="history-list" id="historyList"></div>
@@ -125,10 +124,7 @@
              <select id="fcSource">
                <option value="due">Due Cards</option>
                <option value="weak">Weak Topics</option>
-               <option value="chapter">By Chapter</option>
-             </select>
-             <select id="fcChapterSelect" class="chapter-dropdown" style="display:none; max-width:200px;">
-               <option value="">All</option>
+               <option value="all">All Cards</option>
              </select>
            </div>
            <div>
@@ -138,19 +134,22 @@
                <option value="a-first">Answer → Question</option>
              </select>
            </div>
+           <div class="all-actions">
+              <button id="btnFcReload" class="pill-btn">Restart / Shuffle</button>
+           </div>
         </div>
       </div>
 
       <div class="card flashcard-card">
         <div id="flashcardInner" class="flashcard-inner">
-           <div class="flashcard-front" id="flashcardFront">No cards loaded.</div>
+           <div class="flashcard-front" id="flashcardFront">Select Source & Click Restart</div>
            <div class="flashcard-back" id="flashcardBack" style="display:none;"></div>
         </div>
         <div class="btn-row-main flashcard-controls">
            <button id="btnFcShow">Show Answer</button>
            <button id="btnFcAgain" class="danger">Again (Hard)</button>
            <button id="btnFcGood" class="primary">Good (Easy)</button>
-           <button id="btnFcNext">Next</button>
+           <button id="btnFcNext">Next Card</button>
         </div>
       </div>
     </section>
@@ -158,25 +157,24 @@
     <section class="tab-content" id="tab-exam">
       <div class="card">
          <h2>Exam Simulator</h2>
-         <p class="tiny muted">Simulates a real timed exam environment.</p>
          <div class="row-controls">
            <div>
              <label class="small-label">Pool</label><br>
              <select id="examPool">
                <option value="all">All Questions</option>
                <option value="weak">Weak Areas</option>
-               <option value="chapter">Specific Chapter</option>
+               <option value="chapter">By Chapter</option>
              </select>
              <select id="examChapterSelect" class="chapter-dropdown" style="display:none; width:150px;">
                <option value="">All</option>
              </select>
            </div>
            <div>
-             <label class="small-label">Qs Count</label><br>
+             <label class="small-label">Count</label><br>
              <input id="examCount" type="number" value="40" style="width:60px;">
            </div>
            <div>
-             <label class="small-label">Minutes</label><br>
+             <label class="small-label">Mins</label><br>
              <input id="examMinutes" type="number" value="60" style="width:60px;">
            </div>
            <div class="all-actions">
@@ -188,29 +186,29 @@
       <div class="card" id="examActiveCard" style="display:none;">
          <div class="exam-header">
            <span id="examIndexLabel">Q 1/40</span>
-           <span id="examTimerLabel">Time: 60:00</span>
+           <span id="examTimerLabel">60:00</span>
          </div>
          <div id="examQuestionPanel" class="question-panel"></div>
          <div class="btn-row-main">
            <button id="btnExamPrev">Prev</button>
            <button id="btnExamNext">Next</button>
-           <button id="btnExamFinish" class="danger">Finish Exam</button>
+           <button id="btnExamFinish" class="danger">Finish</button>
          </div>
       </div>
 
       <div class="card" id="examResultCard" style="display:none;">
         <h3>Exam Results</h3>
         <div id="examSummary"></div>
-        <div id="examDetails" class="tiny muted" style="margin-top:1rem;"></div>
+        <button id="btnExamClose" class="pill-btn" style="margin-top:10px;">Close</button>
       </div>
     </section>
 
     <section class="tab-content" id="tab-dashboard">
       <div class="card">
-         <h2>Study Statistics</h2>
+         <h2>Statistics</h2>
          <div class="dashboard-grid">
-           <div class="dash-box" id="dashOverall">Calculations pending...</div>
-           <div class="dash-box" id="dashWeakChapters">Analysis pending...</div>
+           <div class="dash-box" id="dashOverall">Calculating...</div>
+           <div class="dash-box" id="dashWeakChapters">Calculating...</div>
          </div>
       </div>
     </section>
@@ -227,12 +225,12 @@
           <div class="row-controls">
              <div>
                <label class="small-label">Search</label><br>
-               <input id="allSearch" placeholder="Text, ID, Tag..." style="width:180px;">
+               <input id="allSearch" placeholder="Search..." style="width:180px;">
              </div>
              <div>
-               <label class="small-label">Status Filter</label><br>
+               <label class="small-label">Filter</label><br>
                <select id="allFilter">
-                 <option value="all">All Statuses</option>
+                 <option value="all">All</option>
                  <option value="notes">Has Notes 📝</option>
                  <option value="wrong">Has Errors ❌</option>
                  <option value="flagged">Flagged 🚩</option>
@@ -240,19 +238,20 @@
                </select>
              </div>
              <div>
-               <label class="small-label">Chapter Filter</label><br>
+               <label class="small-label">Chapter</label><br>
                <select id="allChapterSelect" class="chapter-dropdown" style="width:200px;">
                  <option value="">All Chapters</option>
                </select>
              </div>
              <div class="all-actions">
                <br>
-               <button id="btnAllApply" class="primary" style="min-width:100px;">Apply Filters</button>
+               <button id="btnAllApply" class="primary" style="min-width:80px;">Apply</button>
              </div>
           </div>
 
           <div class="row-controls" style="margin-top:10px; border-top:1px dashed #eee; padding-top:10px;">
              <div class="all-actions">
+                <button id="btnRangeMode" class="pill-btn" title="Click to enable range selection">✨ Range Select: OFF</button>
                 <button id="btnAllDelete" class="danger">Delete Selected</button>
                 <span style="width:20px;"></span>
                 <input type="file" id="fileInput" accept=".json" style="max-width:200px;">
@@ -265,25 +264,25 @@
             <table class="q-table">
               <thead>
                 <tr>
-                  <th><input type="checkbox" id="allSelectAll"></th>
-                  <th class="sortable" data-sort="id">ID ↕</th>
-                  <th class="sortable" data-sort="text">Question ↕</th>
+                  <th style="width:30px;"><input type="checkbox" id="allSelectAll"></th>
+                  <th class="sortable" data-sort="id" style="width:60px;">ID ↕</th>
+                  <th class="sortable" data-sort="createdAt" style="width:120px;">Date ↕</th> <th class="sortable" data-sort="text">Question ↕</th>
                   <th class="sortable" data-sort="chapter">Chapter ↕</th>
-                  <th class="sortable" data-sort="timesSeen">Seen ↕</th>
-                  <th class="sortable" data-sort="timesWrong">Wrong ↕</th>
-                  <th>Edit</th>
+                  <th class="sortable" data-sort="timesSeen" style="width:60px;">Seen ↕</th>
+                  <th class="sortable" data-sort="timesWrong" style="width:60px;">Err ↕</th>
+                  <th style="width:60px;">Edit</th>
                 </tr>
               </thead>
               <tbody id="allTableBody">
-                <tr><td colspan="7">Loading data...</td></tr>
+                <tr><td colspan="8">Loading data...</td></tr>
               </tbody>
             </table>
           </div>
           <div class="all-footer">
             <span id="allSelectedCount" style="font-weight:bold;">0 Selected</span>
             <div class="all-pager">
-              <button id="allPrevPage">Previous</button>
-              <span id="allPageInfo">Page 1</span>
+              <button id="allPrevPage">Prev</button>
+              <span id="allPageInfo">1/1</span>
               <button id="allNextPage">Next</button>
             </div>
           </div>
@@ -296,20 +295,20 @@
            <div class="builder-row">
              <div class="builder-col">
                <label class="small-label">Source Text</label>
-               <textarea id="builderSourceText" rows="6" placeholder="Paste medical text here..."></textarea>
+               <textarea id="builderSourceText" rows="6" placeholder="Paste text here..."></textarea>
                <div class="builder-inline">
                  <label>Count:</label>
                  <input id="builderNumQuestions" type="number" value="10" style="width:50px;">
-                 <button id="btnBuilderMakePrompt">1. Generate Prompt</button>
+                 <button id="btnBuilderMakePrompt">Generate Prompt</button>
                </div>
-               <textarea id="builderPromptOut" rows="6" readonly placeholder="Prompt will appear here. Copy and send to AI."></textarea>
+               <textarea id="builderPromptOut" rows="6" readonly></textarea>
              </div>
              <div class="builder-col">
-               <label class="small-label">JSON Result from AI</label>
-               <textarea id="builderJsonInput" rows="6" placeholder="Paste the JSON response here..."></textarea>
+               <label class="small-label">JSON Result</label>
+               <textarea id="builderJsonInput" rows="6" placeholder="Paste JSON here..."></textarea>
                <div class="builder-inline">
-                 <button id="btnBuilderPreview">2. Preview</button>
-                 <button id="btnBuilderImportSelected">3. Import Selected</button>
+                 <button id="btnBuilderPreview">Preview</button>
+                 <button id="btnBuilderImportSelected">Import</button>
                </div>
                <div id="builderPreview" class="builder-preview muted tiny">No preview data.</div>
              </div>
@@ -327,44 +326,30 @@
            <input type="file" id="backupFileInput" accept=".json">
            <button id="btnBackupImport">Restore from File</button>
         </div>
-        <div class="backup-status" style="margin-top:10px;">
-           Last Activity: <span id="lastActivityLabel">Never</span>
-        </div>
       </div>
 
       <div class="card">
-        <h2>GitHub Cloud Sync</h2>
-        <p class="tiny muted">Requires Token & Repo settings.</p>
-        <div id="cloudStatus" style="margin-bottom:10px; color:#555; font-weight:500;">Not Connected</div>
+        <h2>GitHub Sync</h2>
+        <div id="cloudStatus" style="margin-bottom:10px; color:#555;">Not Connected</div>
         <div class="row-controls">
           <button id="btnCloudUpload">Upload to Cloud ☁️</button>
           <button id="btnCloudDownload">Download from Cloud 🌩️</button>
         </div>
-        <div id="cloudLoading" style="display:none; color:blue; font-size:0.8rem; margin-top:5px;">Working... please wait...</div>
+        <div id="cloudLoading" style="display:none; color:blue; margin-top:5px;">Processing...</div>
       </div>
     </section>
 
     <section class="tab-content" id="tab-settings">
        <div class="card">
-         <h2>GitHub Configuration</h2>
+         <h2>GitHub Config</h2>
          <div class="settings-grid">
-           <label>
-             <span class="small-label">Access Token</span>
-             <input type="password" id="ghTokenInput" placeholder="ghp_...">
-           </label>
-           <label>
-             <span class="small-label">Repository (User/Repo)</span>
-             <input id="ghRepoInput" placeholder="e.g. Awad1992/mcq-data">
-           </label>
-           <label>
-             <span class="small-label">Filename</span>
-             <input id="ghFileInput" value="mcq_backup.json">
-           </label>
+           <label>Token: <input type="password" id="ghTokenInput"></label>
+           <label>Repo: <input id="ghRepoInput" placeholder="User/Repo"></label>
+           <label>File: <input id="ghFileInput" value="mcq_backup.json"></label>
          </div>
          <div class="btn-row-main">
             <button id="btnSaveGitHub" class="primary">Save Settings</button>
             <button id="btnClearGitHub" class="ghost">Clear Settings</button>
-            <a href="https://github.com/settings/tokens" target="_blank" class="link-btn">Get Token</a>
          </div>
        </div>
 
@@ -372,10 +357,10 @@
          <h2>Danger Zone</h2>
          <div class="settings-grid">
            <label>
-             <span class="small-label">Reset Scope</span>
+             <span class="small-label">Scope</span>
              <select id="resetScope">
-               <option value="all">All Questions (Reset Progress Only)</option>
-               <option value="wrong">Only Wrong Questions</option>
+               <option value="all">All Questions</option>
+               <option value="wrong">Only Wrong</option>
              </select>
            </label>
          </div>
@@ -383,9 +368,8 @@
             <button id="btnResetProgress" class="danger">Reset Progress</button>
          </div>
        </div>
-
        <div class="card">
-          <p class="tiny">MCQ Ultra-Pro v5.0.0 (Ultimate)</p>
+          <p class="tiny">v5.1.0 Professional</p>
        </div>
     </section>
 
@@ -397,37 +381,34 @@
   <div class="modal-body">
     <h3>Edit Question</h3>
     <div class="modal-content">
-       <label>Question Text: <textarea id="editText" rows="3"></textarea></label>
+       <label>Text: <textarea id="editText" rows="3"></textarea></label>
        <label>Chapter: <input id="editChapter"></label>
-       <label>Tags (comma separated): <input id="editTags"></label>
+       <label>Tags: <input id="editTags"></label>
        <label>Explanation: <textarea id="editExplanation" rows="3"></textarea></label>
        <label>Image URL: <input id="editImageUrl"></label>
        
        <div class="small-label">Choices:</div>
        <div id="editChoices"></div>
-       <button id="btnAddChoice" class="pill-btn" style="width:100px;">+ Add Choice</button>
+       <button id="btnAddChoice" class="pill-btn">+ Add Choice</button>
 
        <div class="modal-flags">
           <label><input type="checkbox" id="editFlagged"> Flagged</label>
           <label><input type="checkbox" id="editMaint"> Maintenance</label>
-          <label><input type="checkbox" id="editPinned"> Pinned</label>
-          <label><input type="checkbox" id="editActive"> Active</label>
        </div>
     </div>
     <div class="modal-actions">
-       <button id="btnEditSave" class="primary">Save Changes</button>
+       <button id="btnEditSave" class="primary">Save</button>
        <button id="btnEditCancel">Cancel</button>
     </div>
   </div>
 </div>
 
-<button id="btnForceUpdate" class="floating-update-btn" title="Force Reload">↻ Reload App</button>
+<button id="btnForceUpdate" class="floating-update-btn">↻ Update App</button>
 
-<script src="app.js?v=5.0.0"></script>
+<script src="app.js?v=5.1.0"></script>
 <script>
-  // Simple Service Worker Register
   if ('serviceWorker' in navigator) {
-     navigator.serviceWorker.register('./service-worker.js?v=5.0.0').catch(err => console.log(err));
+     navigator.serviceWorker.register('./service-worker.js?v=5.1.0').catch(()=>{});
   }
 </script>
 </body>
