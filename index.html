@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v8.5 Diamond</title>
+  <title>MCQ Ultra-Pro v8.5.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=8.5.0">
-  <link rel="stylesheet" href="style.css?v=8.5.0">
+  <link rel="manifest" href="manifest.json?v=8.5.1">
+  <link rel="stylesheet" href="style.css?v=8.5.1">
 </head>
 <body>
 
@@ -18,7 +18,7 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Diamond <span class="ver">v8.5</span></h1>
+        <h1>MCQ Diamond <span class="ver">v8.5.1</span></h1>
         <div class="xp-wrapper">
            <div class="xp-bar"><div id="xpFill" style="width:0%"></div></div>
            <span class="xp-text"><span id="userRank">Intern</span> • <span id="userXP">0</span> XP</span>
@@ -68,7 +68,7 @@
                 <select id="chapterSelect" class="std-select chapter-list"><option value="">All</option></select>
               </div>
               <div class="toggles">
-                 <label class="check-label" title="Hide questions you answered correctly">
+                 <label class="check-label" title="Hide correctly answered">
                    <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
                  </label>
               </div>
@@ -103,10 +103,10 @@
             
             <div id="srsButtons" class="srs-row hidden">
                <span class="small-label">Rate Difficulty:</span>
-               <button class="srs-btn again" onclick="handleSRS(1)">Again (1m)</button>
-               <button class="srs-btn hard" onclick="handleSRS(2)">Hard (2d)</button>
-               <button class="srs-btn good" onclick="handleSRS(3)">Good (4d)</button>
-               <button class="srs-btn easy" onclick="handleSRS(4)">Easy (7d)</button>
+               <button class="srs-btn again" id="btnSrsAgain">Again (1m)</button>
+               <button class="srs-btn hard" id="btnSrsHard">Hard (2d)</button>
+               <button class="srs-btn good" id="btnSrsGood">Good (4d)</button>
+               <button class="srs-btn easy" id="btnSrsEasy">Easy (7d)</button>
             </div>
 
             <div class="nav-row">
@@ -143,11 +143,12 @@
            <div class="fc-content hidden" id="flashcardBack"></div>
         </div>
         <div class="btn-row-main fc-controls">
-           <button id="btnFcShow" class="primary-btn">Show Answer (Space)</button>
+           <button id="btnFcShow" class="primary-btn">Show Answer</button>
            <div id="fcGrading" class="hidden">
-             <button class="danger-btn" onclick="nextFlashcard(false)">Again</button>
-             <button class="primary-btn" onclick="nextFlashcard(true)">Good</button>
+             <button class="danger-btn" id="btnFcGradeAgain">Again</button>
+             <button class="primary-btn" id="btnFcGradeGood">Good</button>
            </div>
+           <button id="btnFcNext" class="nav-btn hidden">Next</button>
         </div>
       </div>
     </section>
@@ -155,6 +156,7 @@
     <section class="tab-content" id="tab-exam">
       <div class="card">
          <h2>Exam Simulator</h2>
+         <p class="muted tiny">Timed mode. No feedback until the end.</p>
          <div class="row-controls">
            <select id="examChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
            <input id="examCount" type="number" value="40" class="std-input" style="width:80px;" placeholder="Qty">
@@ -212,8 +214,8 @@
 
     <section class="tab-content" id="tab-all">
       <div class="subnav">
-        <button class="subnav-btn active" onclick="switchSubTab('bank')">Question Bank</button>
-        <button class="subnav-btn" onclick="switchSubTab('builder')">AI Builder</button>
+        <button class="subnav-btn active" id="viewBankBtn">Question Bank</button>
+        <button class="subnav-btn" id="viewBuilderBtn">AI Builder</button>
       </div>
 
       <div id="viewBank">
@@ -221,23 +223,24 @@
           <div class="filter-bar">
              <input id="allSearch" placeholder="Search text, ID, tags..." class="std-input flex-grow">
              <select id="allFilter" class="std-select">
-               <option value="all">Status: All</option>
-               <option value="notes">With Notes</option>
-               <option value="wrong">Has Errors</option>
-               <option value="flagged">Flagged</option>
+               <option value="all">Filter: All</option>
+               <option value="notes">With Notes 📝</option>
+               <option value="wrong">Errors ❌</option>
+               <option value="flagged">Flagged 🚩</option>
                <option value="unseen">Unseen</option>
              </select>
              <select id="allChapterSelect" class="std-select chapter-list">
                <option value="">Chapter: All</option>
              </select>
+             <button id="btnAllApply" class="primary-btn">Apply</button>
           </div>
 
           <div id="bulkBar" class="bulk-toolbar hidden">
              <span>Selected: <b id="selCount">0</b></span>
              <div class="bulk-btns">
-                <button onclick="execBulk('delete')" class="danger-btn small">Delete</button>
-                <button onclick="execBulk('flag')" class="pill-btn small">Flag</button>
-                <button onclick="execBulk('reset')" class="pill-btn small">Reset Stats</button>
+                <button id="btnBulkDelete" class="danger-btn small">Delete</button>
+                <button id="btnBulkFlag" class="pill-btn small">Flag</button>
+                <button id="btnBulkReset" class="pill-btn small">Reset</button>
              </div>
           </div>
 
@@ -260,7 +263,7 @@
           
           <div class="all-footer">
              <button id="allPrevPage" class="nav-btn">Prev</button>
-             <span id="allPageInfo">Page 1</span>
+             <span id="allPageInfo">1 / 1</span>
              <button id="allNextPage" class="nav-btn">Next</button>
           </div>
 
@@ -270,8 +273,8 @@
              </div>
              <div class="io-right">
                 <input type="file" id="fileInput" accept=".json" class="hidden">
-                <button onclick="document.getElementById('fileInput').click()" class="secondary-btn">Import JSON</button>
-                <button id="btnExport" class="secondary-btn">Export JSON</button>
+                <button id="btnImportTrigger" class="secondary-btn">Import JSON</button>
+                <button id="btnExportTrigger" class="secondary-btn">Export JSON</button>
              </div>
           </div>
         </div>
@@ -311,8 +314,8 @@
         <p class="tiny muted">Sync your progress across devices.</p>
         <div id="cloudStatusLabel" class="status-text">Not Connected</div>
         <div class="row-controls">
-          <button id="btnCloudUpload" class="action-btn">Upload to Cloud ⬆</button>
-          <button id="btnCloudDownload" class="action-btn">Download from Cloud ⬇</button>
+          <button id="btnCloudUpload" class="action-btn">Upload ⬆</button>
+          <button id="btnCloudDownload" class="action-btn">Download ⬇</button>
         </div>
         <div id="cloudLoader" class="hidden" style="color:#2563eb; margin-top:5px;">Working...</div>
       </div>
@@ -323,7 +326,7 @@
            <button id="btnLocalExport" class="primary-btn">Download Backup File</button>
            <span>OR</span>
            <input type="file" id="backupFileInput" accept=".json" class="hidden">
-           <button onclick="document.getElementById('backupFileInput').click()" class="action-btn">Restore from File</button>
+           <button id="btnLocalImportTrigger" class="action-btn">Restore from File</button>
         </div>
       </div>
     </section>
@@ -343,6 +346,7 @@
          <h2>Data Management</h2>
          <button id="btnResetProgress" class="danger-btn">Reset All Progress</button>
          <button id="btnForceReload" class="ghost-btn">Force App Reload</button>
+         <button id="btnFactoryReset" class="danger-btn">Factory Reset (Delete DB)</button>
        </div>
     </section>
 
@@ -350,7 +354,7 @@
 </div>
 
 <div id="editModal" class="modal hidden">
-  <div class="modal-backdrop" onclick="closeEditModal()"></div>
+  <div class="modal-backdrop" id="modalBackdrop"></div>
   <div class="modal-content">
      <h3>Edit Question</h3>
      <label class="small-label">Text</label>
@@ -366,23 +370,25 @@
      
      <div class="small-label" style="margin-top:10px;">Choices</div>
      <div id="editChoicesList"></div>
-     <button onclick="addEditChoice()" class="pill-btn small" style="margin-top:5px;">+ Add Choice</button>
+     <button id="btnAddChoice" class="pill-btn small" style="margin-top:5px;">+ Add Choice</button>
 
      <div class="modal-flags">
         <label class="check-label"><input type="checkbox" id="editFlagged"> Flagged</label>
      </div>
      
      <div class="modal-footer">
-        <button onclick="saveEditModal()" class="primary-btn">Save Changes</button>
-        <button onclick="closeEditModal()" class="secondary-btn">Cancel</button>
+        <button id="btnSaveEdit" class="primary-btn">Save</button>
+        <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
      </div>
   </div>
 </div>
 
-<script src="app.js?v=8.5.0"></script>
+<button id="btnForceUpdate" class="floating-update-btn">↻ Reload</button>
+
+<script src="app.js?v=8.5.1"></script>
 <script>
   if ('serviceWorker' in navigator) {
-     navigator.serviceWorker.register('./service-worker.js?v=8.5.0').catch(()=>{});
+     navigator.serviceWorker.register('./service-worker.js?v=8.5.1').catch(()=>{});
   }
 </script>
 </body>
