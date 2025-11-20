@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v11.7</title>
+  <title>MCQ Ultra-Pro v12.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=11.7.0">
+  <link rel="manifest" href="manifest.json?v=12.0.0">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,13 +19,12 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v11.7</span></h1>
-        <div class="xp-wrapper"><span id="userRank">Intern</span></div>
+        <h1>MCQ Ultra-Pro <span class="ver">v12.0</span></h1>
       </div>
     </div>
     <div class="chips">
       <span class="chip" id="dbStatus">DB: Init...</span>
-      <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
+      <span class="chip chip-sync" id="syncStatus">Cloud: Checking...</span>
       <button id="btnHeaderBackup" class="chip header-btn">☁️ Backup</button>
       <select id="themeSelect" class="chip chip-theme">
         <option value="light">☀︎ Light</option>
@@ -46,12 +45,11 @@
 
   <main class="tab-container">
 
-    <!-- 1. PRACTICE TAB -->
+    <!-- 1. PRACTICE -->
     <section id="tab-home" class="tab-content active">
       <div class="card main-layout">
         <div class="row">
           <div class="col-main">
-            <!-- Controls -->
             <div class="row-controls">
               <select id="modeSelect" class="std-select">
                 <option value="due">🧠 Smart Review</option>
@@ -65,39 +63,32 @@
               <select id="chapterSelect" class="std-select chapter-list" style="display:none;">
                   <option value="">All Chapters</option>
               </select>
-              
-              <!-- Refresh Button -->
-              <button id="btnRefreshPractice" class="refresh-btn" title="Apply Filters">↻ Apply</button>
-              
+              <button id="btnRefreshPractice" class="refresh-btn">↻ Apply</button>
               <label class="check-label">
                  <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
               </label>
               <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
             </div>
 
-            <!-- Question Display -->
-            <div id="questionPanel" class="question-panel">
-               <div class="muted" style="padding:20px; text-align:center;">Loading Engine...</div>
-            </div>
-
-            <!-- Tools -->
-            <div class="tools-row">
-               <div id="searchTools" class="search-tools"></div>
-               <button class="ghost-btn" id="btnFlag">Flag ⚐</button>
-               <button class="ghost-btn warning-text" id="btnMaintain">🔧 Report</button>
-            </div>
-            
-            <!-- Maintenance Box -->
             <div id="maintBox" class="maint-box hidden">
                <strong style="color:var(--danger)">🔧 Maintenance Mode</strong>
                <textarea id="maintNote" class="maint-input" placeholder="Describe error..."></textarea>
                <button id="btnSaveMaint" class="tiny-btn">Save Report</button>
             </div>
 
-            <!-- Notes -->
+            <div id="questionPanel" class="question-panel">
+               <div class="muted" style="padding:20px; text-align:center;">Loading Engine...</div>
+            </div>
+
+            <div class="tools-row">
+               <div id="searchTools" class="search-tools"></div>
+               <button class="ghost-btn" id="btnFlag">Flag ⚐</button>
+               <button class="ghost-btn warning-text" id="btnMaintain">🔧 Report</button>
+            </div>
+
             <div class="notes-container">
               <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                 <label class="small-label">My Notes 📝 <span id="saveNoteStatus"></span></label>
+                 <label class="small-label">Notes 📝 <span id="saveNoteStatus"></span></label>
                  <button id="btnSaveNoteManual" class="tiny-btn">💾 Save Note</button>
               </div>
               <textarea id="userNoteArea" class="notes-textarea" placeholder="Type notes here..."></textarea>
@@ -105,24 +96,21 @@
 
             <div id="feedbackPanel" class="feedback-panel hidden"></div>
 
-            <!-- Buttons -->
             <div class="btn-row-main">
-              <button class="primary-btn large" id="btnSubmit">Submit Answer</button>
+              <button class="primary-btn large" id="btnSubmit">Submit</button>
               <button class="primary-btn large hidden" id="btnNext">Next →</button>
               <label class="check-label guess-box">
-                <input type="checkbox" id="guessCheck"> I'm Guessing
+                <input type="checkbox" id="guessCheck"> Guessing
               </label>
             </div>
-            
-            <!-- SRS -->
-            <div id="srsButtons" class="srs-row hidden">
-               <button class="srs-btn again" id="btnSrsAgain">Again (1m)</button>
-               <button class="srs-btn hard" id="btnSrsHard">Hard (2d)</button>
-               <button class="srs-btn good" id="btnSrsGood">Good (4d)</button>
-               <button class="srs-btn easy" id="btnSrsEasy">Easy (7d)</button>
-            </div>
 
-            <!-- Navigation -->
+            <div id="srsButtons" class="srs-row hidden">
+               <button class="srs-btn again" id="btnSrsAgain">Again</button>
+               <button class="srs-btn hard" id="btnSrsHard">Hard</button>
+               <button class="srs-btn good" id="btnSrsGood">Good</button>
+               <button class="srs-btn easy" id="btnSrsEasy">Easy</button>
+            </div>
+            
             <div class="nav-row">
                <button class="secondary-btn" id="btnPrev">← Previous</button>
                <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
@@ -134,37 +122,42 @@
                 <div class="small-label">Session</div>
                 <div id="sessionStats" class="stats-text">0 Correct</div>
              </div>
-             <div class="card side-card">
-                <div class="small-label">History</div>
-                <div class="history-list" id="historyList"></div>
-             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 2. LIBRARY TAB -->
+    <!-- 2. LIBRARY (Sticky Headers) -->
     <section id="tab-all" class="tab-content">
-      <div class="card">
-          <div class="row-controls">
-             <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
-             <select id="allFilter" class="std-select">
-               <option value="all">All</option>
-               <option value="maintain">🔧 Maintenance</option>
-               <option value="notes">With Notes</option>
-               <option value="wrong">Errors</option>
-               <option value="flagged">Flagged</option>
-             </select>
-             <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
-             <button id="btnAllApply" class="refresh-btn">↻ Refresh</button>
+      <div class="card library-card">
+          
+          <!-- Sticky Control Area -->
+          <div class="library-sticky-header">
+              <div class="filter-bar">
+                 <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
+                 <select id="allFilter" class="std-select">
+                   <option value="all">All</option>
+                   <option value="maintain">🔧 Maintenance</option>
+                   <option value="notes">With Notes</option>
+                   <option value="wrong">Errors</option>
+                   <option value="flagged">Flagged</option>
+                 </select>
+                 <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
+                 <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
+              </div>
+
+              <div class="row-controls dup-area">
+                 <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
+                 <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
+                 <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
+              </div>
+              
+              <div class="table-header-row">
+                 <!-- Custom Header Row for Alignment -->
+              </div>
           </div>
 
-          <div class="row-controls" style="background:#fff7ed; padding:10px; border-radius:8px;">
-             <button id="btnScanDup" class="pill-btn">🔍 Scan Duplicates</button>
-             <span id="dupResult" style="font-size:0.8rem; color:#666; margin-left:10px;"></span>
-             <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
-          </div>
-
+          <!-- Scrollable Table Area -->
           <div class="table-wrapper">
             <table class="q-table">
               <thead>
@@ -192,9 +185,9 @@
 
           <div class="io-strip">
              <input type="file" id="fileInput" accept=".json" class="hidden">
-             <button id="btnImportTrigger" class="secondary-btn">📥 Import JSON</button>
-             <button id="btnExportTrigger" class="secondary-btn">💾 Export Full</button>
-             <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
+             <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
+             <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
+             <button id="btnRangeMode" class="pill-btn">✨ Range: OFF</button>
              <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
           </div>
       </div>
@@ -227,9 +220,9 @@
        <div class="card">
           <h2>Exam Simulator</h2>
           <div class="row-controls">
-             <select id="examChapterSelect" class="std-select chapter-list"><option value="">All</option></select>
+             <select id="examChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
              <input id="examCount" type="number" value="40" class="std-input" style="width:70px">
-             <button id="btnStartExam" class="primary-btn">Start</button>
+             <button id="btnStartExam" class="primary-btn">Start Exam</button>
           </div>
        </div>
        <div id="examInterface" class="card hidden">
@@ -266,10 +259,9 @@
     <section id="tab-settings" class="tab-content">
        <div class="card">
           <h3>GitHub Config</h3>
-          <!-- Fixed IDs to match app.js exactly -->
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
-          <button id="btnSaveGh" class="primary-btn">Save Settings</button>
+          <button id="btnSaveGh" class="primary-btn">Save Config</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
@@ -277,7 +269,7 @@
        <div class="card" style="margin-top:20px;">
           <h3>System</h3>
           <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
-          <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
+          <button id="btnFactoryReset" class="danger-btn">Factory Reset (Wipe DB)</button>
           <button id="btnForceReload" class="ghost-btn">Force Reload</button>
        </div>
     </section>
