@@ -1,4 +1,3 @@
-/* MCQ Ultra-Pro v11.5.0 CSS */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -15,7 +14,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 
 /* LAYOUT */
 .app { display: flex; flex-direction: column; height: 100%; max-width: 1400px; margin: 0 auto; }
-.top-bar { padding: 0.8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.top-bar { padding: 0.8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .brand-area { display: flex; align-items: center; gap: 12px; }
 .logo { font-size: 1.5rem; }
 .brand-area h1 { margin: 0; font-size: 1.2rem; color: var(--primary); }
@@ -25,7 +24,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 .header-btn { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
 
 /* TABS */
-.tabs { display: flex; gap: 8px; padding: 10px 20px; background: var(--bg); overflow-x: auto; border-bottom: 1px solid var(--border); }
+.tabs { display: flex; gap: 8px; padding: 10px 20px; background: var(--bg); overflow-x: auto; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .tab-button { padding: 8px 20px; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: 600; transition: 0.2s; }
 .tab-button.active { background: var(--primary); color: white; border-color: var(--primary); }
 .tab-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
@@ -57,11 +56,13 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .range-active { background: var(--primary); color: white; border-color: var(--primary); }
 
 /* TABLE (FIXED LAYOUT) */
-.table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-top: 15px; background: var(--card); max-height: 60vh; }
+.library-card { display: flex; flex-direction: column; height: 100%; max-height: 80vh; overflow: hidden; padding: 0; }
+.library-sticky-header { padding: 1.5rem 1.5rem 0 1.5rem; background: var(--card); z-index: 20; border-bottom: 1px solid var(--border); }
+.table-wrapper { overflow-x: auto; flex: 1; padding: 0 1.5rem; }
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
 .q-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.q-table td.wrap-text { white-space: normal; line-height: 1.4; }
+.q-table td.wrap-text { white-space: normal; line-height: 1.4; } /* Text Wrap for Question */
 .tag-maint { background: var(--maint-bg); color: var(--maint-text); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--maint-text); display: inline-block; }
 
 /* UI ELEMENTS */
@@ -76,6 +77,8 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .srs-row { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; }
 .srs-btn { flex: 1; color: white; }
 .again { background: var(--danger); } .hard { background: var(--warning); } .good { background: var(--success); } .easy { background: var(--primary); }
+.dup-bar { background: #fff7ed; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.io-strip { padding: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; background: var(--card); }
 
 /* DASHBOARD */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
@@ -89,7 +92,5 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
-.library-sticky-header { position: sticky; top: 0; background: var(--card); z-index: 15; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-.io-strip { padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }

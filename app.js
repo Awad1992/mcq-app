@@ -1,6 +1,6 @@
 /**
- * MCQ Ultra-Pro v11.5.0 (Final Integrity)
- * Features: Table Sorting, Range Select, Maintenance, Cloud Check, Nav Buttons.
+ * MCQ Ultra-Pro v12.5 (Integrity Edition)
+ * Verified: Sorting, Select All, Flashcards, Exam, Cloud, Maintenance.
  */
 
 const DB_NAME = 'mcq_pro_v11';
@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadNextQuestion(true);
         
         document.getElementById('dbStatus').textContent = "DB: Ready";
-        checkCloud();
-        showToast('System v11.5 Ready 💎');
+        checkCloud(); // Ping check
+        showToast('System v12.5 Ready 💎');
     } catch(e) { 
         console.error(e);
         alert("Init Error: "+e.message); 
@@ -99,7 +99,7 @@ function loadNextQuestion(reset) {
 
     const panel = document.getElementById('questionPanel');
     if(pool.length === 0) {
-        panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions match criteria.<br>Try "Refresh" or change filters.</div>';
+        panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions match criteria.<br>Try "Apply" or change filters.</div>';
         return;
     }
 
@@ -112,9 +112,7 @@ function loadPrevQuestion() {
     if (App.history.length === 0) return showToast("No history", "warn");
     App.currentQ = App.history.pop();
     renderQ();
-    if(App.currentQ.lastChoice !== undefined) {
-        showFeedback(App.currentQ.lastChoice, App.currentQ);
-    }
+    if(App.currentQ.lastChoice !== undefined) showFeedback(App.currentQ.lastChoice, App.currentQ);
 }
 
 function renderQ() {
@@ -125,7 +123,7 @@ function renderQ() {
     document.getElementById('srsButtons').classList.add('hidden');
     document.getElementById('btnSubmit').classList.remove('hidden');
     document.getElementById('btnNext').classList.add('hidden');
-    document.getElementById('maintBox').classList.add('hidden');
+    document.getElementById('maintBox').style.display = 'none';
     
     document.getElementById('btnFlag').textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
     document.getElementById('btnFlag').style.color = q.flagged ? "red" : "";
@@ -184,7 +182,7 @@ function showFeedback(idx, q) {
     document.getElementById('srsButtons').classList.remove('hidden');
 }
 
-// --- 4. LIBRARY TABLE (FIXED SORT & RANGE) ---
+// --- 4. LIBRARY TABLE ---
 function applyTableFilters() {
     const txt = document.getElementById('allSearch').value.toLowerCase();
     const type = document.getElementById('allFilter').value;
@@ -206,6 +204,13 @@ function sortTable(field) {
     App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
     App.sort.field = field;
     
+    // Visual Indicators
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.textContent = th.dataset.key === field 
+           ? `${th.dataset.key.toUpperCase()} ${App.sort.asc ? '↑' : '↓'}` 
+           : `${th.dataset.key.toUpperCase()} ↕`;
+    });
+
     App.tableQs.sort((a,b) => {
         let valA = a[field] || 0; let valB = b[field] || 0;
         if(typeof valA==='string') { valA=valA.toLowerCase(); valB=valB.toLowerCase(); }
@@ -243,6 +248,7 @@ function renderTable() {
     document.getElementById('selCount').textContent = App.selectedIds.size + " Selected";
 }
 
+// Range Select Logic
 function handleCheck(cb, id) {
     if(App.rangeMode && App.lastCheckId !== null && cb.checked) {
         const all = App.tableQs.map(q=>q.id);
@@ -312,9 +318,12 @@ function setupEvents() {
     bind('btnCloudUpload', 'click', cloudUpload);
     bind('btnCloudDownload', 'click', cloudDownload);
     bind('btnResetProgress', 'click', () => { if(confirm("Reset?")) { App.questions.forEach(q=>{q.timesSeen=0; saveQ(q)}); location.reload(); } });
+    bind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
     
     bind('btnFcShuffle', 'click', buildFlashcardPool);
     bind('btnFcShow', 'click', () => document.getElementById('fcBack').style.display='block');
+    bind('btnFcAgain', 'click', () => nextFlashcard(false));
+    bind('btnFcGood', 'click', () => nextFlashcard(true));
 
     bind('btnStartExam', 'click', startExam);
     bind('btnExamNext', 'click', () => examMove(1));
@@ -327,6 +336,12 @@ function setupEvents() {
     
     // Nav
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+    
+    // SRS
+    bind('btnSrsAgain', 'click', () => handleSRS(1));
+    bind('btnSrsHard', 'click', () => handleSRS(2));
+    bind('btnSrsGood', 'click', () => handleSRS(3));
+    bind('btnSrsEasy', 'click', () => handleSRS(4));
 }
 
 // --- UTILS ---
@@ -339,7 +354,7 @@ function switchTab(id) {
     document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
     document.getElementById(`tab-${id}`).classList.add('active');
     if(id==='all') applyTableFilters();
-    if(id==='dashboard') document.getElementById('dashTotal').textContent = App.questions.length;
+    if(id==='dashboard') renderDashboard();
 }
 function refreshUI() {
     const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();
@@ -431,6 +446,7 @@ function saveSettings() {
 }
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deb64(s) { return decodeURIComponent(escape(atob(s))); }
+
 async function cloudUpload() {
     const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
     if(!t) return alert("Check Settings");
@@ -557,4 +573,10 @@ function handleSRS(grade) {
     q.dueDate = Date.now() + (days * 24 * 60 * 60 * 1000);
     saveQ(q);
     loadNextQuestion(false);
+}
+function renderDashboard() {
+    const total = App.questions.length;
+    const mastered = App.questions.filter(q => q.timesCorrect > 3).length;
+    document.getElementById('dashTotal').textContent = total;
+    document.getElementById('dashMastery').textContent = Math.round((mastered/total)*100 || 0) + '%';
 }

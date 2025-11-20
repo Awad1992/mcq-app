@@ -131,11 +131,10 @@
       </div>
     </section>
 
-    <!-- 2. LIBRARY (Sticky Headers) -->
+    <!-- 2. LIBRARY -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
           
-          <!-- Sticky Control Area -->
           <div class="library-sticky-header">
               <div class="filter-bar">
                  <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
@@ -152,13 +151,11 @@
 
               <div class="row-controls dup-area" style="background:#fff7ed; padding:10px; border-radius:8px;">
                  <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
-                 <!-- Result appears here -->
                  <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
                  <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
               </div>
           </div>
 
-          <!-- Scrollable Table Area -->
           <div class="table-wrapper">
             <table class="q-table">
               <thead>
@@ -188,7 +185,7 @@
              <input type="file" id="fileInput" accept=".json" class="hidden">
              <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
              <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
-             <button id="btnRangeMode" class="pill-btn">✨ Range: OFF</button>
+             <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
              <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
           </div>
       </div>
