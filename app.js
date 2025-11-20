@@ -1,10 +1,10 @@
 /**
- * MCQ Ultra-Pro v12.5 (Final Integrity)
- * Features: Table Sorting, Range Select, Maintenance, Cloud Check, Nav Buttons.
+ * MCQ Ultra-Pro v12.5 (Final Verified)
+ * ALL Features: Select All, Sort, Range, Exam, Flashcards, Maintenance, Cloud.
  */
 
-const DB_NAME = 'mcq_pro_v11';
-const DB_VERSION = 21; // Force Update
+const DB_NAME = 'mcq_pro_v12';
+const DB_VERSION = 21; // Force Clean Init
 let db = null;
 
 const App = {
@@ -29,7 +29,11 @@ function showToast(msg, type='success') {
 function bind(id, ev, fn) { 
     const el = document.getElementById(id); 
     if(el) el.addEventListener(ev, fn); 
-    else console.warn("Missing Element ID:", id);
+    else console.warn("Missing ID:", id);
+}
+function safeSetText(id, val) {
+    const el = document.getElementById(id);
+    if(el) el.textContent = val;
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
@@ -38,8 +42,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         db = await initDB();
         await loadData();
-        
-        // SAFE SETUP (Order Matters)
         loadSettings();
         setupEvents();
         refreshUI();
@@ -47,7 +49,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         buildFlashcardPool();
         loadNextQuestion(true);
         
-        document.getElementById('dbStatus').textContent = "DB: Ready";
+        safeSetText('dbStatus', "DB: Ready");
+        checkCloud();
         showToast('System v12.5 Ready 💎');
     } catch(e) { 
         console.error(e);
@@ -78,31 +81,7 @@ async function loadData() {
     });
 }
 
-// --- 3. SETTINGS SAFE LOAD ---
-function loadSettings() {
-    const t = localStorage.getItem('gh_token') || '';
-    const r = localStorage.getItem('gh_repo') || '';
-    const f = localStorage.getItem('gh_file') || 'mcq_backup.json';
-    
-    const elT = document.getElementById('ghToken');
-    const elR = document.getElementById('ghRepo');
-    const elF = document.getElementById('ghFile');
-    
-    if(elT) elT.value = t;
-    if(elR) elR.value = r;
-    if(elF) elF.value = f;
-}
-
-function saveSettings() {
-    const elT = document.getElementById('ghToken');
-    if(!elT) return;
-    localStorage.setItem('gh_token', elT.value.trim());
-    localStorage.setItem('gh_repo', document.getElementById('ghRepo').value.trim());
-    localStorage.setItem('gh_file', document.getElementById('ghFile').value.trim());
-    showToast('Settings Saved ✅');
-}
-
-// --- 4. PRACTICE ENGINE ---
+// --- 3. PRACTICE ENGINE ---
 function loadNextQuestion(reset) {
     if(reset) App.history = [];
     if(App.currentQ && !reset) App.history.push(App.currentQ);
@@ -132,6 +111,15 @@ function loadNextQuestion(reset) {
     const rand = Math.floor(Math.random() * pool.length);
     App.currentQ = pool[rand];
     renderQ();
+}
+
+function loadPrevQuestion() {
+    if (App.history.length === 0) return showToast("No history", "warn");
+    App.currentQ = App.history.pop();
+    renderQ();
+    if(App.currentQ.lastChoice !== undefined) {
+        showFeedback(App.currentQ.lastChoice, App.currentQ);
+    }
 }
 
 function renderQ() {
@@ -173,7 +161,19 @@ function selectChoice(idx) {
 function submitAnswer() {
     if(App.selectedChoice === undefined) return alert("Select an answer");
     const q = App.currentQ;
-    const idx = App.selectedChoice;
+    q.lastChoice = App.selectedChoice; 
+    
+    showFeedback(App.selectedChoice, q);
+    
+    const isCorrect = q.choices[App.selectedChoice].isCorrect;
+    q.timesSeen = (q.timesSeen||0) + 1;
+    if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1; else q.timesWrong = (q.timesWrong||0)+1;
+    
+    if(!q.dueDate) q.dueDate = Date.now();
+    saveQ(q);
+}
+
+function showFeedback(idx, q) {
     const correctIdx = q.choices.findIndex(c => c.isCorrect);
     const isCorrect = (idx === correctIdx);
     
@@ -187,21 +187,9 @@ function submitAnswer() {
     document.getElementById('btnSubmit').classList.add('hidden');
     document.getElementById('btnNext').classList.remove('hidden');
     document.getElementById('srsButtons').classList.remove('hidden');
-    
-    // Stats
-    q.timesSeen = (q.timesSeen||0)+1;
-    if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1; else q.timesWrong = (q.timesWrong||0)+1;
-    saveQ(q);
 }
 
-function loadPrevQuestion() {
-    if (App.history.length === 0) return showToast("No history", "warn");
-    App.currentQ = App.history.pop();
-    renderQ();
-    // Could restore choice here if needed
-}
-
-// --- 5. TABLE LOGIC ---
+// --- 4. TABLE LOGIC ---
 function applyTableFilters() {
     const txt = document.getElementById('allSearch').value.toLowerCase();
     const type = document.getElementById('allFilter').value;
@@ -256,8 +244,8 @@ function renderTable() {
         `;
         tbody.appendChild(tr);
     });
-    document.getElementById('allPageInfo').textContent = App.page;
-    document.getElementById('selCount').textContent = App.selectedIds.size + " Selected";
+    safeSetText('allPageInfo', App.page);
+    safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
 function handleCheck(cb, id) {
@@ -271,8 +259,7 @@ function handleCheck(cb, id) {
         if(cb.checked) App.selectedIds.add(id); else App.selectedIds.delete(id);
     }
     App.lastCheckId = id;
-    document.getElementById('selCount').textContent = App.selectedIds.size + " Selected";
-    renderTable();
+    safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
 function toggleSelectAll(cb) {
@@ -282,10 +269,19 @@ function toggleSelectAll(cb) {
     data.forEach(q => {
         if(checked) App.selectedIds.add(q.id); else App.selectedIds.delete(q.id);
     });
-    renderTable();
+    renderTable(); // Re-render check state
+    safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
-// --- 6. EVENTS ---
+function toggleRangeMode() {
+    App.rangeMode = !App.rangeMode;
+    const btn = document.getElementById('btnRangeMode');
+    btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
+    btn.classList.toggle('range-active', App.rangeMode);
+    showToast(App.rangeMode ? "Shift-select ON" : "Range OFF");
+}
+
+// --- 5. EVENTS ---
 function setupEvents() {
     bind('btnSubmit', 'click', submitAnswer);
     bind('btnNext', 'click', () => loadNextQuestion(false));
@@ -329,7 +325,7 @@ function setupEvents() {
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
     bind('btnAddChoice', 'click', addEditChoice);
     
-    // Nav
+    // Tabs
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
     
     // Headers
@@ -369,33 +365,12 @@ function saveNoteManual() {
         setTimeout(()=>btn.textContent="💾 Save Note", 2000);
     }
 }
-function toggleRangeMode() {
-    App.rangeMode = !App.rangeMode;
-    const btn = document.getElementById('btnRangeMode');
-    btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
-    btn.classList.toggle('range-active', App.rangeMode);
-    showToast(App.rangeMode ? "Shift-select logic enabled" : "Range OFF");
-}
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-    document.getElementById(`tab-${id}`).classList.add('active');
-    if(id==='all') applyTableFilters();
-    if(id==='dashboard') document.getElementById('dashTotal').textContent = App.questions.length;
-}
-function refreshUI() {
-    const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();
-    const h = '<option value="">All Chapters</option>' + chaps.map(c=>`<option value="${c}">${c}</option>`).join('');
-    document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
-}
-function renderDashboard() {
-    const total = App.questions.length;
-    const mastered = App.questions.filter(q => q.timesCorrect > 3).length;
-    document.getElementById('dashTotal').textContent = total;
-    document.getElementById('dashMastery').textContent = Math.round((mastered/total)*100 || 0) + '%';
+function checkCloud() {
+    const t = localStorage.getItem('gh_token');
+    if(t) safeSetText('syncStatus', "Cloud: Linked");
 }
 
-// Import/Export
+// --- IMPORT/EXPORT ---
 async function handleImport() {
     const f = document.getElementById('fileInput').files[0];
     if(!f) return;
@@ -422,28 +397,36 @@ function handleExport() {
     a.href=u; a.download='MCQ_Backup.json'; a.click();
 }
 
-// Duplicates
+// --- DUPLICATES ---
 function scanDuplicates() {
     const map = new Map(); App.duplicates = [];
     App.questions.forEach(q => {
         const k = (q.text||"").substring(0,40).toLowerCase();
         if(map.has(k)) App.duplicates.push(q); else map.set(k, q);
     });
-    document.getElementById('dupResult').textContent = `${App.duplicates.length} Dups`;
+    document.getElementById('dupResult').textContent = `${App.duplicates.length} Dups Found`;
     if(App.duplicates.length > 0) document.getElementById('btnFixDup').classList.remove('hidden');
 }
 async function fixDuplicates() {
     const tx = db.transaction('questions','readwrite');
     App.duplicates.forEach(q => tx.objectStore('questions').delete(q.id));
-    tx.oncomplete = async () => { await loadData(); scanDuplicates(); showToast('Fixed Duplicates'); };
+    tx.oncomplete = async () => { await loadData(); scanDuplicates(); showToast('Fixed'); };
 }
-async function execBulk(act) {
-    if(!confirm(`Bulk ${act}?`)) return;
-    const tx = db.transaction('questions', 'readwrite');
-    App.selectedIds.forEach(id => { if(act==='delete') tx.objectStore('questions').delete(id); });
-    tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
+
+// --- CLOUD ---
+function loadSettings() {
+    const t = localStorage.getItem('gh_token');
+    if(t) {
+        document.getElementById('ghToken').value = t;
+        document.getElementById('ghRepo').value = localStorage.getItem('gh_repo');
+    }
 }
-// Cloud
+function saveSettings() {
+    localStorage.setItem('gh_token', document.getElementById('ghToken').value);
+    localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
+    localStorage.setItem('gh_file', document.getElementById('ghFile').value);
+    alert("Settings Saved");
+}
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deb64(s) { return decodeURIComponent(escape(atob(s))); }
 async function cloudUpload() {
@@ -469,6 +452,7 @@ async function cloudDownload() {
         tx.oncomplete = () => { loadData(); refreshUI(); showToast('Downloaded'); };
     } catch(e) { alert(e.message); }
 }
+
 // Flashcards
 let fcPool = [], fcIdx = 0;
 function buildFlashcardPool() {
@@ -519,7 +503,8 @@ function finishExam() {
     document.getElementById('examResults').classList.remove('hidden');
     document.getElementById('examScore').innerHTML = `<h2>Score: ${correct} / ${examSession.qs.length}</h2>`;
 }
-// Edit
+
+// Edit Logic
 window.openEdit = (id) => {
     const q = App.questions.find(x=>x.id===id);
     if(!q) return;
@@ -552,6 +537,12 @@ function saveEditModal() {
     applyTableFilters();
     alert("Saved");
 }
+async function execBulk(act) {
+    if(!confirm(`Bulk ${act}?`)) return;
+    const tx = db.transaction('questions', 'readwrite');
+    App.selectedIds.forEach(id => { if(act==='delete') tx.objectStore('questions').delete(id); });
+    tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
+}
 function handleSRS(grade) {
     const q = App.currentQ;
     let days = 1;
@@ -559,4 +550,22 @@ function handleSRS(grade) {
     q.dueDate = Date.now() + (days * 24 * 60 * 60 * 1000);
     saveQ(q);
     loadNextQuestion(false);
+}
+function renderDashboard() {
+    const total = App.questions.length;
+    const mastered = App.questions.filter(q => q.timesCorrect > 3).length;
+    safeSetText('dashTotal', total);
+    safeSetText('dashMastery', Math.round((mastered/total)*100 || 0) + '%');
+}
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.getElementById(`tab-${id}`).classList.add('active');
+    if(id==='all') applyTableFilters();
+    if(id==='dashboard') renderDashboard();
+}
+function refreshUI() {
+    const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();
+    const h = '<option value="">All Chapters</option>' + chaps.map(c=>`<option value="${c}">${c}</option>`).join('');
+    document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
 }

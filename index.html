@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v12.5</title>
+  <title>MCQ Ultra-Pro v13.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=12.5.0">
+  <link rel="manifest" href="manifest.json?v=13.0.0">
   <link rel="stylesheet" href="style.css">
-  <!-- Fix favicon error -->
-  <link rel="icon" href="data:,">
 </head>
 <body>
 
@@ -20,7 +18,7 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v12.5</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v13.0</span></h1>
       </div>
     </div>
     <div class="chips">
@@ -256,18 +254,15 @@
     <section id="tab-settings" class="tab-content">
        <div class="card">
           <h3>GitHub Config</h3>
-          <!-- FIXED IDS HERE: Must match JS exactly -->
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
-          <input id="ghFile" value="mcq_backup.json" class="std-input" style="width:100%; margin-bottom:10px;">
-          
           <button id="btnSaveGh" class="primary-btn">Save Settings</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
        </div>
        <div class="card" style="margin-top:20px;">
-          <h3>System</h3>
+          <h3>Danger Zone</h3>
           <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
           <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
           <button id="btnForceReload" class="ghost-btn">Force Reload</button>
