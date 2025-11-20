@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v9.0</title>
+  <title>MCQ Ultra-Pro v9.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=9.0.0">
-  <link rel="stylesheet" href="style.css?v=9.0.0">
+  <link rel="manifest" href="manifest.json?v=9.1.0">
+  <link rel="stylesheet" href="style.css?v=9.1.0">
 </head>
 <body>
 
@@ -16,18 +16,17 @@
   
   <header class="top-bar">
     <div class="brand-area">
-      <h1>MCQ Ultra-Pro <span class="ver">v9.0 Safety</span></h1>
+      <h1>MCQ Ultra-Pro <span class="ver">v9.1</span></h1>
       <div class="xp-container">
-        <span id="userRank" class="rank-badge">Resident</span>
+        <span id="userRank" class="rank-badge">Intern</span>
         <div class="xp-bar-bg"><div id="xpBarFill" class="xp-bar-fill" style="width:0%"></div></div>
         <span class="xp-val"><span id="currXP">0</span> XP</span>
       </div>
     </div>
     <div class="chips">
-      <button id="btnTimeMachine" class="chip chip-time" title="Restore History">🕰️ Time Machine</button>
+      <button id="btnTimeMachine" class="chip chip-time">🕰️ History</button>
       <span class="chip" id="syncStatus">☁️ Offline</span>
       <select id="themeSelect" class="chip chip-theme">
-        <option value="system">💻 System</option>
         <option value="light">☀︎ Light</option>
         <option value="dark">🌙 Dark</option>
       </select>
@@ -41,7 +40,7 @@
     <button class="tab-button" data-tab="exam">Sim</button>
     <button class="tab-button" data-tab="dashboard">Stats</button>
     <button class="tab-button" data-tab="backup">Backup</button>
-    <button class="tab-button" data-tab="settings">Config</button>
+    <button class="tab-button" data-tab="settings">Settings</button>
   </nav>
 
   <main class="tab-container">
@@ -58,19 +57,14 @@
                   <option value="new">New Questions</option>
                   <option value="wrong">Mistakes</option>
                   <option value="chapter">Specific Chapter</option>
-                  <option value="collection">My Collections</option>
                 </select>
                 <select id="chapterSelect" class="std-select chapter-list" style="display:none;">
                   <option value="">Select Chapter...</option>
                 </select>
               </div>
-              
               <div class="toggles">
-                 <label class="check-label">
-                   <input type="checkbox" id="prefSkipSolved" checked> Skip Solved
-                 </label>
+                 <label class="check-label"><input type="checkbox" id="prefSkipSolved" checked> Skip Solved</label>
               </div>
-
               <div class="all-actions">
                  <button class="pill-btn" id="btnTTS" title="Read Question">🔊 Speak</button>
               </div>
@@ -79,16 +73,15 @@
             <div id="questionPanel" class="question-panel"></div>
             
             <div id="highlighterTools" class="tools-bar hidden">
-               <span class="tiny muted">Highlight Mode Active</span>
+               <span class="tiny muted">Highlight:</span>
                <button class="color-dot yellow" onclick="setHighlight('yellow')"></button>
                <button class="color-dot green" onclick="setHighlight('green')"></button>
-               <button class="color-dot pink" onclick="setHighlight('pink')"></button>
                <button class="pill-btn small" onclick="clearHighlights()">Clear</button>
             </div>
 
             <div class="notes-area-container">
-              <label class="small-label">My Clinical Notes 📝</label>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Add a pearl..."></textarea>
+              <label class="small-label">Notes 📝</label>
+              <textarea id="userNoteArea" class="notes-textarea" placeholder="Add note..."></textarea>
               <div id="saveNoteStatus" class="save-status"></div>
             </div>
 
@@ -99,7 +92,7 @@
               <label class="check-label" style="margin-left:15px;">
                 <input type="checkbox" id="guessCheck"> Guessing
               </label>
-              <button id="btnHighlight" class="ghost-btn">🖍️ Highlight</button>
+              <button id="btnHighlight" class="ghost-btn">🖍️ Highlight Mode</button>
             </div>
             
             <div class="nav-row">
@@ -115,7 +108,7 @@
                <div id="qTimer" class="timer-box">00s</div>
              </div>
              <div class="card side-card">
-               <div class="small-label">Tools</div>
+               <div class="small-label">Quick Refs</div>
                <div id="searchTools" class="v-stack"></div>
              </div>
           </div>
@@ -125,21 +118,21 @@
 
     <section class="tab-content" id="tab-library">
       <div class="subnav">
-         <button class="subnav-btn active" id="viewLib">Question Bank</button>
-         <button class="subnav-btn" id="viewTags">Tag Manager</button>
-         <button class="subnav-btn" id="viewBuilder">AI Builder</button>
+         <button class="subnav-btn active" id="viewLib">Bank</button>
+         <button class="subnav-btn" id="viewBuilder">Builder</button>
       </div>
 
       <div id="libBankView">
         <div class="card">
            <div class="row-controls">
-              <input id="allSearch" placeholder="Global Search (Press /)" class="std-input search-box">
+              <input id="allSearch" placeholder="Search..." class="std-input search-box">
               <select id="allFilter" class="std-select">
                 <option value="all">All</option>
                 <option value="wrong">Errors</option>
-                <option value="notes">Has Notes</option>
-                <option value="unseen">Unseen</option>
+                <option value="notes">Notes</option>
+                <option value="flagged">Flagged</option>
               </select>
+              <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
               <button id="btnAllApply" class="primary-btn">Apply</button>
            </div>
            
@@ -147,7 +140,7 @@
               <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
               <div class="bulk-actions">
                  <button id="btnBulkDelete" class="danger-btn small">Delete</button>
-                 <button id="btnBulkCollection" class="action-btn small">Add to Collection</button>
+                 <button id="btnBulkReset" class="action-btn small">Reset Stats</button>
               </div>
            </div>
 
@@ -174,25 +167,17 @@
         </div>
       </div>
 
-      <div id="libTagView" class="hidden">
-         <div class="card">
-            <h3>Tag Manager</h3>
-            <p class="muted tiny">Rename or merge tags across all questions.</p>
-            <div id="tagList" class="tag-grid"></div>
-         </div>
-      </div>
-
       <div id="libBuilderView" class="hidden">
          <div class="card">
             <div class="builder-layout">
                <div class="b-col">
-                  <label>Source Text</label>
+                  <label>Text</label>
                   <textarea id="builderSource" rows="8" class="std-textarea"></textarea>
                   <button id="btnGenPrompt" class="action-btn">Generate Prompt</button>
                   <textarea id="builderPrompt" rows="4" class="std-textarea" readonly></textarea>
                </div>
                <div class="b-col">
-                  <label>Paste JSON</label>
+                  <label>JSON</label>
                   <textarea id="builderJson" rows="8" class="std-textarea"></textarea>
                   <button id="btnImportJson" class="primary-btn">Import & Auto-Fix</button>
                </div>
@@ -205,12 +190,10 @@
        <div class="card">
           <h2>My Collections</h2>
           <div class="row-controls">
-             <input id="newCollName" placeholder="New Collection Name" class="std-input">
+             <input id="newCollName" placeholder="Name..." class="std-input">
              <button id="btnCreateColl" class="primary-btn">Create</button>
           </div>
-          <div id="collectionsList" class="coll-grid">
-             <div class="empty-state">No collections yet. Create one to group questions.</div>
-          </div>
+          <div id="collectionsList" class="coll-grid"></div>
        </div>
     </section>
 
@@ -220,13 +203,13 @@
           <div class="exam-config">
              <select id="examChapter" class="std-select chapter-list"><option value="">All</option></select>
              <input id="examQty" type="number" value="40" class="std-input" style="width:80px">
-             <button id="btnStartExam" class="primary-btn">Start Block</button>
+             <button id="btnStartExam" class="primary-btn">Start</button>
           </div>
        </div>
        <div id="examUI" class="card hidden">
           <div class="exam-header">
              <span id="examProgress">0/0</span>
-             <span id="examTime" class="timer-red">00:00</span>
+             <span id="examTime">00:00</span>
           </div>
           <div id="examPanel" class="q-panel"></div>
           <div class="nav-row">
@@ -234,6 +217,11 @@
              <button id="btnExamNext" class="nav-btn">Next</button>
              <button id="btnExamSubmit" class="danger-btn">Finish</button>
           </div>
+       </div>
+       <div id="examResults" class="card hidden">
+          <h3>Results</h3>
+          <div id="examScore"></div>
+          <button onclick="location.reload()" class="primary-btn">Close</button>
        </div>
     </section>
 
@@ -261,18 +249,14 @@
     <section class="tab-content" id="tab-backup">
       <div class="card warning-border">
          <h2>Cloud Sync (GitHub)</h2>
-         <div class="sync-status-box">
-            Status: <strong id="ghStatusText">Not Configured</strong>
-         </div>
          <div class="row-controls">
-            <button id="btnCloudUpload" class="action-btn">⬆ Upload to Cloud</button>
-            <button id="btnCloudDownload" class="action-btn">⬇ Download from Cloud</button>
+            <button id="btnCloudUpload" class="action-btn">⬆ Upload</button>
+            <button id="btnCloudDownload" class="action-btn">⬇ Download</button>
          </div>
-         <p class="tiny danger-text">Safety Lock: Upload is blocked if local database is empty.</p>
+         <p class="tiny danger-text">Safeguard: Cannot upload empty DB.</p>
       </div>
-      
       <div class="card">
-         <h2>Local & History</h2>
+         <h2>Local</h2>
          <div class="row-controls">
             <button id="btnLocalExport" class="secondary-btn">Export JSON</button>
             <input type="file" id="fileInput" class="hidden">
@@ -301,8 +285,7 @@
 
 <div id="modalTimeMachine" class="modal hidden">
    <div class="modal-content">
-      <h3>🕰️ Time Machine</h3>
-      <p class="tiny">Restore your database from a previous auto-save point.</p>
+      <h3>🕰️ Time Machine (Last 10 Auto-Saves)</h3>
       <div id="snapshotList" class="snap-list"></div>
       <button class="secondary-btn" onclick="closeModal('modalTimeMachine')">Close</button>
    </div>
@@ -325,6 +308,6 @@
    </div>
 </div>
 
-<script src="app.js?v=9.0.0"></script>
+<script src="app.js?v=9.1.0"></script>
 </body>
 </html>
