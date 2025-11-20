@@ -1,4 +1,4 @@
-/* MCQ Ultra-Pro v11.7.0 CSS */
+/* MCQ Ultra-Pro v11.5.0 CSS */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -54,6 +54,7 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .tiny-btn { padding: 4px 8px; font-size: 0.7rem; background: var(--text); color: var(--bg); }
 .ghost-btn { background: none; color: var(--text); }
 .warning-text { color: var(--warning); }
+.range-active { background: var(--primary); color: white; border-color: var(--primary); }
 
 /* TABLE (FIXED LAYOUT) */
 .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-top: 15px; background: var(--card); max-height: 60vh; }
@@ -88,6 +89,7 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
-.range-active { background: var(--primary); color: white; }
+.library-sticky-header { position: sticky; top: 0; background: var(--card); z-index: 15; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.io-strip { padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }

@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v12.0</title>
+  <title>MCQ Ultra-Pro v12.5</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=12.0.0">
+  <link rel="manifest" href="manifest.json?v=12.5.0">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,12 +19,12 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v12.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v12.5</span></h1>
       </div>
     </div>
     <div class="chips">
       <span class="chip" id="dbStatus">DB: Init...</span>
-      <span class="chip chip-sync" id="syncStatus">Cloud: Checking...</span>
+      <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
       <button id="btnHeaderBackup" class="chip header-btn">☁️ Backup</button>
       <select id="themeSelect" class="chip chip-theme">
         <option value="light">☀︎ Light</option>
@@ -122,6 +122,10 @@
                 <div class="small-label">Session</div>
                 <div id="sessionStats" class="stats-text">0 Correct</div>
              </div>
+             <div class="card side-card">
+                <div class="small-label">History</div>
+                <div class="history-list" id="historyList"></div>
+             </div>
           </div>
         </div>
       </div>
@@ -146,14 +150,11 @@
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
-              <div class="row-controls dup-area">
+              <div class="row-controls dup-area" style="background:#fff7ed; padding:10px; border-radius:8px;">
                  <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
+                 <!-- Result appears here -->
                  <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
                  <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
-              </div>
-              
-              <div class="table-header-row">
-                 <!-- Custom Header Row for Alignment -->
               </div>
           </div>
 
@@ -267,9 +268,9 @@
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
        </div>
        <div class="card" style="margin-top:20px;">
-          <h3>System</h3>
+          <h3>Danger Zone</h3>
           <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
-          <button id="btnFactoryReset" class="danger-btn">Factory Reset (Wipe DB)</button>
+          <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
           <button id="btnForceReload" class="ghost-btn">Force Reload</button>
        </div>
     </section>
