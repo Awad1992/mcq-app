@@ -1,4 +1,4 @@
-// MCQ Ultra-Pro v5.0.1 (Fixed: Missing Functions)
+// MCQ Ultra-Pro v5.0.2 (Fixed: loadTheme missing function)
 const DB_NAME = 'mcqdb_ultra_v50';
 const DB_VERSION = 5;
 let db = null;
@@ -17,7 +17,7 @@ let state = {
   skipSolved: true
 };
 
-let historyStack = []; // To track previous questions
+let historyStack = [];
 
 // --- 1. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -26,12 +26,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     db = await openDB();
     console.log("DB Connected");
     
-    // Load Data First
+    // Load Data
     await refreshGlobalCache();
     
-    // Then Setup UI
+    // Setup UI
     setupEventListeners();
-    loadTheme();
+    loadTheme(); // <--- Fixed: Function is now defined below
     updateGitHubUI();
     refreshChapterDropdowns();
     renderDashboard();
@@ -73,7 +73,23 @@ async function refreshGlobalCache() {
   console.log(`Cache updated: ${state.questions.length} questions`);
 }
 
-// --- 3. EVENT LISTENERS ---
+// --- 3. THEME LOGIC (ADDED MISSING FUNCTION) ---
+function loadTheme() {
+  const saved = localStorage.getItem('mcq_theme') || 'light';
+  document.body.className = `theme-${saved}`;
+  
+  const sel = document.getElementById('themeSelect');
+  if (sel) {
+    sel.value = saved;
+    sel.addEventListener('change', () => {
+       const newTheme = sel.value;
+       document.body.className = `theme-${newTheme}`;
+       localStorage.setItem('mcq_theme', newTheme);
+    });
+  }
+}
+
+// --- 4. EVENT LISTENERS ---
 function setupEventListeners() {
   // Tabs
   document.querySelectorAll('.tab-button').forEach(btn => {
@@ -81,50 +97,49 @@ function setupEventListeners() {
   });
 
   // Practice
-  document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
-  document.getElementById('btnNext').addEventListener('click', () => loadNextQuestion(false));
+  document.getElementById('btnSubmit')?.addEventListener('click', submitAnswer);
+  document.getElementById('btnNext')?.addEventListener('click', () => loadNextQuestion(false));
+  document.getElementById('btnPrev')?.addEventListener('click', loadPrevQuestion);
+  document.getElementById('btnFlag')?.addEventListener('click', toggleFlagCurrent);
   
-  // Fixed: Added missing functions here
-  document.getElementById('btnPrev').addEventListener('click', loadPrevQuestion);
-  document.getElementById('btnFlag').addEventListener('click', toggleFlagCurrent);
-  
-  document.getElementById('modeSelect').addEventListener('change', handleModeChange);
-  document.getElementById('prefSkipSolved').addEventListener('change', (e) => state.skipSolved = e.target.checked);
+  document.getElementById('modeSelect')?.addEventListener('change', handleModeChange);
+  document.getElementById('prefSkipSolved')?.addEventListener('change', (e) => state.skipSolved = e.target.checked);
   
   // Tools
-  document.getElementById('btnFocusMode').addEventListener('click', () => document.body.classList.add('focus-mode'));
-  document.getElementById('btnExitFocus').addEventListener('click', () => document.body.classList.remove('focus-mode'));
-  document.getElementById('btnForceUpdate').addEventListener('click', forceReload);
+  document.getElementById('btnFocusMode')?.addEventListener('click', () => document.body.classList.add('focus-mode'));
+  document.getElementById('btnExitFocus')?.addEventListener('click', () => document.body.classList.remove('focus-mode'));
+  document.getElementById('btnForceUpdate')?.addEventListener('click', forceReload);
 
   // All Questions Table
-  document.getElementById('btnAllApply').addEventListener('click', applyTableFilters);
-  document.getElementById('allSelectAll').addEventListener('change', toggleSelectAll);
-  document.getElementById('btnAllDelete').addEventListener('click', deleteSelected);
-  document.getElementById('btnImport').addEventListener('click', () => document.getElementById('fileInput').click());
-  document.getElementById('fileInput').addEventListener('change', handleFileImport);
-  document.getElementById('btnExport').addEventListener('click', exportQuestions);
+  document.getElementById('btnAllApply')?.addEventListener('click', applyTableFilters);
+  document.getElementById('allSelectAll')?.addEventListener('change', toggleSelectAll);
+  document.getElementById('btnAllDelete')?.addEventListener('click', deleteSelected);
+  document.getElementById('btnImport')?.addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('fileInput')?.addEventListener('change', handleFileImport);
+  document.getElementById('btnExport')?.addEventListener('click', exportQuestions);
   
   document.querySelectorAll('th.sortable').forEach(th => {
     th.addEventListener('click', () => sortTable(th.dataset.sort));
   });
 
-  document.getElementById('allPrevPage').addEventListener('click', () => changePage(-1));
-  document.getElementById('allNextPage').addEventListener('click', () => changePage(1));
+  document.getElementById('allPrevPage')?.addEventListener('click', () => changePage(-1));
+  document.getElementById('allNextPage')?.addEventListener('click', () => changePage(1));
 
   // Settings & Cloud
-  document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubSettings);
-  document.getElementById('btnClearGitHub').addEventListener('click', clearGitHubSettings);
-  document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
-  document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
-  document.getElementById('btnResetProgress').addEventListener('click', resetProgress);
+  document.getElementById('btnSaveGitHub')?.addEventListener('click', saveGitHubSettings);
+  document.getElementById('btnClearGitHub')?.addEventListener('click', clearGitHubSettings);
+  document.getElementById('btnCloudUpload')?.addEventListener('click', cloudUpload);
+  document.getElementById('btnCloudDownload')?.addEventListener('click', cloudDownload);
+  document.getElementById('btnResetProgress')?.addEventListener('click', resetProgress);
   
   // Edit Modal
-  document.getElementById('btnEditSave').addEventListener('click', saveEditModal);
-  document.getElementById('btnEditCancel').addEventListener('click', closeEditModal);
-  document.getElementById('btnAddChoice').addEventListener('click', addChoiceRow);
+  document.getElementById('btnEditSave')?.addEventListener('click', saveEditModal);
+  document.getElementById('btnEditCancel')?.addEventListener('click', closeEditModal);
+  document.getElementById('btnAddChoice')?.addEventListener('click', addChoiceRow);
   
   // Notes Auto-save
-  document.getElementById('userNoteArea').addEventListener('input', debounce(saveNote, 1000));
+  const noteArea = document.getElementById('userNoteArea');
+  if(noteArea) noteArea.addEventListener('input', debounce(saveNote, 1000));
 }
 
 function switchTab(tabId) {
@@ -143,7 +158,7 @@ function switchTab(tabId) {
   if (tabId === 'home') refreshChapterDropdowns();
 }
 
-// --- 4. PRACTICE LOGIC ---
+// --- 5. PRACTICE LOGIC ---
 function handleModeChange(e) {
   state.mode = e.target.value;
   const chBox = document.getElementById('chapterSelect');
@@ -158,7 +173,6 @@ async function loadNextQuestion(reset) {
   fb.style.display = 'none';
   fb.innerHTML = '';
 
-  // History Logic
   if (reset) historyStack = [];
   else if (state.currentQ) historyStack.push(state.currentQ.id);
 
@@ -196,27 +210,17 @@ async function loadNextQuestion(reset) {
   renderQuestionUI();
 }
 
-// Fixed: Added loadPrevQuestion
 async function loadPrevQuestion() {
-  if (historyStack.length === 0) return alert("No previous questions in this session.");
+  if (historyStack.length === 0) return alert("No previous questions.");
   const prevId = historyStack.pop();
   
-  // Find in cache first
   let q = state.questions.find(item => item.id === prevId);
   if (q) {
       state.currentQ = q;
       renderQuestionUI();
-  } else {
-      // Fallback DB fetch
-      const tx = db.transaction('questions', 'readonly');
-      tx.objectStore('questions').get(prevId).onsuccess = (e) => {
-          state.currentQ = e.target.result;
-          renderQuestionUI();
-      };
   }
 }
 
-// Fixed: Added toggleFlagCurrent
 async function toggleFlagCurrent() {
     if (!state.currentQ) return;
     state.currentQ.flagged = !state.currentQ.flagged;
@@ -224,12 +228,8 @@ async function toggleFlagCurrent() {
     const tx = db.transaction('questions', 'readwrite');
     tx.objectStore('questions').put(state.currentQ);
     
-    // Update UI
-    const btn = document.getElementById('btnFlag');
-    btn.textContent = state.currentQ.flagged ? 'Flagged 🚩' : 'Flag ⚐';
-    btn.style.color = state.currentQ.flagged ? '#ef6c00' : '';
+    renderQuestionUI();
     
-    // Update Cache
     const idx = state.questions.findIndex(q => q.id === state.currentQ.id);
     if (idx !== -1) state.questions[idx] = state.currentQ;
 }
@@ -240,7 +240,6 @@ function renderQuestionUI() {
   const noteArea = document.getElementById('userNoteArea');
   const flagBtn = document.getElementById('btnFlag');
   
-  // Update flag button visually
   if (flagBtn) {
       flagBtn.textContent = q.flagged ? 'Flagged 🚩' : 'Flag ⚐';
       flagBtn.style.color = q.flagged ? '#ef6c00' : '';
@@ -264,17 +263,20 @@ function renderQuestionUI() {
   html += '</div>';
   
   panel.innerHTML = html;
-  noteArea.value = q.userNotes || '';
+  if (noteArea) noteArea.value = q.userNotes || '';
   document.getElementById('saveNoteStatus').textContent = '';
-  document.getElementById('guessCheck').checked = false;
   
-  // Search Tools
+  const gCheck = document.getElementById('guessCheck');
+  if(gCheck) gCheck.checked = false;
+  
   const tools = document.getElementById('searchTools');
-  const term = encodeURIComponent(q.chapter || 'Medicine');
-  tools.innerHTML = `
-    <a href="https://www.google.com/search?q=${term}" target="_blank" class="search-btn">Google</a>
-    <a href="https://www.uptodate.com/contents/search?search=${term}" target="_blank" class="search-btn">UpToDate</a>
-  `;
+  if (tools) {
+    const term = encodeURIComponent(q.chapter || 'Medicine');
+    tools.innerHTML = `
+      <a href="https://www.google.com/search?q=${term}" target="_blank" class="search-btn">Google</a>
+      <a href="https://www.uptodate.com/contents/search?search=${term}" target="_blank" class="search-btn">UpToDate</a>
+    `;
+  }
 }
 
 window.strike = (i) => {
@@ -290,9 +292,8 @@ async function submitAnswer() {
   const idx = parseInt(sel.value);
   const correctIdx = state.currentQ.choices.findIndex(c => c.isCorrect);
   const isCorrect = (idx === correctIdx);
-  const isGuess = document.getElementById('guessCheck').checked;
+  const isGuess = document.getElementById('guessCheck')?.checked;
 
-  // Feedback
   const fb = document.getElementById('feedbackPanel');
   fb.style.display = 'block';
   fb.innerHTML = `
@@ -305,7 +306,6 @@ async function submitAnswer() {
   document.getElementById(`c_${correctIdx}`).classList.add('correct', 'show');
   if(!isCorrect) document.getElementById(`c_${idx}`).classList.add('wrong', 'show');
 
-  // Save Stats
   const q = state.currentQ;
   q.timesSeen = (q.timesSeen || 0) + 1;
   if(isCorrect) q.timesCorrect = (q.timesCorrect || 0) + 1;
@@ -319,7 +319,6 @@ async function submitAnswer() {
     timestamp: new Date().toISOString()
   });
   
-  // Update local cache
   const cacheIdx = state.questions.findIndex(item => item.id === q.id);
   if(cacheIdx > -1) state.questions[cacheIdx] = q;
 }
@@ -336,9 +335,8 @@ async function saveNote() {
   setTimeout(() => status.textContent = '', 1500);
 }
 
-// --- 5. ALL QUESTIONS TABLE ---
+// --- 6. TABLE & FILTERING ---
 function applyTableFilters() {
-  // Get Filters
   const search = document.getElementById('allSearch').value.toLowerCase();
   const type = document.getElementById('allFilter').value;
   const chap = document.getElementById('allChapterSelect').value;
@@ -365,7 +363,6 @@ function sortTable(field, toggle = true) {
     else { state.sortField = field; state.sortAsc = true; }
   }
 
-  // Update icons
   document.querySelectorAll('th.sortable').forEach(th => {
      const base = th.dataset.sort;
      th.textContent = base === field ? `${base.toUpperCase()} ${state.sortAsc ? '↑' : '↓'}` : `${base.toUpperCase()} ↕`;
@@ -468,7 +465,7 @@ async function deleteSelected() {
   };
 }
 
-// --- 6. IMPORT / EXPORT ---
+// --- 7. IMPORT / EXPORT ---
 async function handleFileImport() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) return;
@@ -484,7 +481,6 @@ async function handleFileImport() {
       let count = 0;
 
       for (const q of json) {
-        // Clean ID logic
         let cleanId = parseInt(String(q.id).replace(/\D/g, ''));
         if (!cleanId || isNaN(cleanId)) cleanId = Date.now() + Math.floor(Math.random() * 10000);
 
@@ -526,16 +522,21 @@ function exportQuestions() {
   a.click();
 }
 
-// --- 7. SETTINGS & GITHUB ---
+// --- 8. GITHUB & SETTINGS ---
 function updateGitHubUI() {
   const cfg = JSON.parse(localStorage.getItem('mcq_gh_config') || '{}');
+  const statusEl = document.getElementById('syncStatus');
+  const tokenEl = document.getElementById('ghTokenInput');
+  
   if(cfg.token) {
-    document.getElementById('syncStatus').textContent = "Cloud: Linked ✅";
-    document.getElementById('ghTokenInput').value = cfg.token;
-    document.getElementById('ghRepoInput').value = cfg.repo;
-    document.getElementById('ghFileInput').value = cfg.file;
+    if(statusEl) statusEl.textContent = "Cloud: Linked ✅";
+    if(tokenEl) {
+        tokenEl.value = cfg.token;
+        document.getElementById('ghRepoInput').value = cfg.repo;
+        document.getElementById('ghFileInput').value = cfg.file;
+    }
   } else {
-    document.getElementById('syncStatus').textContent = "Cloud: Offline";
+    if(statusEl) statusEl.textContent = "Cloud: Offline";
   }
 }
 
@@ -636,7 +637,6 @@ async function cloudDownload() {
   }
 }
 
-// --- 8. HELPERS ---
 async function resetProgress() {
   if(!confirm("Reset progress? This cannot be undone.")) return;
   const tx = db.transaction('questions', 'readwrite');
@@ -646,7 +646,6 @@ async function resetProgress() {
     q.timesSeen = 0;
     q.timesCorrect = 0;
     q.timesWrong = 0;
-    q.userNotes = ''; // Also clear notes? Optional.
     store.put(q);
   });
   
@@ -665,6 +664,7 @@ async function refreshChapterDropdowns() {
   
   const selects = document.querySelectorAll('.chapter-dropdown');
   selects.forEach(sel => {
+    const old = sel.value;
     sel.innerHTML = '<option value="">All Chapters</option>';
     Array.from(chapters).sort().forEach(c => {
       const opt = document.createElement('option');
@@ -672,6 +672,7 @@ async function refreshChapterDropdowns() {
       opt.textContent = c;
       sel.appendChild(opt);
     });
+    if(old) sel.value = old;
   });
 }
 
@@ -680,13 +681,15 @@ async function renderDashboard() {
   const seen = state.questions.filter(q => q.timesSeen > 0).length;
   const weak = state.questions.filter(q => q.timesWrong > 1).length;
   
-  document.getElementById('dashOverall').innerHTML = `
-    <h3>Overall Stats</h3>
-    <p>Total Questions: <b>${total}</b></p>
-    <p>Questions Attempted: <b>${seen}</b></p>
-    <p>Weak Questions: <b style="color:red">${weak}</b></p>
-  `;
-  document.getElementById('dashWeakChapters').innerHTML = `<p class="muted">Detailed analytics coming soon.</p>`;
+  const dash = document.getElementById('dashOverall');
+  if(dash) {
+    dash.innerHTML = `
+      <h3>Overall Stats</h3>
+      <p>Total Questions: <b>${total}</b></p>
+      <p>Questions Attempted: <b>${seen}</b></p>
+      <p>Weak Questions: <b style="color:red">${weak}</b></p>
+    `;
+  }
 }
 
 function forceReload() {
@@ -708,24 +711,27 @@ window.openEditModal = async (id) => {
     const q = e.target.result;
     if(!q) return;
     
-    document.getElementById('editModal').dataset.id = id;
-    document.getElementById('editModal').classList.remove('hidden');
-    
-    document.getElementById('editText').value = q.text || '';
-    document.getElementById('editChapter').value = q.chapter || '';
-    document.getElementById('editTags').value = (q.tags || []).join(',');
-    document.getElementById('editExplanation').value = q.explanation || '';
-    document.getElementById('editImageUrl').value = q.imageUrl || '';
-    document.getElementById('editFlagged').checked = !!q.flagged;
-    
-    renderEditChoices(q.choices);
+    const modal = document.getElementById('editModal');
+    if(modal) {
+        modal.dataset.id = id;
+        modal.classList.remove('hidden');
+        
+        document.getElementById('editText').value = q.text || '';
+        document.getElementById('editChapter').value = q.chapter || '';
+        document.getElementById('editTags').value = (q.tags || []).join(',');
+        document.getElementById('editExplanation').value = q.explanation || '';
+        document.getElementById('editImageUrl').value = q.imageUrl || '';
+        document.getElementById('editFlagged').checked = !!q.flagged;
+        
+        renderEditChoices(q.choices);
+    }
   };
 };
 
 function renderEditChoices(choices) {
   const container = document.getElementById('editChoices');
   container.innerHTML = '';
-  (choices || []).forEach((c, i) => {
+  (choices || []).forEach((c) => {
      const div = document.createElement('div');
      div.className = 'edit-choice-row';
      div.innerHTML = `
@@ -750,7 +756,8 @@ function addChoiceRow() {
 }
 
 async function saveEditModal() {
-  const id = parseInt(document.getElementById('editModal').dataset.id);
+  const modal = document.getElementById('editModal');
+  const id = parseInt(modal.dataset.id);
   const tx = db.transaction('questions', 'readwrite');
   
   const choiceRows = document.querySelectorAll('.edit-choice-row');
@@ -784,5 +791,6 @@ async function saveEditModal() {
 }
 
 function closeEditModal() {
-  document.getElementById('editModal').classList.add('hidden');
+  const modal = document.getElementById('editModal');
+  if(modal) modal.classList.add('hidden');
 }
