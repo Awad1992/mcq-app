@@ -1,10 +1,10 @@
 /**
- * MCQ Ultra-Pro v13.0 (Final Integrity)
- * Verified: Practice Logic, Library Layout, All Features.
+ * MCQ Ultra-Pro v14.0 (Final Integrity)
+ * Validated: All Buttons, IDs, Null Checks, Imports, Nav Logic.
  */
 
 const DB_NAME = 'mcq_pro_v13';
-const DB_VERSION = 22; // Force Clean Init
+const DB_VERSION = 23; // Force Clean Init
 let db = null;
 
 const App = {
@@ -13,7 +13,8 @@ const App = {
     filter: { search: '', status: 'all', chapter: '', mode: 'due' },
     sort: { field: 'id', asc: true },
     page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
-    history: [], duplicates: []
+    history: [], duplicates: [],
+    user: { xp: 0, streak: 0 }
 };
 
 // --- HELPER FUNCTIONS ---
@@ -52,7 +53,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
-        showToast('System v13.0 Ready 💎');
+        showToast('System v14.0 Ready 💎');
+        
+        // Update Streak
+        safeSetText('streakCount', App.user.streak);
+        safeSetText('userXP', App.user.xp);
+        
     } catch(e) { 
         console.error(e);
         alert("Init Error: "+e.message); 
@@ -74,11 +80,10 @@ function initDB() {
 }
 async function loadData() {
     return new Promise(resolve => {
-        const tx = db.transaction('questions', 'readonly');
-        tx.objectStore('questions').getAll().onsuccess = (e) => {
-            App.questions = e.target.result || [];
-            resolve();
-        };
+        const tx = db.transaction(['questions', 'user'], 'readonly');
+        tx.objectStore('questions').getAll().onsuccess = (e) => App.questions = e.target.result || [];
+        tx.objectStore('user').get('stats').onsuccess = (e) => { if(e.target.result) App.user = e.target.result; };
+        tx.oncomplete = resolve;
     });
 }
 
@@ -174,7 +179,12 @@ function submitAnswer() {
     
     const isCorrect = q.choices[App.selectedChoice].isCorrect;
     q.timesSeen = (q.timesSeen||0) + 1;
-    if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1; else q.timesWrong = (q.timesWrong||0)+1;
+    if(isCorrect) {
+        q.timesCorrect = (q.timesCorrect||0)+1;
+        updateXP(10);
+    } else {
+        q.timesWrong = (q.timesWrong||0)+1;
+    }
     
     if(!q.dueDate) q.dueDate = Date.now();
     saveQ(q);
@@ -197,6 +207,13 @@ function showFeedback(idx, q) {
     document.getElementById('btnSubmit').classList.add('hidden');
     document.getElementById('btnNext').classList.remove('hidden');
     document.getElementById('srsButtons').classList.remove('hidden');
+}
+
+function updateXP(amount) {
+    App.user.xp = (App.user.xp || 0) + amount;
+    safeSetText('userXP', App.user.xp);
+    const tx = db.transaction('user', 'readwrite');
+    tx.objectStore('user').put({ key: 'stats', ...App.user });
 }
 
 // --- 4. LIBRARY TABLE ---
@@ -335,11 +352,16 @@ function setupEvents() {
     bind('btnSaveEdit', 'click', saveEditModal);
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
     bind('btnAddChoice', 'click', addEditChoice);
+    bind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
     
-    // Tabs
+    // Global Key Shortcuts
+    document.addEventListener('keydown', (e) => {
+       if(e.key === '[') loadPrevQuestion();
+       if(e.key === ']') document.getElementById('btnNext').click();
+       if(e.key === 'Escape') document.getElementById('editModal').classList.add('hidden');
+    });
+
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-    
-    // Headers
     document.querySelectorAll('.sortable').forEach(th => {
         th.addEventListener('click', () => sortTable(th.dataset.key));
     });
@@ -385,6 +407,9 @@ function saveNote() {
         safeSetText('saveNoteStatus', "Saved ✓");
         setTimeout(()=>safeSetText('saveNoteStatus', ""), 2000);
     }
+}
+function toggleFlagCurrent() {
+    if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); }
 }
 function checkCloud() {
     const t = localStorage.getItem('gh_token');

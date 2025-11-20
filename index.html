@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v13.0</title>
+  <title>MCQ Ultra-Pro v14.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=13.0.0">
+  <link rel="manifest" href="manifest.json?v=14.0.0">
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:,">
 </head>
 <body>
 
@@ -14,11 +15,15 @@
 
 <div class="app" id="appRoot">
   
+  <!-- Header -->
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v13.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v14.0</span></h1>
+        <div class="xp-wrapper">
+           <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
+        </div>
       </div>
     </div>
     <div class="chips">
@@ -32,6 +37,7 @@
     </div>
   </header>
 
+  <!-- Tabs -->
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
     <button class="tab-button" data-tab="all">Library</button>
@@ -98,7 +104,7 @@
               <button class="primary-btn large" id="btnSubmit">Submit</button>
               <button class="primary-btn large hidden" id="btnNext">Next →</button>
               <label class="check-label guess-box">
-                <input type="checkbox" id="guessCheck"> Guessing
+                <input type="checkbox" id="guessCheck"> I'm Guessing
               </label>
             </div>
 
@@ -163,6 +169,9 @@
                     <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
                  </div>
               </div>
+              
+              <!-- Drag Drop Zone Overlay (Hidden by default) -->
+              <div id="dropZone" class="drop-zone hidden">Drop JSON file here to Import</div>
           </div>
 
           <div class="table-wrapper">
@@ -247,6 +256,7 @@
              <div class="dash-box"><h3>Total</h3><span id="dashTotal" class="dash-val">0</span></div>
              <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
              <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
+             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div> <!-- NEW -->
           </div>
           <div style="margin-top:20px; text-align:center;">
              <button id="btnRefreshStats" class="refresh-btn">↻ Refresh Stats</button>
