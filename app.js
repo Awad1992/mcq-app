@@ -1,551 +1,959 @@
-// MCQ Study App Ultra-Pro v5.0 - GOLDEN STABLE
-// Features: Practice, Builder, GitHub Sync (Fixed), Focus Mode, Notes, Strikethrough, SRS
+/* MCQ Study App Ultra-Pro v5.1 - Based on Original v4.3.2 */
 
-const DB_NAME = 'mcqdb_ultra_v41';
-const DB_VERSION = 3;
-let db = null;
-
-// --- 1. HELPER FUNCTIONS (DEFINED FIRST TO PREVENT ERRORS) ---
-
-function debounce(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f4f5f7;
+  color: #111;
+}
+
+body.theme-dark {
+  background: #111827;
+  color: #f9fafb;
+}
+
+body.theme-night {
+  background: #000000;
+  color: #f9fafb;
+}
+
+body.theme-calm {
+  background: #e8f5e9;
+  color: #102027;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0.75rem 0.75rem 2rem;
+}
+
+/* --- FOCUS MODE STYLES (New) --- */
+body.focus-mode .top-bar,
+body.focus-mode .tabs,
+body.focus-mode .col-side,
+body.focus-mode .row-controls, 
+body.focus-mode .notes-area-container,
+body.focus-mode .stats-row,
+body.focus-mode .subnav,
+body.focus-mode #btnForceUpdate,
+body.focus-mode .history-list {
+  display: none !important;
+}
+
+body.focus-mode .app {
+  padding-top: 4rem;
+  max-width: 800px;
+}
+
+body.focus-mode .card {
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+/* Floating Exit Button (Visible only in Focus Mode) */
+.floating-exit-focus {
+  position: fixed; top: 20px; right: 20px; z-index: 9999;
+  background-color: #c62828; color: #fff;
+  border: none; border-radius: 50px;
+  padding: 10px 20px; font-weight: bold; cursor: pointer;
+  display: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+body.focus-mode .floating-exit-focus { display: block; }
+
+/* Floating Update Button (New) */
+.floating-update-btn {
+  position: fixed; bottom: 20px; left: 20px; z-index: 9999;
+  background-color: #222; color: #fff;
+  border: 1px solid #444; border-radius: 50px;
+  padding: 8px 12px; font-size: 0.75rem; cursor: pointer;
+  opacity: 0.6; transition: opacity 0.3s;
+}
+.floating-update-btn:hover { opacity: 1; background: #000; }
+
+/* --- Original Styles Continued --- */
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  margin-bottom: 0.5rem;
+}
+
+body.theme-dark .top-bar,
+body.theme-night .top-bar {
+  background: #111827;
+  color: #f9fafb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+body.theme-calm .top-bar {
+  background: #ffffff;
+}
+
+.top-bar h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.top-bar .ver {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  color: #777;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.chip {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+}
+
+.chip-theme {
+  border-radius: 999px;
+  padding: 0.05rem 0.35rem;
+}
+
+.chip-ok {
+  border-color: #c8e6c9;
+  background: #e8f5e9;
+}
+
+.chip-flag {
+  border-color: #ffcdd2;
+  background: #ffebee;
+}
+
+.chip-sync {
+  border-color: #bbdefb;
+  background: #e3f2fd;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.25rem 0 0.5rem;
+  overflow-x: auto;
+}
+
+.tab-button {
+  border: 1px solid #ccc;
+  background: #f7f7f7;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab-button.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+body.theme-dark .tab-button,
+body.theme-night .tab-button {
+  background: #111827;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+body.theme-dark .tab-button.active,
+body.theme-night .tab-button.active {
+  background: #f9fafb;
+  color: #111827;
+  border-color: #f9fafb;
+}
+
+.tab-container {
+  margin-top: 0.25rem;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  margin-bottom: 0.5rem;
+}
+
+body.theme-dark .card,
+body.theme-night .card {
+  background: #020617;
+  color: #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+body.theme-calm .card {
+  background: #ffffff;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.col-main {
+  flex: 2;
+}
+
+.col-side {
+  flex: 1;
+}
+
+.side-card {
+  margin-top: 0.5rem;
+}
+
+.small-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #666;
+}
+
+body.theme-dark .small-label,
+body.theme-night .small-label {
+  color: #9ca3af;
+}
+
+.muted {
+  color: #666;
+}
+
+body.theme-dark .muted,
+body.theme-night .muted {
+  color: #9ca3af;
+}
+
+.tiny {
+  font-size: 0.75rem;
+}
+
+.row-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.row-controls > div {
+  min-width: 140px;
+}
+
+input, select, button, textarea {
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+input, select, textarea {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.35rem;
+  border: 1px solid #ccc;
+}
+
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea,
+body.theme-night input,
+body.theme-night select,
+body.theme-night textarea {
+  background: #020617;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+button {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+button.danger {
+  border-color: #f44336;
+  color: #f44336;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.btn-row-tight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.pill-btn {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.question-panel {
+  min-height: 140px;
+  margin-top: 0.5rem;
+}
+
+.q-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.tag-chapter {
+  font-size: 0.75rem;
+  color: #555;
+  margin-top: 0.15rem;
+}
+
+.tag-chapter span {
+  margin-right: 0.2rem;
+}
+
+.img-preview img {
+  max-width: 100%;
+  max-height: 180px;
+  display: block;
+  margin-top: 0.25rem;
+}
+
+/* --- CHOICES (Updated for Strikethrough) --- */
+.choice-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.choice {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: #f9f9f9;
+}
+
+body.theme-dark .choice:hover {
+  background: #1e293b;
+}
+
+.choice.strikethrough {
+  text-decoration: line-through;
+  opacity: 0.5;
+  background-color: #f0f0f0;
+}
+
+body.theme-dark .choice.strikethrough {
+  background-color: #1f2937;
+  color: #6b7280;
+}
+
+.btn-strike {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  color: #888;
+  border: 1px solid #eee;
+  background: #fff;
+  cursor: pointer;
+  margin-top: 0.2rem;
+}
+
+body.theme-dark .btn-strike {
+  background: #374151;
+  border-color: #4b5563;
+  color: #9ca3af;
+}
+
+.choice input {
+  margin-top: 0.25rem;
+}
+
+.choice.correct.show {
+  background: #e8f5e9;
+  border-color: #c8e6c9;
+}
+
+.choice.wrong.show {
+  background: #ffebee;
+  border-color: #ffcdd2;
+}
+
+body.theme-dark .choice.correct.show,
+body.theme-night .choice.correct.show {
+  background: #064e3b;
+  border-color: #065f46;
+}
+
+body.theme-dark .choice.wrong.show,
+body.theme-night .choice.wrong.show {
+  background: #7f1d1d;
+  border-color: #991b1b;
+}
+
+.feedback-panel {
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.75rem;
+  background: #fafafa;
+  border-radius: 0.5rem;
+  border-left: 4px solid #ccc;
+}
+
+body.theme-dark .feedback-panel {
+  background: #1e293b;
+  border-left-color: #4b5563;
+}
+
+.feedback-correct {
+  border-left-color: #2e7d32;
+}
+
+.feedback-wrong {
+  border-left-color: #c62828;
+}
+
+/* --- NOTES AREA (New) --- */
+.notes-area-container {
+  margin-top: 1rem;
+  border-top: 1px dashed #ddd;
+  padding-top: 0.5rem;
+}
+
+.notes-textarea {
+  width: 100%;
+  font-size: 0.85rem;
+  min-height: 60px;
+  margin-top: 0.25rem;
+  resize: vertical;
+  background: #fff9c4; /* Yellow note */
+  color: #333;
+  border: 1px solid #fbc02d;
+}
+
+body.theme-dark .notes-textarea {
+  background: #422006;
+  color: #fef3c7;
+  border-color: #a16207;
+}
+
+.save-note-status {
+  font-size: 0.7rem;
+  color: #2e7d32;
+  margin-top: 0.1rem;
+  height: 1rem;
+}
+
+/* --- SMART SEARCH (New) --- */
+.search-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+.search-btn {
+  text-decoration: none;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  background: #f9f9f9;
+  color: #555;
+}
+.search-btn:hover {
+  background: #eee;
+  color: #111;
+}
+body.theme-dark .search-btn {
+  background: #1f2937;
+  border-color: #374151;
+  color: #9ca3af;
+}
+
+/* --- Original styles continued --- */
+
+.stats-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+
+.stats-row div strong {
+  font-weight: 600;
+}
+
+.history-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.history-item {
+  padding: 0.25rem 0.1rem;
+  border-bottom: 1px dashed #eee;
+  cursor: pointer;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-item:hover {
+  background: #fafafa;
+}
+
+body.theme-dark .history-item,
+body.theme-night .history-item {
+  border-bottom-color: #374151;
+}
+
+body.theme-dark .history-item:hover,
+body.theme-night .history-item:hover {
+  background: #020617;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  margin-left: 0.15rem;
+}
+
+.pill-correct {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.pill-wrong {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.pill-flag {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.pill-maint {
+  background: #ede7f6;
+  color: #5e35b1;
+}
+
+.pill-pin {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.pill-dup {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  margin-top: 0.5rem;
+}
+
+.q-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.q-table th,
+.q-table td {
+  border-bottom: 1px solid #eee;
+  padding: 0.25rem 0.35rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.q-table th {
+  background: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+body.theme-dark .q-table th,
+body.theme-night .q-table th {
+  background: #020617;
+}
+
+.q-table tbody tr:hover {
+  background: #fdfdfd;
+}
+
+body.theme-dark .q-table tbody tr:hover,
+body.theme-night .q-table tbody tr:hover {
+  background: #020617;
+}
+
+.all-actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.backup-status {
+  font-size: 0.8rem;
+  color: #444;
+}
+
+.link-btn {
+  text-decoration: none;
+  border-radius: 999px;
+  border: 1px solid #1976d2;
+  color: #1976d2;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.settings-grid label input {
+  width: 100%;
+}
+
+.related-box {
+  max-width: 260px;
+  max-height: 72px;
+  overflow-y: auto;
+  border-radius: 0.35rem;
+  border: 1px dashed #ddd;
+  padding: 0.25rem 0.35rem;
+}
+
+.related-link {
+  display: block;
+  font-size: 0.72rem;
+  margin-bottom: 0.1rem;
+  cursor: pointer;
+}
+
+.related-link span {
+  font-weight: 500;
+}
+
+/* Flashcards */
+.flashcard-card {
+  min-height: 200px;
+}
+
+.flashcard-inner {
+  min-height: 160px;
+  border-radius: 0.5rem;
+  border: 1px dashed #ddd;
+  padding: 0.75rem;
+}
+
+.flashcard-front, .flashcard-back {
+  font-size: 0.9rem;
+}
+
+.flashcard-back {
+  margin-top: 0.5rem;
+  border-top: 1px dashed #ddd;
+  padding-top: 0.5rem;
+}
+
+.flashcard-controls {
+  justify-content: flex-end;
+}
+
+/* Exam */
+.exam-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+/* Dashboard */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.5rem;
+}
+
+.dash-box {
+  border-radius: 0.5rem;
+  border: 1px dashed #ddd;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.dash-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.dash-list {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+/* Modal */
+.modal.hidden {
+  display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+}
+
+.modal-body {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, 94vw);
+  max-height: 84vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+body.theme-dark .modal-body,
+body.theme-night .modal-body {
+  background: #020617;
+  color: #e5e7eb;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modal-content textarea {
+  resize: vertical;
+}
+
+.modal-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.modal-actions {
+  justify-content: flex-end;
+  margin-top: 0.6rem;
+}
+
+#editChoices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.edit-choice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.edit-choice-row input[type="text"] {
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
   }
-  return array;
-}
-
-function encodeBase64(str) {
-  const bytes = new TextEncoder().encode(str);
-  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
-  return btoa(binString);
-}
-
-function decodeBase64(str) {
-  const binString = atob(str);
-  const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
-  return new TextDecoder().decode(bytes);
-}
-
-function fmtTime(iso) {
-  if (!iso) return '-';
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
-
-// --- 2. APP STATE ---
-let currentQuestion = null;
-let currentChoices = [];
-let currentMode = 'due';
-let currentChapter = '';
-let lastResult = null;
-let lastSelectedIndex = null;
-let historyStack = [];
-let allSelectedIds = new Set();
-let allCurrentPage = 1;
-const ALL_PAGE_SIZE = 50;
-let flashcardPool = [];
-let flashcardIndex = -1;
-let flashcardShowBack = false;
-let examSession = null;
-let examTimerId = null;
-let builderPreviewCache = [];
-let prefSkipSolved = true;
-
-// --- 3. INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await openDB();
-    loadTheme();
-    await loadPracticePrefs();
-    loadGitHubConfigIntoUI();
-    refreshCloudInfo();
-    await refreshChapterOptions();
-    setupEventListeners();
-    
-    // Start App
-    await loadNextQuestion(true);
-    reloadAllQuestionsTable(); // Pre-load table
-    updateStatsBar();
-  } catch (err) {
-    console.error("Fatal Init Error:", err);
-    alert("App Initialization Failed: " + err.message);
+  .col-main, .col-side {
+    flex: 1 1 auto;
   }
-});
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('questions')) {
-        const s = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
-        s.createIndex('by_chapter', 'chapter', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('answers')) {
-        const a = db.createObjectStore('answers', { keyPath: 'id', autoIncrement: true });
-        a.createIndex('by_question', 'questionId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('meta')) {
-        db.createObjectStore('meta', { keyPath: 'key' });
-      }
-    };
-    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
-// --- 4. EVENT LISTENERS ---
-function setupEventListeners() {
-  // Tabs
-  document.querySelectorAll('.tab-button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.getAttribute('data-tab')).classList.add('active');
-      if(btn.getAttribute('data-tab') === 'all') reloadAllQuestionsTable();
-    });
-  });
-
-  // Practice
-  el('btnSubmit', 'click', submitAnswer);
-  el('btnNext', 'click', () => loadNextQuestion(false));
-  el('btnPrev', 'click', goPreviousQuestion);
-  el('btnFlag', 'click', toggleFlag);
-  el('modeSelect', 'change', (e) => {
-     currentMode = e.target.value;
-     const div = document.getElementById('chapterSelect');
-     div.style.display = (currentMode === 'chapter') ? 'inline-block' : 'none';
-     if(currentMode !== 'chapter') currentChapter = '';
-     loadNextQuestion(true);
-  });
-  el('chapterSelect', 'change', (e) => { currentChapter = e.target.value; loadNextQuestion(true); });
-  el('userNoteArea', 'input', debounce(saveCurrentNote, 1000));
-  
-  // Focus Mode
-  el('btnFocusMode', 'click', () => document.body.classList.add('focus-mode'));
-  el('btnExitFocus', 'click', () => document.body.classList.remove('focus-mode'));
-
-  // All Questions / Builder
-  el('btnAllReload', 'click', reloadAllQuestionsTable);
-  el('allSearch', 'input', debounce(reloadAllQuestionsTable, 500));
-  el('allFilter', 'change', reloadAllQuestionsTable);
-  el('allPrevPage', 'click', () => { if(allCurrentPage>1){allCurrentPage--; reloadAllQuestionsTable();} });
-  el('allNextPage', 'click', () => { allCurrentPage++; reloadAllQuestionsTable(); });
-  el('btnAllDelete', 'click', deleteSelectedAll);
-  
-  // Builder Subnav
-  document.querySelectorAll('.subnav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.subnav-btn').forEach(b => b.classList.remove('subnav-btn-active'));
-      btn.classList.add('subnav-btn-active');
-      const view = btn.getAttribute('data-allview');
-      document.getElementById('allViewBank').style.display = (view==='bank'?'block':'none');
-      document.getElementById('allViewBuilder').style.display = (view==='builder'?'block':'none');
-    });
-  });
-  
-  el('btnBuilderMakePrompt', 'click', makeBuilderPrompt);
-  el('btnBuilderPreview', 'click', builderPreviewFromJson);
-  el('btnBuilderImportSelected', 'click', builderImportSelected);
-
-  // GitHub & Backup
-  el('btnSaveGitHub', 'click', saveGitHubConfigFromUI);
-  el('btnCloudUpload', 'click', cloudUpload);
-  el('btnCloudDownload', 'click', cloudDownload);
-  el('btnBackupExport', 'click', exportFullBackup);
-  el('btnBackupImport', 'click', handleBackupImport);
-  el('btnForceUpdate', 'click', forceUpdateApp);
-
-  // Edit Modal
-  el('btnEditSave', 'click', saveEditedQuestion);
-  el('btnEditCancel', 'click', closeEditModal);
-  el('btnAddChoice', 'click', () => addEditChoiceRow('','',false));
-}
-
-function el(id, evt, fn) {
-  const elem = document.getElementById(id);
-  if(elem) elem.addEventListener(evt, fn);
-}
-
-// --- 5. PRACTICE LOGIC ---
-async function loadNextQuestion(reset) {
-  if(!db) return;
-  if(reset) historyStack = [];
-  else if(currentQuestion && currentQuestion.id) historyStack.push(currentQuestion.id);
-  
-  currentQuestion = await pickQuestion();
-  lastSelectedIndex = null;
-  renderQuestion();
-  updateStatsBar();
-}
-
-async function pickQuestion() {
-  const all = await getAllQuestions();
-  if(!all.length) return null;
-  
-  let filtered = all.filter(q => q.active !== false);
-  const now = new Date().toISOString();
-  
-  if(currentMode === 'due') filtered = filtered.filter(q => !q.dueAt || q.dueAt <= now);
-  else if(currentMode === 'new') filtered = filtered.filter(q => !q.timesSeen);
-  else if(currentMode === 'wrong') filtered = filtered.filter(q => q.timesWrong > 0);
-  else if(currentMode === 'flagged') filtered = filtered.filter(q => q.flagged);
-  else if(currentMode === 'chapter' && currentChapter) filtered = filtered.filter(q => q.chapter === currentChapter);
-  
-  if(!filtered.length && currentMode === 'due') filtered = all; 
-  if(!filtered.length) return null;
-  
-  filtered.sort((a,b) => (a.dueAt||'').localeCompare(b.dueAt||''));
-  return filtered[Math.floor(Math.random() * Math.min(filtered.length, 20))]; 
-}
-
-function renderQuestion() {
-  const panel = document.getElementById('questionPanel');
-  const note = document.getElementById('userNoteArea');
-  const fb = document.getElementById('feedbackPanel');
-  const search = document.getElementById('searchTools');
-  
-  if(!currentQuestion) {
-    panel.innerHTML = '<div class="muted">No questions found. Import data.</div>';
-    if(note) note.value = '';
-    return;
+  .top-bar {
+    flex-direction: column;
   }
-  
-  const q = currentQuestion;
-  currentChoices = q.choices || [];
-  
-  let html = `<div class="q-text">Q#${q.id} · ${q.text}</div>`;
-  html += `<div class="tag-chapter">${q.chapter||''} ${q.tags ? '· '+q.tags.join(', ') : ''}</div>`;
-  
-  html += '<div style="margin-top:10px;">';
-  currentChoices.forEach((c, i) => {
-    html += `<div class="choice-container">
-      <label class="choice" id="choice-${i}">
-        <input type="radio" name="choice" value="${i}">
-        <span>${String.fromCharCode(65+i)}. ${c.text}</span>
-      </label>
-      <button class="btn-strike" onclick="toggleStrike(${i})">✕</button>
-    </div>`;
-  });
-  html += '</div>';
-  
-  panel.innerHTML = html;
-  fb.innerHTML = '';
-  if(note) note.value = q.userNotes || '';
-  
-  // Smart Search
-  if(search) {
-    const term = (q.tags && q.tags[0]) || (q.chapter||'').replace(/Ch\d+/,'') || 'Medicine';
-    search.innerHTML = `
-      <a href="https://google.com/search?q=${encodeURIComponent(term + ' medical')}" target="_blank" class="search-btn">Google</a>
-      <a href="https://uptodate.com/contents/search?search=${encodeURIComponent(term)}" target="_blank" class="search-btn">UpToDate</a>
-    `;
+  .top-bar h1 {
+    font-size: 1rem;
+  }
+  .modal-body {
+    top: 4%;
   }
 }
 
-window.toggleStrike = function(i) {
-  const el = document.getElementById(`choice-${i}`);
-  if(el) el.classList.toggle('strikethrough');
+
+.all-table-wrapper {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
-async function submitAnswer() {
-  if(!currentQuestion) return;
-  const sel = document.querySelector('input[name="choice"]:checked');
-  if(!sel) { alert("Select an answer!"); return; }
-  
-  const idx = parseInt(sel.value);
-  const correctIdx = currentChoices.findIndex(c => c.isCorrect);
-  const isCorrect = (idx === correctIdx);
-  const isGuess = document.getElementById('guessCheck').checked;
-  const q = currentQuestion;
-  
-  q.timesSeen = (q.timesSeen||0)+1;
-  if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1; else q.timesWrong = (q.timesWrong||0)+1;
-  
-  // Simple SRS
-  if(!isCorrect || isGuess) {
-    q.srInterval = 1; 
-  } else {
-    q.srInterval = (q.srInterval||1) * 2.5;
-  }
-  q.dueAt = new Date(Date.now() + q.srInterval*86400000).toISOString();
-  
-  const tx = db.transaction(['questions','answers'], 'readwrite');
-  tx.objectStore('questions').put(q);
-  tx.objectStore('answers').add({
-    questionId: q.id, answeredAt: new Date().toISOString(), selectedIndex: idx, isCorrect
-  });
-  
-  tx.oncomplete = () => {
-    const fb = document.getElementById('feedbackPanel');
-    fb.innerHTML = `<div class="${isCorrect?'feedback-correct':'feedback-wrong'}">
-      <strong>${isCorrect?'Correct!':'Wrong.'}</strong><br>${q.explanation||''}
-    </div>`;
-    updateStatsBar();
-  };
+.all-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-// --- 6. ALL QUESTIONS & BUILDER ---
-async function reloadAllQuestionsTable() {
-  const tbody = document.getElementById('allTableBody');
-  if(!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
-  
-  const all = await getAllQuestions();
-  const search = (document.getElementById('allSearch').value || '').toLowerCase();
-  const filter = document.getElementById('allFilter').value;
-  
-  let arr = all.filter(q => {
-    const txt = (q.text + ' ' + q.chapter).toLowerCase();
-    if(search && !txt.includes(search)) return false;
-    if(filter === 'notes' && (!q.userNotes || !q.userNotes.trim())) return false;
-    if(filter === 'flagged' && !q.flagged) return false;
-    if(filter === 'wrong' && !q.timesWrong) return false;
-    return true;
-  });
-  
-  // Sort Descending ID (Newest First)
-  arr.sort((a,b) => b.id - a.id);
-  
-  const total = arr.length;
-  const start = (allCurrentPage - 1) * ALL_PAGE_SIZE;
-  const pageItems = arr.slice(start, start + ALL_PAGE_SIZE);
-  
-  tbody.innerHTML = '';
-  pageItems.forEach(q => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="checkbox" class="q-select" data-id="${q.id}"></td>
-      <td>${q.id}</td>
-      <td>${q.text.substring(0,50)}... ${q.userNotes?'📝':''}</td>
-      <td>${q.chapter||''}</td>
-      <td>${q.timesCorrect}/${q.timesSeen}</td>
-      <td><button class="pill-btn" onclick="editQuestion(${q.id})">Edit</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  
-  document.getElementById('allPageInfo').textContent = `${start+1}-${Math.min(start+ALL_PAGE_SIZE, total)} of ${total}`;
-  document.getElementById('allSelectedCount').textContent = `${allSelectedIds.size} selected`;
+.all-selected-indicator {
+  font-size: 12px;
+  color: #444;
 }
 
-// Builder Logic
-function makeBuilderPrompt() {
-  const txt = document.getElementById('builderSourceText').value;
-  if(!txt) { alert("Paste text first."); return; }
-  document.getElementById('builderPromptOut').value = 
-    `Generate JSON MCQs from this text. Format: [{ "text": "...", "choices": [{"text": "...", "isCorrect": boolean}], "explanation": "...", "chapter": "...", "tags": [] }]. Text:\n\n${txt}`;
+.all-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-function builderPreviewFromJson() {
-  try {
-    const json = JSON.parse(document.getElementById('builderJsonInput').value);
-    builderPreviewCache = Array.isArray(json) ? json : (json.questions || []);
-    document.getElementById('builderPreview').innerHTML = `Found ${builderPreviewCache.length} questions. Click Import.`;
-  } catch(e) { alert("Invalid JSON"); }
+.all-bulk-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-function builderImportSelected() {
-  if(!builderPreviewCache.length) return;
-  const tx = db.transaction('questions', 'readwrite');
-  builderPreviewCache.forEach(q => tx.objectStore('questions').put({
-    text: q.text, choices: q.choices||[], explanation: q.explanation||'', chapter: q.chapter||'Imported', tags: q.tags||[],
-    createdAt: new Date().toISOString(), timesSeen: 0, timesCorrect: 0, timesWrong: 0, active: true
-  }));
-  tx.oncomplete = () => { alert("Imported!"); reloadAllQuestionsTable(); loadNextQuestion(true); };
+.all-bulk-actions button {
+  font-size: 11px;
+  padding: 3px 6px;
 }
 
-// --- 7. GITHUB SYNC (FIXED) ---
-function saveGitHubConfigFromUI() {
-  const token = document.getElementById('ghTokenInput').value.trim();
-  const repo = document.getElementById('ghRepoInput').value.trim();
-  const file = document.getElementById('ghFileInput').value.trim();
-  
-  if(!token) { alert("Token missing!"); return; }
-  localStorage.setItem('mcq_github_config', JSON.stringify({token, repo, file}));
-  refreshCloudInfo();
-  alert("✅ Settings Saved!");
+.subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-async function cloudUpload() {
-  try {
-    const cfg = JSON.parse(localStorage.getItem('mcq_github_config')||'{}');
-    if(!cfg.token) throw new Error("No settings.");
-    
-    const btn = document.getElementById('btnCloudUpload');
-    btn.textContent = "Uploading..."; btn.disabled = true;
-    
-    const qs = await getAllQuestions();
-    const content = encodeBase64(JSON.stringify({ meta: {date: new Date()}, questions: qs }));
-    
-    const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
-    let sha = null;
-    try {
-      const check = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
-      if(check.ok) sha = (await check.json()).sha;
-    } catch(e){}
-    
-    const body = { message: "Backup", content: content };
-    if(sha) body.sha = sha;
-    
-    const res = await fetch(url, {
-       method: 'PUT',
-       headers: { Authorization: `token ${cfg.token}`, 'Content-Type': 'application/json' },
-       body: JSON.stringify(body)
-    });
-    
-    if(!res.ok) throw new Error("GitHub API Error");
-    alert("✅ Uploaded!");
-  } catch(e) { alert("Error: "+e.message); }
-  finally { document.getElementById('btnCloudUpload').textContent="Upload → GitHub"; document.getElementById('btnCloudUpload').disabled=false; }
+.subnav-btn {
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: #f8f8f8;
+  cursor: pointer;
 }
 
-async function cloudDownload() {
-  try {
-    const cfg = JSON.parse(localStorage.getItem('mcq_github_config')||'{}');
-    if(!cfg.token) throw new Error("No settings.");
-    
-    const btn = document.getElementById('btnCloudDownload');
-    btn.textContent = "Downloading..."; btn.disabled = true;
-    
-    const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
-    const res = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
-    if(!res.ok) throw new Error("Fetch failed.");
-    
-    const json = await res.json();
-    const data = JSON.parse(decodeBase64(json.content));
-    
-    if(data.questions) {
-       const tx = db.transaction('questions', 'readwrite');
-       data.questions.forEach(q => tx.objectStore('questions').put(q));
-       tx.oncomplete = () => { alert("✅ Merged!"); reloadAllQuestionsTable(); loadNextQuestion(true); };
-    }
-  } catch(e) { alert("Error: "+e.message); }
-  finally { document.getElementById('btnCloudDownload').textContent="Download ← GitHub"; document.getElementById('btnCloudDownload').disabled=false; }
+.subnav-btn-active {
+  background: #222;
+  color: #fff;
+  border-color: #222;
 }
 
-// --- 8. UTILS & EXPORT ---
-async function getAllQuestions() {
-  const tx = db.transaction('questions', 'readonly');
-  return await new Promise(r => tx.objectStore('questions').getAll().onsuccess = e => r(e.target.result || []));
+.builder-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
-async function saveCurrentNote() {
-  if(!currentQuestion) return;
-  currentQuestion.userNotes = document.getElementById('userNoteArea').value;
-  db.transaction('questions','readwrite').objectStore('questions').put(currentQuestion);
-  document.getElementById('saveNoteStatus').textContent = 'Saved';
-}
-async function refreshChapterOptions() {
-  if(!db) return;
-  const all = await getAllQuestions();
-  const chapters = [...new Set(all.map(q=>q.chapter).filter(Boolean))].sort();
-  const sel = document.getElementById('chapterSelect');
-  if(sel) {
-    const old = sel.value;
-    sel.innerHTML = '<option value="">All Chapters</option>';
-    chapters.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
-    sel.value = old;
-  }
-}
-function updateStatsBar() {
-  getAllQuestions().then(all => {
-     const total = all.length;
-     const seen = all.filter(q=>q.timesSeen).length;
-     document.getElementById('statsBar').innerHTML = `Total: <strong>${total}</strong> | Answered: <strong>${seen}</strong>`;
-  });
-}
-function forceUpdateApp() {
-  if(confirm("Force Reload?")) {
-     if('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(r=>r.forEach(w=>w.unregister()));
-     window.location.reload(true);
-  }
-}
-function loadGitHubConfigIntoUI() {
-    const cfg = JSON.parse(localStorage.getItem('mcq_github_config') || '{}');
-    if(document.getElementById('ghTokenInput')) document.getElementById('ghTokenInput').value = cfg.token || '';
-    if(document.getElementById('ghRepoInput')) document.getElementById('ghRepoInput').value = cfg.repo || '';
-}
-function refreshCloudInfo() {
-  const cfg = JSON.parse(localStorage.getItem('mcq_github_config') || '{}');
-  const el = document.getElementById('cloudInfo');
-  if(el) el.textContent = cfg.token ? `Linked: ${cfg.repo}` : 'Not linked.';
-}
-function loadPracticePrefs() {} 
-function loadTheme() {} 
-function goPreviousQuestion() { 
-  if(historyStack.length) { 
-    const id = historyStack.pop(); 
-    db.transaction('questions').objectStore('questions').get(id).onsuccess = e => {
-      if(e.target.result) { currentQuestion = e.target.result; renderQuestion(); }
-    }
-  }
-}
-function toggleFlag() { 
-  if(currentQuestion) { 
-    currentQuestion.flagged = !currentQuestion.flagged;
-    db.transaction('questions','readwrite').objectStore('questions').put(currentQuestion);
-    alert(currentQuestion.flagged?"Flagged":"Unflagged");
-  }
-}
-function toggleMaintenanceFlag() {}
-function deleteSelectedAll() {
-   const checked = document.querySelectorAll('.q-select:checked');
-   if(!checked.length) return;
-   if(!confirm("Delete selected?")) return;
-   const tx = db.transaction('questions', 'readwrite');
-   checked.forEach(box => tx.objectStore('questions').delete(parseInt(box.dataset.id)));
-   tx.oncomplete = () => reloadAllQuestionsTable();
-}
-function exportFullBackup() {
-   getAllQuestions().then(qs => {
-      const b = new Blob([JSON.stringify({questions:qs})], {type:'application/json'});
-      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download='backup.json'; a.click();
-   });
-}
-function handleBackupImport() {
-   const f = document.getElementById('backupFileInput').files[0];
-   if(!f) return;
-   const r = new FileReader();
-   r.onload = e => {
-      const d = JSON.parse(e.target.result);
-      const list = d.questions || (Array.isArray(d) ? d : []);
-      const tx = db.transaction('questions','readwrite');
-      list.forEach(q => tx.objectStore('questions').put(q));
-      tx.oncomplete = () => { alert("Imported"); reloadAllQuestionsTable(); };
-   };
-   r.readAsText(f);
-}
-function resetProgress() {}
 
-// Edit Modal Stubs (Minimal for stability)
-window.editQuestion = function(id) {
-   db.transaction('questions').objectStore('questions').get(id).onsuccess = e => {
-      const q = e.target.result;
-      window.editingId = id;
-      document.getElementById('editText').value = q.text;
-      document.getElementById('editModal').classList.remove('hidden');
-   };
+.builder-col {
+  flex: 1 1 280px;
+  min-width: 260px;
 }
-function saveEditedQuestion() {
-   const tx = db.transaction('questions','readwrite');
-   tx.objectStore('questions').get(window.editingId).onsuccess = e => {
-      const q = e.target.result;
-      q.text = document.getElementById('editText').value;
-      tx.objectStore('questions').put(q).onsuccess = () => {
-         document.getElementById('editModal').classList.add('hidden');
-         reloadAllQuestionsTable();
-         if(currentQuestion.id === q.id) renderQuestion();
-      };
-   };
+
+.builder-col textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
 }
-function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
-function addEditChoiceRow() {}
+
+.builder-inline {
+  margin: 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.builder-preview {
+  margin-top: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  padding: 4px 6px;
+  background: #fafafa;
+}
