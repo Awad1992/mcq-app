@@ -3,8 +3,8 @@
  * Validated: All Buttons, IDs, Null Checks, Imports, Nav Logic.
  */
 
-const DB_NAME = 'mcq_pro_v13';
-const DB_VERSION = 23; // Force Clean Init
+const DB_NAME = 'mcq_pro_v14'; // New name to ensure fresh start
+const DB_VERSION = 1; 
 let db = null;
 
 const App = {

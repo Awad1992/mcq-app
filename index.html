@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#2563eb">
   <link rel="manifest" href="manifest.json?v=15.0.0">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="data:,"> <!-- Fixes Favicon 404 -->
 </head>
 <body>
 
@@ -15,6 +15,7 @@
 
 <div class="app" id="appRoot">
   
+  <!-- Header -->
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
@@ -36,6 +37,7 @@
     </div>
   </header>
 
+  <!-- Navigation Tabs -->
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
     <button class="tab-button" data-tab="all">Library</button>
@@ -47,11 +49,12 @@
 
   <main class="tab-container">
 
-    <!-- 1. PRACTICE -->
+    <!-- 1. PRACTICE TAB -->
     <section id="tab-home" class="tab-content active">
       <div class="card main-layout">
         <div class="row">
           <div class="col-main">
+            <!-- Controls -->
             <div class="row-controls">
               <select id="modeSelect" class="std-select">
                 <option value="due">🧠 Smart Review</option>
@@ -102,7 +105,7 @@
               <button class="primary-btn large" id="btnSubmit">Submit</button>
               <button class="primary-btn large hidden" id="btnNext">Next →</button>
               <label class="check-label guess-box">
-                <input type="checkbox" id="guessCheck"> Guessing
+                <input type="checkbox" id="guessCheck"> I'm Guessing
               </label>
             </div>
 
@@ -133,7 +136,7 @@
       </div>
     </section>
 
-    <!-- 2. LIBRARY (Consolidated Top Bar) -->
+    <!-- 2. LIBRARY TAB -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
           
@@ -199,7 +202,7 @@
       </div>
     </section>
 
-    <!-- 3. FLASHCARDS -->
+    <!-- 3. FLASHCARDS TAB -->
     <section id="tab-flashcards" class="tab-content">
        <div class="card center-layout">
           <h3>Flashcards</h3>
@@ -221,7 +224,7 @@
        </div>
     </section>
 
-    <!-- 4. EXAM -->
+    <!-- 4. EXAM TAB -->
     <section id="tab-exam" class="tab-content">
        <div class="card">
           <h2>Exam Simulator</h2>
@@ -246,7 +249,7 @@
        </div>
     </section>
 
-    <!-- 5. DASHBOARD -->
+    <!-- 5. DASHBOARD TAB -->
     <section id="tab-dashboard" class="tab-content">
        <div class="card">
           <h2>Statistics</h2>
@@ -254,7 +257,7 @@
              <div class="dash-box"><h3>Total</h3><span id="dashTotal" class="dash-val">0</span></div>
              <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
              <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
-             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div> <!-- NEW -->
+             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div>
           </div>
           <div style="margin-top:20px; text-align:center;">
              <button id="btnRefreshStats" class="refresh-btn">↻ Refresh Stats</button>
@@ -262,7 +265,7 @@
        </div>
     </section>
 
-    <!-- 6. SETTINGS -->
+    <!-- 6. SETTINGS TAB -->
     <section id="tab-settings" class="tab-content">
        <div class="card">
           <h3>GitHub Config</h3>
@@ -274,15 +277,6 @@
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
-          
-          <!-- RESTORE PREVIOUS BACKUP (New Feature) -->
-          <div style="margin-top:15px;">
-             <label class="small-label">Restore from History</label>
-             <select id="backupHistorySelect" class="std-select" style="width:100%; margin-bottom:5px;">
-                <option value="">Select a previous backup...</option>
-             </select>
-             <button id="btnRestoreHistory" class="secondary-btn">Restore Selected</button>
-          </div>
        </div>
        <div class="card" style="margin-top:20px;">
           <h3>System</h3>
