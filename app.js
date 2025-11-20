@@ -1,6 +1,6 @@
 /**
- * MCQ Ultra-Pro v10.1 (State Memory Fix)
- * Fixes: Previous Question coloring (Show my choice), Save Note Feedback.
+ * MCQ Ultra-Pro v10.2.0 (Compliance Release)
+ * Fixes: Table Sorting, Layout, Import Safety, Previous Button.
  */
 
 const DB_NAME = 'mcq_pro_v10';
@@ -10,6 +10,7 @@ let db = null;
 // --- STATE ---
 const App = {
     questions: [],
+    tableQs: [],
     selectedIds: new Set(),
     currentQ: null,
     filter: { search: '', status: 'all', chapter: '', mode: 'due' },
@@ -55,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         buildFlashcardPool();
         loadNextQuestion(true);
         
-        console.log('v10.1 Memory Fix Loaded');
+        console.log('v10.2 Compliance Fix Loaded');
     } catch (e) {
         console.error(e);
         alert("Init Error: " + e.message);
@@ -90,15 +91,12 @@ function loadSettingsToUI() {
     const t = localStorage.getItem('gh_token') || '';
     const r = localStorage.getItem('gh_repo') || '';
     const f = localStorage.getItem('gh_file') || 'mcq_backup.json';
-    
     const elToken = document.getElementById('ghToken');
     const elRepo = document.getElementById('ghRepo');
     const elFile = document.getElementById('ghFile');
-    
     if(elToken) elToken.value = t;
     if(elRepo) elRepo.value = r;
     if(elFile) elFile.value = f;
-    
     updateSyncStatus(t && r);
 }
 
@@ -106,11 +104,9 @@ function saveSettings() {
     const t = document.getElementById('ghToken').value.trim();
     const r = document.getElementById('ghRepo').value.trim();
     const f = document.getElementById('ghFile').value.trim();
-    
     localStorage.setItem('gh_token', t);
     localStorage.setItem('gh_repo', r);
     localStorage.setItem('gh_file', f);
-    
     showToast('Saved ✅');
     updateSyncStatus(t && r);
 }
@@ -140,7 +136,6 @@ async function loadNextQuestion(reset) {
         return;
     }
 
-    // Filter Logic
     let pool = App.questions.filter(q => q.active !== false);
     const m = document.getElementById('modeSelect').value;
     const c = document.getElementById('chapterSelect').value;
@@ -163,7 +158,6 @@ async function loadNextQuestion(reset) {
         return;
     }
 
-    // HISTORY STACK
     if (reset) App.history = [];
     if (App.currentQ) App.history.push(App.currentQ);
 
@@ -174,35 +168,23 @@ async function loadNextQuestion(reset) {
 function loadPrevQuestion() {
     if (App.history.length === 0) return showToast("No Previous Question", "warn");
     App.currentQ = App.history.pop();
-    
-    // Render the question
     renderQuestionUI();
     
-    // RESTORE STATE (The Fix)
-    // Check if we have a saved last choice for this question
+    // Restore State
     if (App.currentQ.lastChoiceIdx !== undefined) {
         const idx = App.currentQ.lastChoiceIdx;
         const correctIdx = App.currentQ.choices.findIndex(c => c.isCorrect);
         const isCorrect = (idx === correctIdx);
         
-        // Re-show Feedback UI
         const fb = document.getElementById('feedbackPanel');
         fb.classList.remove('hidden');
-        fb.innerHTML = `
-          <div style="font-weight:bold; color:${isCorrect?'#10b981':'#ef4444'}; margin-bottom:10px;">
-             ${isCorrect ? 'Correct! 🎉' : 'Wrong ❌'}
-          </div>
-          <div class="muted">${App.currentQ.explanation || 'No explanation.'}</div>
-        `;
+        fb.innerHTML = `<div style="font-weight:bold; color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect ? 'Correct!' : 'Wrong'}</div><div class="muted">${App.currentQ.explanation}</div>`;
         
-        // Re-color buttons
-        const correctEl = document.getElementById(`c_${correctIdx}`);
-        const selectedEl = document.getElementById(`c_${idx}`);
+        const cEl = document.getElementById(`c_${correctIdx}`);
+        const sEl = document.getElementById(`c_${idx}`);
+        if(cEl) cEl.classList.add('correct');
+        if(sEl && !isCorrect) sEl.classList.add('wrong');
         
-        if(correctEl) correctEl.classList.add('correct');
-        if(selectedEl && !isCorrect) selectedEl.classList.add('wrong');
-        
-        // Adjust buttons
         document.getElementById('btnSubmit').classList.add('hidden');
         document.getElementById('btnNext').classList.remove('hidden');
     }
@@ -236,16 +218,6 @@ function renderQuestionUI() {
     h += `</div>`;
     
     if(panel) panel.innerHTML = h;
-    
-    // Search Links
-    const term = encodeURIComponent(q.chapter || 'Medicine');
-    const tools = document.getElementById('searchTools');
-    if(tools) {
-        tools.innerHTML = `
-          <a href="https://google.com/search?q=${term}" target="_blank" class="pill-btn">Google</a>
-          <a href="https://uptodate.com/contents/search?search=${term}" target="_blank" class="pill-btn">UpToDate</a>
-        `;
-    }
 }
 
 function submitAnswer() {
@@ -274,8 +246,7 @@ function submitAnswer() {
     document.getElementById('btnNext').classList.remove('hidden');
     
     const q = App.currentQ;
-    // SAVE STATE FOR PREVIOUS BUTTON
-    q.lastChoiceIdx = idx; 
+    q.lastChoiceIdx = idx; // Save State
     q.timesSeen = (q.timesSeen||0)+1;
     if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1;
     else q.timesWrong = (q.timesWrong||0)+1;
@@ -293,28 +264,15 @@ function handleSRS(grade) {
     loadNextQuestion(false);
 }
 
-// --- NOTE SAVING (VISUAL FEEDBACK FIX) ---
 function saveNote() {
     if(App.currentQ) { 
         App.currentQ.userNotes = document.getElementById('userNoteArea').value; 
         saveQuestion(App.currentQ); 
         
-        // Text Feedback
-        const status = document.getElementById('saveNoteStatus');
-        if(status) status.textContent = "Saved ✓";
-        
-        // Button Feedback
         const btn = document.getElementById('btnSaveNoteManual');
         if(btn) {
-            const oldText = btn.textContent;
-            btn.textContent = "Saved! ✅";
-            btn.style.background = "#10b981";
-            btn.style.color = "white";
-            setTimeout(() => {
-                btn.textContent = oldText;
-                btn.style.background = "";
-                btn.style.color = "";
-            }, 2000);
+             btn.textContent = "Saved! ✅";
+             setTimeout(() => btn.textContent = "💾 Save Note", 2000);
         }
     }
 }
@@ -330,7 +288,7 @@ function selectChoice(idx) {
 }
 function toggleStrike(idx) { document.getElementById(`c_${idx}`).classList.toggle('strikethrough'); }
 
-// --- 5. TABLE & LIBRARY ---
+// --- 5. TABLE (SORTING & LAYOUT FIXED) ---
 function applyTableFilters() {
     const search = document.getElementById('allSearch').value.toLowerCase();
     const type = document.getElementById('allFilter').value;
@@ -343,6 +301,27 @@ function applyTableFilters() {
         if(type === 'wrong' && (!q.timesWrong || q.timesWrong === 0)) return false;
         if(type === 'flagged' && !q.flagged) return false;
         return true;
+    });
+    renderTable();
+}
+
+function sortTable(field) {
+    App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
+    App.sort.field = field;
+    
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.textContent = th.dataset.key === field 
+           ? `${th.dataset.key.toUpperCase()} ${App.sort.asc ? '↑' : '↓'}`
+           : `${th.dataset.key.toUpperCase()} ↕`;
+    });
+
+    App.tableQs.sort((a, b) => {
+        let vA = a[field] || 0;
+        let vB = b[field] || 0;
+        if(typeof vA === 'string') { vA=vA.toLowerCase(); vB=vB.toLowerCase(); }
+        if(vA < vB) return App.sort.asc ? -1 : 1;
+        if(vA > vB) return App.sort.asc ? 1 : -1;
+        return 0;
     });
     renderTable();
 }
@@ -364,16 +343,15 @@ function renderTable() {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
         const maint = q.maintenance ? '🔧' : '';
-        const dateStr = q.createdAt ? new Date(q.createdAt).toLocaleDateString() : '-';
         
         tr.innerHTML = `
            <td><input type="checkbox" class="row-cb" ${isSel?'checked':''}></td>
            <td>${q.id}</td>
-           <td style="font-size:0.75rem; color:#666;">${dateStr}</td>
-           <td>${q.text.substring(0,50)}...</td>
+           <td>${q.text.substring(0,80)}...</td>
            <td>${q.chapter||'-'}</td>
-           <td>${maint}</td>
-           <td><button class="pill-btn small" onclick="alert('Edit via Builder recommended for now')">✎</button></td>
+           <td>${q.timesSeen||0}</td>
+           <td>${q.timesWrong||0}</td>
+           <td><button class="pill-btn small" onclick="alert('Edit functionality reserved')">✎</button></td>
         `;
         
         const cb = tr.querySelector('.row-cb');
@@ -425,16 +403,16 @@ function toggleRangeMode() {
     btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
 }
 
-// --- 6. EVENTS BINDING ---
+// --- 6. EVENTS ---
 function setupEvents() {
     document.querySelectorAll('.tab-button').forEach(b => 
         b.addEventListener('click', () => switchTab(b.dataset.tab)));
     
     bindEvent('btnSubmit', 'click', submitAnswer);
     bindEvent('btnNext', 'click', () => loadNextQuestion(false));
-    bindEvent('btnPrev', 'click', loadPrevQuestion); // FIXED
+    bindEvent('btnPrev', 'click', loadPrevQuestion);
     bindEvent('btnFlag', 'click', toggleFlagCurrent);
-    bindEvent('btnSaveNoteManual', 'click', saveNote); // FIXED
+    bindEvent('btnSaveNoteManual', 'click', saveNote);
     
     bindEvent('modeSelect', 'change', () => loadNextQuestion(true));
     bindEvent('chapterSelect', 'change', () => loadNextQuestion(true));
@@ -472,6 +450,12 @@ function setupEvents() {
     bindEvent('btnExamFinish', 'click', finishExam);
     bindEvent('btnExamClose', 'click', () => { document.getElementById('examResults').classList.add('hidden'); switchTab('home'); });
 
+    bindEvent('btnRefreshStats', 'click', renderDashboard);
+
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => sortTable(th.dataset.key));
+    });
+
     const note = document.getElementById('userNoteArea');
     if(note) note.addEventListener('input', debounce(saveNote, 1000));
 }
@@ -495,7 +479,7 @@ function refreshUI() {
     document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
 }
 
-// Import/Export
+// Import with Confirmation
 async function handleImport() {
     const file = document.getElementById('fileInput').files[0];
     if(!file) return;
@@ -503,6 +487,8 @@ async function handleImport() {
     reader.onload = async (e) => {
         try {
             const json = JSON.parse(e.target.result);
+            if(!confirm(`Found ${json.length} items. Proceed with Import?`)) return;
+            
             const tx = db.transaction('questions', 'readwrite');
             json.forEach(q => {
                 q.id = parseInt(String(q.id).replace(/\D/g,'')) || Date.now();
@@ -513,14 +499,17 @@ async function handleImport() {
     };
     reader.readAsText(file);
 }
+
 function handleExport() {
     const b = new Blob([JSON.stringify(App.questions, null, 2)], {type:'application/json'});
     const u = URL.createObjectURL(b);
     const a = document.createElement('a');
     a.href=u; a.download='MCQ_Backup.json'; a.click();
 }
+
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deb64(s) { return decodeURIComponent(escape(atob(s))); }
+
 async function cloudUpload() {
     const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
     if(!t) return alert("Check Settings");
@@ -544,7 +533,9 @@ async function cloudDownload() {
         tx.oncomplete = () => { loadData(); refreshUI(); showToast('Downloaded'); };
     } catch(e) { alert(e.message); }
 }
+
 function resetProgress() { if(confirm("Reset stats?")) { const tx=db.transaction('questions','readwrite'); App.questions.forEach(q=>{q.timesSeen=0; q.timesCorrect=0; q.timesWrong=0; tx.objectStore('questions').put(q)}); tx.oncomplete=()=>location.reload(); } }
+function renderDashboard() { document.getElementById('dashTotal').textContent = App.questions.length; }
 
 // Flashcards
 let fcPool = []; let fcIdx = 0;

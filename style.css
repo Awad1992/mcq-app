@@ -1,4 +1,4 @@
-/* MCQ Ultra-Pro v10.0.0 CSS */
+/* MCQ Ultra-Pro v10.2.0 CSS */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -68,11 +68,12 @@ button { cursor:pointer; border:none; border-radius:8px; font-weight:600; paddin
 .notes-container { margin-top:20px; padding-top:10px; border-top:1px dashed var(--border); }
 .notes-textarea { min-height:60px; resize:vertical; background:#fffbeb; color:#451a03; width:100%; margin-top:5px; }
 
-/* Table */
+/* Table (FIXED LAYOUT) */
 .table-wrapper { overflow-x:auto; border-radius:8px; border:1px solid var(--border); margin-top:15px; background:var(--card); max-height:60vh; }
-.q-table { width:100%; border-collapse:collapse; font-size:0.9rem; }
-.q-table th { background:var(--bg); padding:12px; text-align:left; border-bottom:2px solid var(--border); cursor:pointer; position:sticky; top:0; z-index:10; white-space:nowrap; }
-.q-table td { padding:10px 12px; border-bottom:1px solid var(--border); }
+.q-table { width:100%; border-collapse:collapse; font-size:0.9rem; table-layout: fixed; } /* FIXED LAYOUT */
+.q-table th { background:var(--bg); padding:12px; text-align:left; border-bottom:2px solid var(--border); cursor:pointer; position:sticky; top:0; z-index:10; white-space:nowrap; overflow: hidden; }
+.q-table td { padding:10px 12px; border-bottom:1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-table td:nth-child(3) { white-space: normal; line-height: 1.4; } /* Question Text wraps */
 .dup-bar { display:flex; gap:10px; align-items:center; background:#fff7ed; padding:10px; border-radius:8px; margin-bottom:10px; }
 .io-strip { display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid var(--border); padding-top:10px; }
 
