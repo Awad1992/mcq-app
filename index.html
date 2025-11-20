@@ -7,7 +7,6 @@
   <meta name="theme-color" content="#2563eb">
   <link rel="manifest" href="manifest.json?v=13.0.0">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:,"> <!-- Fix Favicon 404 -->
 </head>
 <body>
 
@@ -130,9 +129,10 @@
       </div>
     </section>
 
-    <!-- 2. LIBRARY -->
+    <!-- 2. LIBRARY (Consolidated Top Bar) -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
+          
           <div class="library-sticky-header">
               <div class="filter-bar">
                  <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
@@ -147,20 +147,21 @@
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
-              <!-- Consolidated Action Bar -->
+              <!-- ALL ACTIONS MOVED HERE -->
               <div class="row-controls action-area">
-                 <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
-                 <span id="dupResult" class="muted small-label" style="margin-left:10px;"></span>
-                 <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
-                 
-                 <div class="spacer" style="flex:1;"></div>
-
-                 <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
-                 <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
-                 
-                 <input type="file" id="fileInput" accept=".json" class="hidden">
-                 <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
-                 <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
+                 <div class="action-group">
+                    <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
+                    <span id="dupResult" class="muted small-label" style="margin-left:5px;"></span>
+                    <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
+                 </div>
+                 <div class="spacer"></div>
+                 <div class="action-group">
+                    <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
+                    <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
+                    <input type="file" id="fileInput" accept=".json" class="hidden">
+                    <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
+                    <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
+                 </div>
               </div>
           </div>
 
