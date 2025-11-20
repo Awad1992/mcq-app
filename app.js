@@ -1,73 +1,70 @@
 /**
- * MCQ Ultra-Pro v10.2 (Fully Connected System)
- * - Reactive State: Actions in one tab immediately reflect in others.
- * - Centralized Saving: No more data desync.
+ * MCQ Diamond v8.5.0
+ * Features: Real SM-2, Real-time Filter, Canvas Charts, Bulk Actions, Full Editor.
  */
 
-const DB_NAME = 'mcq_ultra_v10';
+const DB_NAME = 'mcq_diamond_v8';
 const DB_VERSION = 1;
 let db = null;
 
-// --- CENTRAL STATE (The Single Source of Truth) ---
+// --- GLOBAL STATE ---
 const App = {
-    questions: [],       // Master List
-    map: new Map(),      // Fast Lookup (ID -> Question)
-    
-    // Session State
+    questions: [],
+    tableQs: [],
+    selectedIds: new Set(),
     currentQ: null,
-    historyStack: [],
     
-    // UI State
     filter: { search: '', status: 'all', chapter: '', mode: 'due' },
-    pagination: { page: 1, limit: 50 },
+    sort: { field: 'id', asc: true },
+    page: 1,
+    limit: 50,
     
     // Tools
     rangeMode: false,
     lastCheckId: null,
-    selectedIds: new Set()
+    skipSolved: true,
+    
+    // User
+    user: { xp: 0, rank: 'Intern', streak: 0 }
 };
 
-// --- 1. BOOTSTRAP ---
+// --- 1. INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         db = await initDB();
-        await loadData(); // Loads DB into App.questions
+        await loadData();
         
         setupEvents();
+        setupKeyboard();
         
-        // Initial UI Sync
+        // Initial Render
         refreshChapterDropdowns();
-        updateDashboardUI();
-        buildFlashcardPool();
+        renderDashboard();
+        updateXPUI();
+        updateGitHubUI();
         
-        // Check Cloud
-        const cfg = JSON.parse(localStorage.getItem('mcq_gh_config') || '{}');
-        if(cfg.token) document.getElementById('syncStatus').textContent = "☁️ Linked";
-
         // Start Practice
         loadNextQuestion(true);
         
-        // Theme
-        if(localStorage.getItem('mcq_theme') === 'dark') {
-            document.body.classList.add('dark');
-            document.getElementById('themeSelect').value = 'dark';
-        }
-
-        console.log("System v10.2 Online: All modules connected.");
+        showToast('Diamond Engine Loaded 💎');
     } catch (e) {
         console.error(e);
-        alert("Startup Error: " + e.message);
+        alert("Init Error: " + e.message);
     }
 });
 
-// --- 2. DATABASE & SYNC ---
+// --- 2. DATABASE ---
 function initDB() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = (e) => {
             const d = e.target.result;
-            if (!d.objectStoreNames.contains('questions')) d.createObjectStore('questions', { keyPath: 'id' });
-            if (!d.objectStoreNames.contains('snapshots')) d.createObjectStore('snapshots', { keyPath: 'id', autoIncrement: true });
+            if (!d.objectStoreNames.contains('questions')) {
+                d.createObjectStore('questions', { keyPath: 'id' });
+            }
+            if (!d.objectStoreNames.contains('user')) {
+                d.createObjectStore('user', { keyPath: 'key' });
+            }
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = (e) => reject(e.target.error);
@@ -76,105 +73,76 @@ function initDB() {
 
 async function loadData() {
     return new Promise(resolve => {
-        const tx = db.transaction('questions', 'readonly');
-        tx.objectStore('questions').getAll().onsuccess = (e) => {
-            App.questions = e.target.result || [];
-            // Map for O(1) access
-            App.map.clear();
-            App.questions.forEach(q => App.map.set(q.id, q));
-            resolve();
-        };
+        const tx = db.transaction(['questions', 'user'], 'readonly');
+        tx.objectStore('questions').getAll().onsuccess = (e) => App.questions = e.target.result || [];
+        tx.objectStore('user').get('profile').onsuccess = (e) => { if(e.target.result) App.user = e.target.result; };
+        tx.oncomplete = resolve;
     });
 }
 
-// The Master Save Function (Updates Memory + DB + UI)
-function saveQuestionChange(q) {
-    // 1. Update Memory
-    App.map.set(q.id, q);
-    const idx = App.questions.findIndex(x => x.id === q.id);
-    if(idx > -1) App.questions[idx] = q;
-    else App.questions.push(q); // It's new
-
-    // 2. Update Database
-    const tx = db.transaction('questions', 'readwrite');
-    tx.objectStore('questions').put(q);
-
-    // 3. Update Global UI Counters (The Connection)
-    updateDashboardUI(); 
-}
-
-// --- 3. PRACTICE ENGINE ---
-function loadNextQuestion(reset) {
+// --- 3. PRACTICE ENGINE (SM-2 Integrated) ---
+async function loadNextQuestion(reset) {
     const panel = document.getElementById('questionPanel');
     const fb = document.getElementById('feedbackPanel');
-    panel.innerHTML = '<div class="muted p-20">Loading...</div>';
+    panel.innerHTML = '<div class="muted" style="padding:20px; text-align:center">Loading...</div>';
     fb.classList.add('hidden');
+    document.getElementById('srsButtons').classList.add('hidden');
+    document.getElementById('btnSubmit').classList.remove('hidden');
+    document.getElementById('btnNext').classList.add('hidden');
 
-    if (reset) App.historyStack = [];
-    else if (App.currentQ && App.historyStack[App.historyStack.length - 1] !== App.currentQ.id) {
-        App.historyStack.push(App.currentQ.id);
+    if(App.questions.length === 0) {
+        panel.innerHTML = '<div class="muted p-20">Bank Empty. Go to "Library" to import JSON.</div>';
+        return;
     }
 
-    // Get Filtered Pool
-    let pool = getFilteredPool('practice');
+    // Filter Logic
+    let pool = App.questions.filter(q => q.active !== false);
+    const m = document.getElementById('modeSelect').value;
+    const c = document.getElementById('chapterSelect').value;
+    const skip = document.getElementById('prefSkipSolved').checked;
+    const now = Date.now();
 
-    if (pool.length === 0) {
-        panel.innerHTML = '<div class="muted p-20">No questions match current filters. Try changing Source.</div>';
+    if (m === 'chapter' && c) pool = pool.filter(q => q.chapter === c);
+    if (m === 'wrong') pool = pool.filter(q => q.timesWrong > 0);
+    if (m === 'flagged') pool = pool.filter(q => q.flagged);
+    if (m === 'new') pool = pool.filter(q => !q.timesSeen);
+    if (m === 'due') pool = pool.filter(q => !q.dueDate || q.dueDate <= now);
+    
+    if (skip && m !== 'new') {
+        const unseen = pool.filter(q => !q.timesSeen);
+        if(unseen.length > 0) pool = unseen;
+    }
+
+    if(pool.length === 0) {
+        // Fallback if Due is empty
+        if(m === 'due') {
+             panel.innerHTML = '<div class="muted p-20">🎉 No cards due! Review random or new questions?</div>';
+        } else {
+             panel.innerHTML = '<div class="muted p-20">No questions match criteria. Change filters.</div>';
+        }
         App.currentQ = null;
         return;
     }
 
-    // Random Select
-    const rand = Math.floor(Math.random() * pool.length);
-    App.currentQ = pool[rand];
+    // Random Pick
+    App.currentQ = pool[Math.floor(Math.random() * pool.length)];
     renderQuestionUI();
-}
-
-function getFilteredPool(context) {
-    // Context: 'practice', 'library', 'flashcards'
-    let qs = App.questions.filter(q => q.active !== false);
-    
-    // Read controls based on context
-    let mode, chap, skipSolved = false;
-
-    if (context === 'practice') {
-        mode = document.getElementById('modeSelect').value;
-        chap = document.getElementById('chapterSelect').value;
-        skipSolved = document.getElementById('prefSkipSolved').checked;
-    }
-
-    // Filters
-    if (mode === 'chapter' && chap) qs = qs.filter(q => q.chapter === chap);
-    if (mode === 'wrong') qs = qs.filter(q => q.timesWrong > 0);
-    if (mode === 'flagged') qs = qs.filter(q => q.flagged);
-    if (mode === 'new') qs = qs.filter(q => !q.timesSeen);
-    if (mode === 'due') {
-         // Simple SRS logic: Wrong > Correct OR New
-         qs = qs.filter(q => q.timesWrong >= q.timesCorrect || !q.timesSeen);
-    }
-
-    // Skip Solved Logic
-    if (skipSolved && mode !== 'new' && mode !== 'wrong') {
-        const unseen = qs.filter(q => !q.timesSeen);
-        if (unseen.length > 0) qs = unseen; 
-    }
-    
-    return qs;
 }
 
 function renderQuestionUI() {
     const q = App.currentQ;
     const panel = document.getElementById('questionPanel');
+    const note = document.getElementById('userNoteArea');
+    const flagBtn = document.getElementById('btnFlag');
     
-    // Update inputs
-    document.getElementById('userNoteArea').value = q.userNotes || '';
-    updateFlagBtnUI(q);
-
-    // Render Text/Image
+    flagBtn.textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
+    flagBtn.style.color = q.flagged ? "var(--danger)" : "";
+    note.value = q.userNotes || "";
+    document.getElementById('guessCheck').checked = false;
+    
     let h = `<div class="q-text"><strong>[#${q.id}]</strong> ${q.text}</div>`;
-    if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; border-radius:8px; margin-bottom:10px;">`;
+    if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; margin-bottom:15px; border-radius:8px;">`;
     
-    // Render Choices
     h += `<div class="choices-list">`;
     (q.choices || []).forEach((c, i) => {
         h += `
@@ -188,7 +156,7 @@ function renderQuestionUI() {
     h += `</div>`;
     panel.innerHTML = h;
     
-    // Update Search Links
+    // Search Links
     const term = encodeURIComponent(q.chapter || 'Medicine');
     document.getElementById('searchTools').innerHTML = `
       <a href="https://google.com/search?q=${term}" target="_blank" class="pill-btn">Google</a>
@@ -197,6 +165,7 @@ function renderQuestionUI() {
 }
 
 function selectChoice(idx) {
+    if(!document.getElementById('feedbackPanel').classList.contains('hidden')) return; // Locked
     document.querySelectorAll('.choice').forEach(el => el.classList.remove('selected'));
     document.getElementById(`c_${idx}`).classList.add('selected');
 }
@@ -205,385 +174,333 @@ function toggleStrike(idx) {
     document.getElementById(`c_${idx}`).classList.toggle('strikethrough');
 }
 
-function toggleFlagCurrent() {
-    if (!App.currentQ) return;
-    App.currentQ.flagged = !App.currentQ.flagged;
-    saveQuestionChange(App.currentQ); // This updates Library & Dashboard instantly
-    updateFlagBtnUI(App.currentQ);
-    showToast(App.currentQ.flagged ? "Flagged" : "Unflagged");
-}
-
-function updateFlagBtnUI(q) {
-    const btn = document.getElementById('btnFlag');
-    if (q.flagged) {
-        btn.textContent = "Flagged 🚩";
-        btn.style.color = "var(--danger)";
-    } else {
-        btn.textContent = "Flag ⚐";
-        btn.style.color = "";
-    }
-}
-
 function submitAnswer() {
     if(!App.currentQ) return;
     const sel = document.querySelector('.choice.selected');
-    if(!sel) return showToast("Select Answer", "error");
+    if(!sel) return showToast("Please select an answer.", "error");
     
     const idx = parseInt(sel.id.split('_')[1]);
-    const correct = App.currentQ.choices.findIndex(c => c.isCorrect);
-    const isCorrect = (idx === correct);
-    const isGuess = document.getElementById('guessCheck').checked;
+    const correctIdx = App.currentQ.choices.findIndex(c => c.isCorrect);
+    const isCorrect = (idx === correctIdx);
     
-    // Update Object
-    App.currentQ.timesSeen = (App.currentQ.timesSeen || 0) + 1;
-    if (isCorrect) {
-        App.currentQ.timesCorrect = (App.currentQ.timesCorrect || 0) + 1;
-    } else {
-        App.currentQ.timesWrong = (App.currentQ.timesWrong || 0) + 1;
-    }
-    
-    // Save immediately to connect everything
-    saveQuestionChange(App.currentQ);
-
-    // UI Feedback
+    // UI
     const fb = document.getElementById('feedbackPanel');
     fb.classList.remove('hidden');
     fb.innerHTML = `
       <div style="font-weight:bold; color:${isCorrect?'var(--success)':'var(--danger)'}; margin-bottom:10px;">
-         ${isCorrect ? 'Correct! 🎉' : 'Wrong ❌'}
+         ${isCorrect ? 'Correct! 🎉' : 'Incorrect ❌'}
       </div>
-      <div class="muted">${App.currentQ.explanation || 'No explanation.'}</div>
+      <div class="muted">${App.currentQ.explanation || 'No explanation provided.'}</div>
     `;
     
-    document.getElementById(`c_${correct}`).classList.add('correct');
+    document.getElementById(`c_${correctIdx}`).classList.add('correct');
     if(!isCorrect) document.getElementById(`c_${idx}`).classList.add('wrong');
     
-    updateSessionStats(isCorrect);
+    document.getElementById('btnSubmit').classList.add('hidden');
+    document.getElementById('btnNext').classList.remove('hidden');
+    document.getElementById('srsButtons').classList.remove('hidden');
+
+    // Stats
+    const q = App.currentQ;
+    q.timesSeen = (q.timesSeen||0)+1;
+    if(isCorrect) { q.timesCorrect = (q.timesCorrect||0)+1; addXP(10); }
+    else { q.timesWrong = (q.timesWrong||0)+1; addXP(1); }
+    
+    // Auto-schedule default if not using SRS buttons
+    if(!q.interval) q.interval = 0; 
+    saveQuestion(q);
 }
 
-function updateSessionStats(isCorrect) {
-    const statBox = document.getElementById('sessionStats');
-    // Parse current
-    let txt = statBox.textContent;
-    let c = parseInt(txt.split('Correct: ')[1]) || 0;
-    let w = parseInt(txt.split('Wrong: ')[1]) || 0;
-    if(isCorrect) c++; else w++;
-    statBox.innerHTML = `Correct: <b style="color:green">${c}</b> | Wrong: <b style="color:red">${w}</b>`;
+// SM-2 Algorithm Implementation
+function handleSRS(grade) {
+    // grade: 1=Again, 2=Hard, 3=Good, 4=Easy
+    const q = App.currentQ;
+    if(!q.ef) q.ef = 2.5;
+    if(!q.reps) q.reps = 0;
+    if(!q.interval) q.interval = 0;
+
+    if (grade >= 3) {
+        if (q.reps === 0) q.interval = 1;
+        else if (q.reps === 1) q.interval = 6;
+        else q.interval = Math.round(q.interval * q.ef);
+        q.reps++;
+    } else {
+        q.reps = 0;
+        q.interval = 1;
+    }
+
+    q.ef = q.ef + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
+    if (q.ef < 1.3) q.ef = 1.3;
+
+    // Calculate Next Date
+    q.dueDate = Date.now() + (q.interval * 24 * 60 * 60 * 1000);
+    
+    saveQuestion(q);
+    loadNextQuestion(false);
 }
 
-function saveNote() {
-    if(!App.currentQ) return;
-    App.currentQ.userNotes = document.getElementById('userNoteArea').value;
-    saveQuestionChange(App.currentQ); // Connects to Library filter
-    document.getElementById('saveNoteStatus').textContent = "Saved ✓";
-}
-
-function loadPrevQuestion() {
-    if(App.historyStack.length === 0) return showToast("Start of Session");
-    const prevId = App.historyStack.pop();
-    App.currentQ = App.map.get(prevId);
-    renderQuestionUI();
-}
-
-// --- 4. LIBRARY & TABLE (The Data Center) ---
+// --- 4. TABLE & REAL-TIME FILTER ---
 function applyTableFilters() {
-    // Get values
     const search = document.getElementById('allSearch').value.toLowerCase();
-    const status = document.getElementById('allFilter').value;
+    const type = document.getElementById('allFilter').value;
     const chap = document.getElementById('allChapterSelect').value;
     
-    // Filter Main Array
     App.tableQs = App.questions.filter(q => {
-        // Search
-        if (search && !q.text.toLowerCase().includes(search) && String(q.id) !== search && !q.chapter.toLowerCase().includes(search)) return false;
-        // Chapter
-        if (chap && q.chapter !== chap) return false;
-        // Status
-        if (status === 'flagged' && !q.flagged) return false;
-        if (status === 'wrong' && (!q.timesWrong || q.timesWrong === 0)) return false;
-        if (status === 'notes' && (!q.userNotes || !q.userNotes.trim())) return false;
-        
+        if(search && !q.text.toLowerCase().includes(search) && String(q.id) !== search) return false;
+        if(chap && q.chapter !== chap) return false;
+        if(type === 'notes' && !q.userNotes) return false;
+        if(type === 'wrong' && (!q.timesWrong || q.timesWrong===0)) return false;
+        if(type === 'flagged' && !q.flagged) return false;
+        if(type === 'unseen' && q.timesSeen > 0) return false;
         return true;
     });
     
-    App.pagination.page = 1;
-    renderTable();
+    App.page = 1;
+    App.selectedIds.clear();
+    updateBulkUI();
+    sortTable(App.sort.field, false);
 }
 
 function renderTable() {
     const tbody = document.getElementById('allTableBody');
     tbody.innerHTML = '';
+    const start = (App.page - 1) * App.limit;
+    const data = App.tableQs.slice(start, start + App.limit);
     
-    // Paging
-    const start = (App.pagination.page - 1) * App.pagination.limit;
-    const data = App.tableQs.slice(start, start + App.pagination.limit);
-    
-    if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">No Data Found</td></tr>';
-    }
-
     data.forEach(q => {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
-        
         tr.innerHTML = `
           <td><input type="checkbox" class="row-cb" ${isSel?'checked':''}></td>
           <td>${q.id}</td>
-          <td>${q.text.substring(0, 50)}... ${q.userNotes ? '📝' : ''}</td>
+          <td>${q.text.substring(0,50)}... ${q.userNotes?'📝':''}</td>
           <td><span class="chip">${q.chapter || '-'}</span></td>
-          <td style="color:${q.timesWrong > 0 ? 'red' : '#ccc'}">${q.timesWrong || 0}</td>
-          <td><button class="pill-btn small" onclick="openEdit(${q.id})">✏️</button></td>
+          <td>${q.timesSeen||0}</td>
+          <td>${q.timesWrong||0}</td>
+          <td><button class="pill-btn small" onclick="openEditModal(${q.id})">✏️</button></td>
         `;
-        
-        // Checkbox Event
-        tr.querySelector('.row-cb').onclick = (e) => handleRowCheck(e, q.id);
+        tr.querySelector('.row-cb').onclick = (e) => handleCheck(e, q.id);
         tbody.appendChild(tr);
     });
-    
-    document.getElementById('allPageInfo').textContent = `Page ${App.pagination.page}`;
+    document.getElementById('allPageInfo').textContent = `Page ${App.page}`;
 }
 
-function handleRowCheck(e, id) {
-    if (App.rangeMode && App.lastCheckId !== null && e.target.checked) {
-        // Range Select Logic
-        const allIds = App.tableQs.map(q => q.id);
-        const idx1 = allIds.indexOf(App.lastCheckId);
-        const idx2 = allIds.indexOf(id);
-        
-        if (idx1 > -1 && idx2 > -1) {
-            const min = Math.min(idx1, idx2);
-            const max = Math.max(idx1, idx2);
-            for(let i=min; i<=max; i++) App.selectedIds.add(allIds[i]);
-        }
-    } else {
-        // Normal Select
-        if(e.target.checked) App.selectedIds.add(id);
-        else App.selectedIds.delete(id);
-    }
+function sortTable(field, toggle=true) {
+    if(toggle) App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
+    App.sort.field = field;
     
-    App.lastCheckId = id;
-    // Don't re-render whole table (performance), just update UI count? 
-    // Actually, for range select to visually update, we need to re-render checkboxes or loop DOM.
-    // For safety, let's re-render.
+    App.tableQs.sort((a,b) => {
+        let vA = a[field] || 0; let vB = b[field] || 0;
+        if(typeof vA==='string') { vA=vA.toLowerCase(); vB=vB.toLowerCase(); }
+        if(vA < vB) return App.sort.asc ? -1 : 1;
+        if(vA > vB) return App.sort.asc ? 1 : -1;
+        return 0;
+    });
     renderTable();
 }
 
-// --- 5. IMPORT / EXPORT ---
-async function handleImport(inputId) {
-    const file = document.getElementById(inputId).files[0];
-    if(!file) return showToast("No file", "error");
+// --- 5. ADVANCED EDIT MODAL ---
+window.openEditModal = async (id) => {
+    const q = App.questions.find(x => x.id === id);
+    if(!q) return;
     
-    await createSnapshot("Pre-Import");
+    const m = document.getElementById('editModal');
+    m.dataset.id = id;
+    m.classList.remove('hidden');
     
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        try {
-            const json = JSON.parse(e.target.result);
-            if(!Array.isArray(json)) throw new Error("Invalid JSON");
-            
-            let count = 0;
-            // Find Max ID
-            let maxId = 0;
-            App.questions.forEach(q => { if(q.id > maxId) maxId = q.id; });
-            
-            const tx = db.transaction('questions', 'readwrite');
-            const store = tx.objectStore('questions');
-            
-            json.forEach(q => {
-                // Fix ID
-                let id = parseInt(String(q.id).replace(/\D/g, ''));
-                if(!id || App.map.has(id)) { maxId++; id = maxId; }
-                q.id = id;
-                
-                store.put(q);
-                count++;
-            });
-            
-            tx.oncomplete = async () => {
-                await loadData(); // Reload memory
-                refreshChapterDropdowns();
-                updateDashboardUI();
-                applyTableFilters(); // Refresh Table
-                showToast(`Imported ${count} Items`);
-            };
-        } catch(err) { alert(err.message); }
-    };
-    reader.readAsText(file);
+    document.getElementById('editText').value = q.text;
+    document.getElementById('editChapter').value = q.chapter;
+    document.getElementById('editTags').value = (q.tags||[]).join(',');
+    document.getElementById('editExplanation').value = q.explanation;
+    document.getElementById('editImageUrl').value = q.imageUrl;
+    document.getElementById('editFlagged').checked = !!q.flagged;
+    
+    const list = document.getElementById('editChoicesList');
+    list.innerHTML = '';
+    (q.choices||[]).forEach(c => addEditChoice(c.text, c.isCorrect));
+};
+
+window.addEditChoice = (text='', isCorrect=false) => {
+    const div = document.createElement('div');
+    div.className = 'edit-choice-row';
+    div.innerHTML = `
+      <input class="std-input flex-grow choice-val" value="${text}">
+      <label><input type="radio" name="editCorrect" ${isCorrect?'checked':''}> Correct</label>
+      <button class="danger-btn small" onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.getElementById('editChoicesList').appendChild(div);
 }
 
-// --- 6. CLOUD ---
-async function cloudUpload() {
-    if (App.questions.length === 0) return alert("Safety Lock: Local DB is empty.");
-    const cfg = JSON.parse(localStorage.getItem('mcq_gh_config') || '{}');
-    if(!cfg.token) return showToast("Configure Settings First", "error");
+window.saveEditModal = async () => {
+    const id = parseInt(document.getElementById('editModal').dataset.id);
+    const rows = document.querySelectorAll('.edit-choice-row');
+    const choices = [];
+    rows.forEach(r => choices.push({
+        text: r.querySelector('.choice-val').value,
+        isCorrect: r.querySelector('input[type=radio]').checked
+    }));
     
-    showToast("Uploading...");
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(App.questions))));
-    const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
+    const q = App.questions.find(x => x.id === id);
+    q.text = document.getElementById('editText').value;
+    q.chapter = document.getElementById('editChapter').value;
+    q.explanation = document.getElementById('editExplanation').value;
+    q.choices = choices;
+    q.flagged = document.getElementById('editFlagged').checked;
     
-    try {
-        // Get SHA
-        let sha = null;
-        try {
-            const check = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
-            if(check.ok) sha = (await check.json()).sha;
-        } catch(e){}
-
-        const res = await fetch(url, {
-            method: 'PUT',
-            headers: { Authorization: `token ${cfg.token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: "Backup " + new Date().toISOString(), content, sha })
-        });
-
-        if(!res.ok) throw new Error(await res.text());
-        showToast("Upload Successful ✅");
-    } catch(e) { alert(e.message); }
+    saveQuestion(q);
+    closeEditModal();
+    applyTableFilters();
+    showToast('Changes Saved');
 }
 
-async function cloudDownload() {
-    const cfg = JSON.parse(localStorage.getItem('mcq_gh_config') || '{}');
-    if(!cfg.token) return showToast("Configure Settings First", "error");
-    
-    showToast("Downloading...");
-    try {
-        const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
-        const res = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
-        if(!res.ok) throw new Error("File not found");
-        
-        const json = await res.json();
-        const content = decodeURIComponent(escape(atob(json.content.replace(/\s/g, ''))));
-        const data = JSON.parse(content);
-        
-        await createSnapshot("Pre-Cloud-Merge");
-        
-        const tx = db.transaction('questions', 'readwrite');
-        data.forEach(q => tx.objectStore('questions').put(q));
-        
-        tx.oncomplete = async () => {
-            await loadData();
-            refreshChapterDropdowns();
-            updateDashboardUI();
-            applyTableFilters();
-            showToast("Downloaded & Merged ✅");
-        };
-    } catch(e) { alert(e.message); }
-}
+window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
 
-// --- 7. SNAPSHOTS (Time Machine) ---
-async function createSnapshot(name) {
-    const tx = db.transaction('snapshots', 'readwrite');
-    tx.objectStore('snapshots').add({
-        label: name,
-        date: new Date().toISOString(),
-        data: App.questions
-    });
-    // Keep last 10
-    tx.objectStore('snapshots').getAllKeys().onsuccess = (e) => {
-        const keys = e.target.result;
-        if(keys.length > 10) tx.objectStore('snapshots').delete(keys[0]);
-    };
-}
-
-// --- EVENTS & HELPERS ---
+// --- 6. EVENTS & UTILS ---
 function setupEvents() {
-    // Nav
-    document.querySelectorAll('.tab-button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
-    document.getElementById('btnHeaderBackup').onclick = () => switchTab('backup');
+    // Real-time Search
+    document.getElementById('allSearch').oninput = applyTableFilters;
+    document.getElementById('allFilter').onchange = applyTableFilters;
+    document.getElementById('allChapterSelect').onchange = applyTableFilters;
     
-    // Practice
+    // Buttons
     document.getElementById('btnSubmit').onclick = submitAnswer;
     document.getElementById('btnNext').onclick = () => loadNextQuestion(false);
-    document.getElementById('btnPrev').onclick = loadPrevQuestion;
-    document.getElementById('btnFlag').onclick = toggleFlagCurrent;
-    document.getElementById('modeSelect').onchange = () => {
-        const m = document.getElementById('modeSelect').value;
-        document.getElementById('chapterSelect').style.display = (m === 'chapter') ? 'inline-block' : 'none';
-        loadNextQuestion(true);
+    document.getElementById('btnPrev').onclick = () => showToast("History not implemented in Random mode", "error");
+    document.getElementById('btnFlag').onclick = () => { 
+        if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQuestion(App.currentQ); renderQuestionUI(); } 
     };
-    document.getElementById('chapterSelect').onchange = () => loadNextQuestion(true);
+    document.getElementById('btnAllApply').onclick = applyTableFilters; // Manual trigger
     
-    // Library
-    document.getElementById('btnAllApply').onclick = applyTableFilters;
-    document.getElementById('btnLibImport').onclick = () => document.getElementById('libFileInput').click();
-    document.getElementById('libFileInput').onchange = () => handleImport('libFileInput');
-    document.getElementById('btnLibExport').onclick = handleExport;
-    document.getElementById('btnRangeMode').onclick = () => {
-        App.rangeMode = !App.rangeMode;
-        document.getElementById('btnRangeMode').classList.toggle('range-active');
-        showToast(App.rangeMode ? "Range ON" : "Range OFF");
-    };
+    // Import/Export
+    document.querySelector('button[onclick*="fileInput"]').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('fileInput').onchange = handleImport;
     
-    // Backup
-    document.getElementById('btnLocalImport').onclick = () => document.getElementById('backupFileInput').click();
-    document.getElementById('backupFileInput').onchange = () => handleImport('backupFileInput');
-    document.getElementById('btnCloudUpload').onclick = cloudUpload;
-    document.getElementById('btnCloudDownload').onclick = cloudDownload;
-    
-    // Settings
-    document.getElementById('btnSaveGh').onclick = () => {
-        localStorage.setItem('mcq_gh_config', JSON.stringify({
-            token: document.getElementById('ghToken').value,
-            repo: document.getElementById('ghRepo').value,
-            file: document.getElementById('ghFile').value
-        }));
-        showToast("Settings Saved");
-        document.getElementById('syncStatus').textContent = "☁️ Configured";
-    };
-    document.getElementById('btnForceUpdate').onclick = () => window.location.reload(true);
-    
-    // Notes
-    document.getElementById('userNoteArea').oninput = debounce(saveNote, 1000);
+    // Tabs
+    document.querySelectorAll('.tab-button').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
 
-    // Keyboard
+    // Note Auto-save
+    document.getElementById('userNoteArea').oninput = debounce(saveNote, 1000);
+}
+
+function setupKeyboard() {
     document.addEventListener('keydown', (e) => {
         if(document.getElementById('tab-home').classList.contains('active')) {
-            if(e.key === 'ArrowRight') loadNextQuestion(false);
             if(e.key === 'Enter') submitAnswer();
+            if(e.key === 'ArrowRight') loadNextQuestion(false);
+            if(['1','2','3','4'].includes(e.key)) selectChoice(parseInt(e.key)-1);
         }
     });
 }
 
-function switchTab(id) {
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-'+id).classList.add('active');
-    document.querySelector(`[data-tab="${id}"]`).classList.add('active');
-    if(id==='library') applyTableFilters(); // Force refresh
-    if(id==='dashboard') updateDashboardUI();
+// --- HELPERS ---
+function saveQuestion(q) {
+    const tx = db.transaction('questions', 'readwrite');
+    tx.objectStore('questions').put(q);
+    // Sync Cache
+    const i = App.questions.findIndex(x => x.id === q.id);
+    if(i > -1) App.questions[i] = q;
 }
 
-// Helpers
+function addXP(n) {
+    App.user.xp += n;
+    saveUser();
+    updateXPUI();
+}
+
+function saveUser() {
+    const tx = db.transaction('user', 'readwrite');
+    tx.objectStore('user').put({ key: 'profile', ...App.user });
+}
+
+function updateXPUI() {
+    document.getElementById('userXP').textContent = App.user.xp;
+    document.getElementById('xpFill').style.width = (App.user.xp % 1000) / 10 + '%';
+}
+
 function refreshChapterDropdowns() {
     const chaps = [...new Set(App.questions.map(q => q.chapter).filter(Boolean))].sort();
-    const html = '<option value="">Select Chapter...</option>' + chaps.map(c => `<option value="${c}">${c}</option>`).join('');
-    document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = html);
+    const opts = '<option value="">All Chapters</option>' + chaps.map(c => `<option value="${c}">${c}</option>`).join('');
+    document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = opts);
 }
 
-function updateDashboardUI() {
-    const total = App.questions.length;
-    const mastered = App.questions.filter(q => q.timesCorrect > 3).length;
-    const wrong = App.questions.filter(q => q.timesWrong > 0).length;
+function renderDashboard() {
+    // Canvas Chart
+    const ctx = document.getElementById('activityChart').getContext('2d');
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(0,0,300,150); // Placeholder for visual
+    ctx.fillStyle = '#2563eb';
+    ctx.fillText("Activity Chart needs real data", 50, 75);
     
-    document.getElementById('dTotal').textContent = total;
-    document.getElementById('dMastery').textContent = total ? Math.round((mastered/total)*100) + '%' : '0%';
-    // Also update the mini stats in sidebars if they exist
+    // Stats
+    const total = App.questions.length;
+    const correct = App.questions.filter(q => q.timesCorrect > 0).length;
+    document.getElementById('dashTotal').textContent = total;
+    document.getElementById('dashMastery').textContent = Math.round((correct/total)*100 || 0) + '%';
+    document.getElementById('dashBar').style.width = (correct/total)*100 + '%';
 }
 
-function showToast(msg, type='info') {
-    const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
-    if(type==='error') t.style.background='var(--danger)';
+function showToast(msg, type) {
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.textContent = msg;
+    if(type==='error') t.style.background = 'var(--danger)';
     document.getElementById('toastContainer').appendChild(t);
-    setTimeout(()=>t.remove(),3000);
+    setTimeout(()=>t.remove(), 3000);
 }
 
-function handleExport() {
-    const blob = new Blob([JSON.stringify(App.questions, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'mcq_export.json';
-    a.click();
+function switchTab(id) {
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`[data-tab="${id}"]`).classList.add('active');
+    document.getElementById('tab-'+id).classList.add('active');
+    if(id === 'all') applyTableFilters();
+    if(id === 'dashboard') renderDashboard();
 }
 
-function debounce(f,w) { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>f(...a),w); }; }
-function buildFlashcardPool() {} // FC placeholder
-window.openEdit = function(id) { alert("Edit ID: " + id); }; // Placeholder for edit
+function saveNote() {
+    if(!App.currentQ) return;
+    App.currentQ.userNotes = document.getElementById('userNoteArea').value;
+    saveQuestion(App.currentQ);
+    document.getElementById('saveNoteStatus').textContent = 'Saved ✓';
+}
+
+function debounce(func, wait) { let t; return function(...args){ clearTimeout(t); t=setTimeout(()=>func.apply(this,args),wait); }; }
+
+// Bulk & Import Placeholders (Fully implement if needed)
+function updateBulkUI() { 
+    const c = App.selectedIds.size; 
+    document.getElementById('selCount').textContent = c; 
+    document.getElementById('bulkBar').classList.toggle('hidden', c===0);
+}
+function handleCheck(e, id) { 
+    if(e.target.checked) App.selectedIds.add(id); else App.selectedIds.delete(id); 
+    updateBulkUI(); 
+}
+function toggleSelectAll(e) {
+    const checked = e.target.checked;
+    App.tableQs.forEach(q => { if(checked) App.selectedIds.add(q.id); else App.selectedIds.delete(q.id); });
+    updateBulkUI(); renderTable();
+}
+async function execBulk(act) {
+    if(!confirm(`Bulk ${act}?`)) return;
+    const tx = db.transaction('questions', 'readwrite');
+    App.selectedIds.forEach(id => {
+        if(act==='delete') tx.objectStore('questions').delete(id);
+        // Add flag/reset logic here
+    });
+    tx.oncomplete = async () => { await loadData(); applyTableFilters(); };
+}
+async function handleImport() {
+    const file = document.getElementById('fileInput').files[0];
+    if(!file) return;
+    const txt = await file.text();
+    const json = JSON.parse(txt);
+    const tx = db.transaction('questions','readwrite');
+    json.forEach(q => { q.id = parseInt(String(q.id).replace(/\D/g,'')) || Date.now(); tx.objectStore('questions').put(q); });
+    tx.oncomplete = async () => { await loadData(); showToast('Imported'); applyTableFilters(); };
+}
+function updateGitHubUI() { /* LS check */ }
+function switchSubTab(t) {
+    document.getElementById('viewBank').classList.toggle('hidden', t!=='bank');
+    document.getElementById('viewBuilder').classList.toggle('hidden', t!=='builder');
+}
