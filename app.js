@@ -1,959 +1,932 @@
-/* MCQ Study App Ultra-Pro v5.1 - Based on Original v4.3.2 */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #f4f5f7;
-  color: #111;
-}
-
-body.theme-dark {
-  background: #111827;
-  color: #f9fafb;
-}
-
-body.theme-night {
-  background: #000000;
-  color: #f9fafb;
-}
-
-body.theme-calm {
-  background: #e8f5e9;
-  color: #102027;
-}
-
-body {
-  min-height: 100vh;
-}
-
-.app {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0.75rem 0.75rem 2rem;
-}
-
-/* --- FOCUS MODE STYLES (New) --- */
-body.focus-mode .top-bar,
-body.focus-mode .tabs,
-body.focus-mode .col-side,
-body.focus-mode .row-controls, 
-body.focus-mode .notes-area-container,
-body.focus-mode .stats-row,
-body.focus-mode .subnav,
-body.focus-mode #btnForceUpdate,
-body.focus-mode .history-list {
-  display: none !important;
-}
-
-body.focus-mode .app {
-  padding-top: 4rem;
-  max-width: 800px;
-}
-
-body.focus-mode .card {
-  box-shadow: none;
-  border: none;
-  background: transparent;
-}
-
-/* Floating Exit Button (Visible only in Focus Mode) */
-.floating-exit-focus {
-  position: fixed; top: 20px; right: 20px; z-index: 9999;
-  background-color: #c62828; color: #fff;
-  border: none; border-radius: 50px;
-  padding: 10px 20px; font-weight: bold; cursor: pointer;
-  display: none;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-body.focus-mode .floating-exit-focus { display: block; }
-
-/* Floating Update Button (New) */
-.floating-update-btn {
-  position: fixed; bottom: 20px; left: 20px; z-index: 9999;
-  background-color: #222; color: #fff;
-  border: 1px solid #444; border-radius: 50px;
-  padding: 8px 12px; font-size: 0.75rem; cursor: pointer;
-  opacity: 0.6; transition: opacity 0.3s;
-}
-.floating-update-btn:hover { opacity: 1; background: #000; }
-
-/* --- Original Styles Continued --- */
-
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: #ffffff;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  margin-bottom: 0.5rem;
-}
-
-body.theme-dark .top-bar,
-body.theme-night .top-bar {
-  background: #111827;
-  color: #f9fafb;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.6);
-}
-
-body.theme-calm .top-bar {
-  background: #ffffff;
-}
-
-.top-bar h1 {
-  font-size: 1.1rem;
-  margin: 0;
-}
-
-.top-bar .ver {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.subtitle {
-  font-size: 0.8rem;
-  color: #777;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  justify-content: flex-end;
-}
-
-.chip {
-  font-size: 0.7rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  border: 1px solid #ddd;
-  background: #fafafa;
-}
-
-.chip-theme {
-  border-radius: 999px;
-  padding: 0.05rem 0.35rem;
-}
-
-.chip-ok {
-  border-color: #c8e6c9;
-  background: #e8f5e9;
-}
-
-.chip-flag {
-  border-color: #ffcdd2;
-  background: #ffebee;
-}
-
-.chip-sync {
-  border-color: #bbdefb;
-  background: #e3f2fd;
-}
-
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin: 0.25rem 0 0.5rem;
-  overflow-x: auto;
-}
-
-.tab-button {
-  border: 1px solid #ccc;
-  background: #f7f7f7;
-  border-radius: 999px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.tab-button.active {
-  background: #111;
-  color: #fff;
-  border-color: #111;
-}
-
-body.theme-dark .tab-button,
-body.theme-night .tab-button {
-  background: #111827;
-  border-color: #4b5563;
-  color: #e5e7eb;
-}
-
-body.theme-dark .tab-button.active,
-body.theme-night .tab-button.active {
-  background: #f9fafb;
-  color: #111827;
-  border-color: #f9fafb;
-}
-
-.tab-container {
-  margin-top: 0.25rem;
-}
-
-.tab-content {
-  display: none;
-}
-
-.tab-content.active {
-  display: block;
-}
-
-.card {
-  background: #ffffff;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-  margin-bottom: 0.5rem;
-}
-
-body.theme-dark .card,
-body.theme-night .card {
-  background: #020617;
-  color: #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-body.theme-calm .card {
-  background: #ffffff;
-}
-
-.row {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.col-main {
-  flex: 2;
-}
-
-.col-side {
-  flex: 1;
-}
-
-.side-card {
-  margin-top: 0.5rem;
-}
-
-.small-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #666;
-}
-
-body.theme-dark .small-label,
-body.theme-night .small-label {
-  color: #9ca3af;
-}
-
-.muted {
-  color: #666;
-}
-
-body.theme-dark .muted,
-body.theme-night .muted {
-  color: #9ca3af;
-}
-
-.tiny {
-  font-size: 0.75rem;
-}
-
-.row-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-end;
-}
-
-.row-controls > div {
-  min-width: 140px;
-}
-
-input, select, button, textarea {
-  font-family: inherit;
-  font-size: 0.85rem;
-}
-
-input, select, textarea {
-  padding: 0.2rem 0.4rem;
-  border-radius: 0.35rem;
-  border: 1px solid #ccc;
-}
-
-body.theme-dark input,
-body.theme-dark select,
-body.theme-dark textarea,
-body.theme-night input,
-body.theme-night select,
-body.theme-night textarea {
-  background: #020617;
-  border-color: #4b5563;
-  color: #e5e7eb;
-}
-
-button {
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid #ccc;
-  background: #f7f7f7;
-  cursor: pointer;
-}
-
-button.primary {
-  background: #111;
-  color: #fff;
-  border-color: #111;
-}
-
-button.ghost {
-  background: transparent;
-}
-
-button.danger {
-  border-color: #f44336;
-  color: #f44336;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.btn-row-main {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
-  align-items: center;
-}
-
-.btn-row-tight {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
-}
-
-.pill-btn {
-  padding: 0.15rem 0.6rem;
-  font-size: 0.75rem;
-}
-
-.question-panel {
-  min-height: 140px;
-  margin-top: 0.5rem;
-}
-
-.q-text {
-  font-size: 0.9rem;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.tag-chapter {
-  font-size: 0.75rem;
-  color: #555;
-  margin-top: 0.15rem;
-}
-
-.tag-chapter span {
-  margin-right: 0.2rem;
-}
-
-.img-preview img {
-  max-width: 100%;
-  max-height: 180px;
-  display: block;
-  margin-top: 0.25rem;
-}
-
-/* --- CHOICES (Updated for Strikethrough) --- */
-.choice-container {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.3rem;
-}
-
-.choice {
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.4rem;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.35rem;
-  font-size: 0.9rem;
-  border: 1px solid transparent;
-  transition: all 0.2s;
-  cursor: pointer;
-}
-
-.choice:hover {
-  background: #f9f9f9;
-}
-
-body.theme-dark .choice:hover {
-  background: #1e293b;
-}
-
-.choice.strikethrough {
-  text-decoration: line-through;
-  opacity: 0.5;
-  background-color: #f0f0f0;
-}
-
-body.theme-dark .choice.strikethrough {
-  background-color: #1f2937;
-  color: #6b7280;
-}
-
-.btn-strike {
-  padding: 0.1rem 0.4rem;
-  font-size: 0.7rem;
-  color: #888;
-  border: 1px solid #eee;
-  background: #fff;
-  cursor: pointer;
-  margin-top: 0.2rem;
-}
-
-body.theme-dark .btn-strike {
-  background: #374151;
-  border-color: #4b5563;
-  color: #9ca3af;
-}
-
-.choice input {
-  margin-top: 0.25rem;
-}
-
-.choice.correct.show {
-  background: #e8f5e9;
-  border-color: #c8e6c9;
-}
-
-.choice.wrong.show {
-  background: #ffebee;
-  border-color: #ffcdd2;
-}
-
-body.theme-dark .choice.correct.show,
-body.theme-night .choice.correct.show {
-  background: #064e3b;
-  border-color: #065f46;
-}
-
-body.theme-dark .choice.wrong.show,
-body.theme-night .choice.wrong.show {
-  background: #7f1d1d;
-  border-color: #991b1b;
-}
-
-.feedback-panel {
-  margin-top: 0.8rem;
-  font-size: 0.85rem;
-  padding: 0.75rem;
-  background: #fafafa;
-  border-radius: 0.5rem;
-  border-left: 4px solid #ccc;
-}
-
-body.theme-dark .feedback-panel {
-  background: #1e293b;
-  border-left-color: #4b5563;
-}
-
-.feedback-correct {
-  border-left-color: #2e7d32;
-}
-
-.feedback-wrong {
-  border-left-color: #c62828;
-}
-
-/* --- NOTES AREA (New) --- */
-.notes-area-container {
-  margin-top: 1rem;
-  border-top: 1px dashed #ddd;
-  padding-top: 0.5rem;
-}
-
-.notes-textarea {
-  width: 100%;
-  font-size: 0.85rem;
-  min-height: 60px;
-  margin-top: 0.25rem;
-  resize: vertical;
-  background: #fff9c4; /* Yellow note */
-  color: #333;
-  border: 1px solid #fbc02d;
-}
-
-body.theme-dark .notes-textarea {
-  background: #422006;
-  color: #fef3c7;
-  border-color: #a16207;
-}
-
-.save-note-status {
-  font-size: 0.7rem;
-  color: #2e7d32;
-  margin-top: 0.1rem;
-  height: 1rem;
-}
-
-/* --- SMART SEARCH (New) --- */
-.search-tools {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  flex-wrap: wrap;
-}
-.search-btn {
-  text-decoration: none;
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid #ddd;
-  background: #f9f9f9;
-  color: #555;
-}
-.search-btn:hover {
-  background: #eee;
-  color: #111;
-}
-body.theme-dark .search-btn {
-  background: #1f2937;
-  border-color: #374151;
-  color: #9ca3af;
-}
-
-/* --- Original styles continued --- */
-
-.stats-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-}
-
-.stats-row div strong {
-  font-weight: 600;
-}
-
-.history-list {
-  max-height: 260px;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-  font-size: 0.78rem;
-}
-
-.history-item {
-  padding: 0.25rem 0.1rem;
-  border-bottom: 1px dashed #eee;
-  cursor: pointer;
-}
-
-.history-item:last-child {
-  border-bottom: none;
-}
-
-.history-item:hover {
-  background: #fafafa;
-}
-
-body.theme-dark .history-item,
-body.theme-night .history-item {
-  border-bottom-color: #374151;
-}
-
-body.theme-dark .history-item:hover,
-body.theme-night .history-item:hover {
-  background: #020617;
-}
-
-.pill {
-  display: inline-block;
-  padding: 0.05rem 0.35rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  margin-left: 0.15rem;
-}
-
-.pill-correct {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.pill-wrong {
-  background: #ffebee;
-  color: #c62828;
-}
-
-.pill-flag {
-  background: #fff3e0;
-  color: #ef6c00;
-}
-
-.pill-maint {
-  background: #ede7f6;
-  color: #5e35b1;
-}
-
-.pill-pin {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.pill-dup {
-  background: #fce7f3;
-  color: #9d174d;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  margin-top: 0.5rem;
-}
-
-.q-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
-}
-
-.q-table th,
-.q-table td {
-  border-bottom: 1px solid #eee;
-  padding: 0.25rem 0.35rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.q-table th {
-  background: #fafafa;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-body.theme-dark .q-table th,
-body.theme-night .q-table th {
-  background: #020617;
-}
-
-.q-table tbody tr:hover {
-  background: #fdfdfd;
-}
-
-body.theme-dark .q-table tbody tr:hover,
-body.theme-night .q-table tbody tr:hover {
-  background: #020617;
-}
-
-.all-actions {
-  display: flex;
-  gap: 0.3rem;
-  align-items: center;
-}
-
-.backup-status {
-  font-size: 0.8rem;
-  color: #444;
-}
-
-.link-btn {
-  text-decoration: none;
-  border-radius: 999px;
-  border: 1px solid #1976d2;
-  color: #1976d2;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.8rem;
-}
-
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.settings-grid label input {
-  width: 100%;
-}
-
-.related-box {
-  max-width: 260px;
-  max-height: 72px;
-  overflow-y: auto;
-  border-radius: 0.35rem;
-  border: 1px dashed #ddd;
-  padding: 0.25rem 0.35rem;
-}
-
-.related-link {
-  display: block;
-  font-size: 0.72rem;
-  margin-bottom: 0.1rem;
-  cursor: pointer;
-}
-
-.related-link span {
-  font-weight: 500;
-}
-
-/* Flashcards */
-.flashcard-card {
-  min-height: 200px;
-}
-
-.flashcard-inner {
-  min-height: 160px;
-  border-radius: 0.5rem;
-  border: 1px dashed #ddd;
-  padding: 0.75rem;
-}
-
-.flashcard-front, .flashcard-back {
-  font-size: 0.9rem;
-}
-
-.flashcard-back {
-  margin-top: 0.5rem;
-  border-top: 1px dashed #ddd;
-  padding-top: 0.5rem;
-}
-
-.flashcard-controls {
-  justify-content: flex-end;
-}
-
-/* Exam */
-.exam-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  margin-bottom: 0.4rem;
-}
-
-/* Dashboard */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0.5rem;
-}
-
-.dash-box {
-  border-radius: 0.5rem;
-  border: 1px dashed #ddd;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.8rem;
-}
-
-.dash-title {
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.dash-list {
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-/* Modal */
-.modal.hidden {
-  display: none;
-}
-
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-}
-
-.modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-}
-
-.modal-body {
-  position: absolute;
-  top: 8%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(720px, 94vw);
-  max-height: 84vh;
-  overflow-y: auto;
-  background: #ffffff;
-  border-radius: 0.5rem;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  padding: 0.75rem 0.85rem 0.85rem;
-}
-
-body.theme-dark .modal-body,
-body.theme-night .modal-body {
-  background: #020617;
-  color: #e5e7eb;
-}
-
-.modal-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.modal-content textarea {
-  resize: vertical;
-}
-
-.modal-flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
-  font-size: 0.8rem;
-}
-
-.modal-actions {
-  justify-content: flex-end;
-  margin-top: 0.6rem;
-}
-
-#editChoices {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-}
-
-.edit-choice-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-.edit-choice-row input[type="text"] {
-  width: 100%;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .row {
-    flex-direction: column;
+// MCQ Study App Ultra-Pro v5.1
+// Based on original v4.3.2 code provided by user.
+// Added features: GitHub Fix (UTF-8), Focus Mode, Notes, Strikethrough, Smart Search, Guess Mode.
+
+const DB_NAME = 'mcqdb_ultra_v41';
+const DB_VERSION = 3;
+
+let db = null;
+
+// --- 1. HELPER FUNCTIONS (DEFINED FIRST TO PREVENT ERRORS) ---
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  .col-main, .col-side {
-    flex: 1 1 auto;
-  }
-  .top-bar {
-    flex-direction: column;
-  }
-  .top-bar h1 {
-    font-size: 1rem;
-  }
-  .modal-body {
-    top: 4%;
+  return arr;
+}
+
+function randomChoice(arr) {
+  if (!arr.length) return null;
+  const idx = Math.floor(Math.random() * arr.length);
+  return arr[idx];
+}
+
+function encodeBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join("");
+  return btoa(binString);
+}
+
+function decodeBase64(str) {
+  const binString = atob(str);
+  const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function fmtTime(iso) {
+  if (!iso) return '–';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
   }
 }
 
+// --- 2. APP STATE ---
+let currentQuestion = null;
+let currentChoices = [];
+let currentMode = 'due';
+let currentChapter = '';
+let lastResult = null;
+let lastSelectedIndex = null;
+let historyStack = [];
 
-.all-table-wrapper {
-  max-height: 60vh;
-  overflow-y: auto;
+// Practice preferences
+let prefSkipSolved = true;
+
+// ALL tab selection & pagination state
+let allSelectedIds = new Set();
+let allCurrentPage = 1;
+let allTotalPages = 1;
+const ALL_PAGE_SIZE = 50;
+let allRangeAnchorIndex = null;
+let lastActivityAt = null;
+let currentTheme = 'light';
+
+// Spaced repetition / flashcards
+let flashcardPool = [];
+let flashcardIndex = -1;
+let flashcardShowBack = false;
+
+// Exam simulation
+let examSession = null;
+let examTimerId = null;
+
+// DOM Elements
+const questionPanel = document.getElementById('questionPanel');
+const feedbackPanel = document.getElementById('feedbackPanel');
+const historyListEl = document.getElementById('historyList');
+const modeSelect = document.getElementById('modeSelect');
+const chapterFilterEl = document.getElementById('chapterFilter');
+const prefSkipSolvedEl = document.getElementById('prefSkipSolved');
+const relatedBox = document.getElementById('relatedBox');
+const themeSelect = document.getElementById('themeSelect');
+const resetBtn = document.getElementById('btnResetProgress');
+
+// Builder Cache
+let builderPreviewCache = [];
+
+
+// --- 3. INITIALIZATION & EVENTS ---
+
+async function loadPracticePrefs() {
+  try {
+    const val = await loadMeta('prefSkipSolved');
+    if (typeof val === 'boolean') {
+      prefSkipSolved = val;
+    }
+    const cb = document.getElementById('prefSkipSolved');
+    if (cb) {
+      cb.checked = !!prefSkipSolved;
+    }
+  } catch (e) {
+    console.warn('loadPracticePrefs failed', e);
+  }
 }
 
-.all-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  gap: 8px;
-  flex-wrap: wrap;
+function setPrefSkipSolved(val) {
+  prefSkipSolved = !!val;
+  saveMeta('prefSkipSolved', prefSkipSolved);
 }
 
-.all-selected-indicator {
-  font-size: 12px;
-  color: #444;
+if (prefSkipSolvedEl) {
+  prefSkipSolvedEl.addEventListener('change', () => {
+    setPrefSkipSolved(!!prefSkipSolvedEl.checked);
+  });
 }
 
-.all-pager {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+if (resetBtn) {
+  resetBtn.addEventListener('click', async () => {
+    const scopeEl = document.getElementById('resetScope');
+    const scope = scopeEl ? scopeEl.value : 'all';
+    await resetProgress(scope);
+  });
 }
 
-.all-bulk-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+// Tabs
+document.querySelectorAll('.tab-button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.getAttribute('data-tab');
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(sec => sec.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'all') {
+      reloadAllQuestionsTable();
+    } else if (tab === 'backup') {
+      refreshBackupLabels();
+      refreshCloudInfo();
+    } else if (tab === 'settings') {
+      loadGitHubConfigIntoUI();
+    } else if (tab === 'dashboard') {
+      renderDashboard();
+    } else if (tab === 'home') {
+      refreshChapterOptions();
+    }
+  });
+});
+
+// Subnav
+(function () {
+  const bankView = document.getElementById('allViewBank');
+  const builderView = document.getElementById('allViewBuilder');
+  const subnavBtns = document.querySelectorAll('.subnav-btn');
+  subnavBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-allview');
+      subnavBtns.forEach(b => b.classList.remove('subnav-btn-active'));
+      btn.classList.add('subnav-btn-active');
+      if (target === 'builder') {
+        if (bankView) bankView.style.display = 'none';
+        if (builderView) builderView.style.display = 'block';
+      } else {
+        if (bankView) bankView.style.display = 'block';
+        if (builderView) builderView.style.display = 'none';
+      }
+    });
+  });
+})();
+
+// Builder Buttons
+document.getElementById('btnBuilderMakePrompt')?.addEventListener('click', makeBuilderPrompt);
+document.getElementById('btnBuilderPreview')?.addEventListener('click', builderPreviewFromJson);
+document.getElementById('btnBuilderImportSelected')?.addEventListener('click', builderImportSelected);
+
+// Theme
+function loadTheme() {
+  try {
+    const t = localStorage.getItem('mcq_theme') || 'light';
+    currentTheme = t;
+    applyTheme();
+  } catch {
+    currentTheme = 'light';
+    applyTheme();
+  }
+}
+function applyTheme() {
+  document.body.classList.remove('theme-light','theme-dark','theme-night','theme-calm');
+  if (currentTheme === 'dark') document.body.classList.add('theme-dark');
+  else if (currentTheme === 'night') document.body.classList.add('theme-night');
+  else if (currentTheme === 'calm') document.body.classList.add('theme-calm');
+  themeSelect.value = currentTheme;
+}
+themeSelect.addEventListener('change', () => {
+  currentTheme = themeSelect.value || 'light';
+  applyTheme();
+  try { localStorage.setItem('mcq_theme', currentTheme); } catch {}
+});
+
+// Mode select
+modeSelect.addEventListener('change', () => {
+  currentMode = modeSelect.value;
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (currentMode === 'chapter') {
+    refreshChapterOptions();
+    if (chapterSelect) chapterSelect.style.display = 'inline-block';
+  } else {
+    if (chapterSelect) {
+      chapterSelect.style.display = 'none';
+      chapterSelect.value = '';
+    }
+    currentChapter = '';
+  }
+  loadNextQuestion(true);
+});
+document.getElementById('chapterSelect')?.addEventListener('change', (e) => {
+  const sel = e.target;
+  currentChapter = (sel && sel.value ? sel.value.trim() : '');
+  loadNextQuestion(true);
+});
+
+// Quick filter buttons
+document.getElementById('btnQuickWrong').addEventListener('click', () => {
+  currentMode = 'wrong';
+  modeSelect.value = 'wrong';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
+  loadNextQuestion(true);
+});
+document.getElementById('btnQuickFlagged').addEventListener('click', () => {
+  currentMode = 'flagged';
+  modeSelect.value = 'flagged';
+  const chapterSelect = document.getElementById('chapterSelect');
+  if (chapterSelect) {
+    chapterSelect.style.display = 'none';
+    chapterSelect.value = '';
+  }
+  currentChapter = '';
+  loadNextQuestion(true);
+});
+document.getElementById('btnStartDaily').addEventListener('click', () => {
+  startDailyChallenge();
+});
+
+// Focus Mode Logic
+const btnFocusMode = document.getElementById('btnFocusMode');
+const btnExitFocus = document.getElementById('btnExitFocus');
+if(btnFocusMode) {
+  btnFocusMode.addEventListener('click', () => {
+    document.body.classList.add('focus-mode');
+  });
+}
+if(btnExitFocus) {
+  btnExitFocus.addEventListener('click', () => {
+    document.body.classList.remove('focus-mode');
+  });
 }
 
-.all-bulk-actions button {
-  font-size: 11px;
-  padding: 3px 6px;
+// Notes Logic
+const userNoteArea = document.getElementById('userNoteArea');
+if (userNoteArea) {
+  userNoteArea.addEventListener('input', debounce(saveCurrentNote, 1000));
 }
 
-.subnav {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+// Force Update Logic
+const btnForceUpdate = document.getElementById('btnForceUpdate');
+if (btnForceUpdate) {
+  btnForceUpdate.addEventListener('click', async () => {
+    if (!confirm('Update App? This will clear cache and reload.')) return;
+    btnForceUpdate.textContent = 'Updating...';
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+      }
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(key => caches.delete(key)));
+    }
+    window.location.reload(true);
+  });
 }
 
-.subnav-btn {
-  border-radius: 999px;
-  border: 1px solid #ccc;
-  padding: 4px 10px;
-  font-size: 12px;
-  background: #f8f8f8;
-  cursor: pointer;
+
+// Buttons Home
+document.getElementById('btnSubmit').addEventListener('click', submitAnswer);
+document.getElementById('btnNext').addEventListener('click', () => {
+  lastResult = null;
+  feedbackPanel.innerHTML = '';
+  loadNextQuestion(false);
+});
+document.getElementById('btnPrev').addEventListener('click', goPreviousQuestion);
+document.getElementById('btnFlag').addEventListener('click', toggleFlag);
+document.getElementById('btnMaint').addEventListener('click', toggleMaintenanceFlag);
+
+// Import / Export (home)
+document.getElementById('btnImport').addEventListener('click', handleImportSimple);
+document.getElementById('btnExport').addEventListener('click', exportQuestionsOnly);
+document.getElementById('btnImportUrl')?.addEventListener('click', handleImportFromUrl);
+
+// All questions tab controls
+document.getElementById('btnAllReload').addEventListener('click', reloadAllQuestionsTable);
+document.getElementById('btnAllDelete').addEventListener('click', deleteSelectedAll);
+document.getElementById('btnAllDeleteDups').addEventListener('click', deleteDuplicateClusters);
+document.getElementById('allSelectAll').addEventListener('change', e => {
+  const boxes = Array.from(document.querySelectorAll('#allTableBody input.row-select'));
+  boxes.forEach(ch => {
+    const id = parseInt(ch.getAttribute('data-id'), 10);
+    ch.checked = e.target.checked;
+    if (e.target.checked) {
+      allSelectedIds.add(id);
+    } else {
+      allSelectedIds.delete(id);
+    }
+  });
+  updateAllSelectedCount();
+});
+document.getElementById('allSearch').addEventListener('input', debounce(reloadAllQuestionsTable, 250));
+document.getElementById('allFilter').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('allSort').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+document.getElementById('rangeFrom').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+document.getElementById('rangeTo').addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+document.getElementById('allChapterSelect').addEventListener('change', () => { allCurrentPage = 1; reloadAllQuestionsTable(); });
+const allLastNInput = document.getElementById('allLastN');
+if (allLastNInput) {
+  allLastNInput.addEventListener('input', debounce(() => { allCurrentPage = 1; reloadAllQuestionsTable(); }, 250));
+}
+const prevBtn = document.getElementById('allPrevPage');
+if (prevBtn) {
+  prevBtn.addEventListener('click', () => {
+    if (allCurrentPage > 1) {
+      allCurrentPage--;
+      reloadAllQuestionsTable();
+    }
+  });
+}
+const nextBtn = document.getElementById('allNextPage');
+if (nextBtn) {
+  nextBtn.addEventListener('click', () => {
+    if (allCurrentPage < allTotalPages) {
+      allCurrentPage++;
+      reloadAllQuestionsTable();
+    }
+  });
+}
+const bulkChapBtn = document.getElementById('allBulkSetChapter');
+if (bulkChapBtn) {
+  bulkChapBtn.addEventListener('click', bulkSetChapterForSelected);
+}
+const bulkTagBtn = document.getElementById('allBulkAddTag');
+if (bulkTagBtn) {
+  bulkTagBtn.addEventListener('click', bulkAddTagForSelected);
 }
 
-.subnav-btn-active {
-  background: #222;
-  color: #fff;
-  border-color: #222;
+// Backup tab controls
+document.getElementById('btnBackupExport').addEventListener('click', exportFullBackup);
+document.getElementById('btnBackupImport').addEventListener('click', handleBackupImport);
+
+// Cloud sync controls
+document.getElementById('btnCloudUpload').addEventListener('click', cloudUpload);
+document.getElementById('btnCloudDownload').addEventListener('click', cloudDownload);
+const quickBackupBtn = document.getElementById('btnBackupQuick');
+if (quickBackupBtn) {
+  quickBackupBtn.addEventListener('click', cloudUpload);
 }
 
-.builder-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+// Settings tab – GitHub
+document.getElementById('btnSaveGitHub').addEventListener('click', saveGitHubConfigFromUI);
+document.getElementById('btnClearGitHub').addEventListener('click', () => {
+  localStorage.removeItem('mcq_github_config');
+  loadGitHubConfigIntoUI();
+  refreshCloudInfo();
+});
+
+// Flashcards controls
+const fcSourceEl = document.getElementById('fcSource');
+const fcChapterFilterEl = document.getElementById('fcChapterFilter');
+const fcModeEl = document.getElementById('fcMode');
+const fcFront = document.getElementById('flashcardFront');
+const fcBack = document.getElementById('flashcardBack');
+
+fcSourceEl.addEventListener('change', () => {
+  if (fcSourceEl.value === 'chapter') {
+    fcChapterFilterEl.style.display = 'inline-block';
+  } else {
+    fcChapterFilterEl.style.display = 'none';
+    fcChapterFilterEl.value = '';
+  }
+  buildFlashcardPool();
+});
+fcChapterFilterEl.addEventListener('change', buildFlashcardPool);
+fcModeEl.addEventListener('change', renderFlashcard);
+
+document.getElementById('btnFcShow').addEventListener('click', () => {
+  flashcardShowBack = true;
+  renderFlashcard();
+});
+document.getElementById('btnFcAgain').addEventListener('click', async () => {
+  await updateSpacedAfterFlashcard(false);
+  nextFlashcard();
+});
+document.getElementById('btnFcGood').addEventListener('click', async () => {
+  await updateSpacedAfterFlashcard(true);
+  nextFlashcard();
+});
+document.getElementById('btnFcNext').addEventListener('click', () => {
+  nextFlashcard();
+});
+
+// Exam sim controls
+document.getElementById('btnStartExam').addEventListener('click', startExam);
+document.getElementById('examPool').addEventListener('change', () => {
+  const v = document.getElementById('examPool').value;
+  const f = document.getElementById('examChapterFilter');
+  f.style.display = (v === 'chapter') ? 'inline-block' : 'none';
+});
+document.getElementById('btnExamPrev').addEventListener('click', () => examMove(-1));
+document.getElementById('btnExamNext').addEventListener('click', () => examMove(1));
+document.getElementById('btnExamFinish').addEventListener('click', finishExam);
+
+
+// --- PRACTICE LOGIC ---
+
+async function loadNextQuestion(resetHistory) {
+  if (resetHistory) {
+    historyStack = [];
+  } else if (currentQuestion && currentQuestion.id != null) {
+    historyStack.push(currentQuestion.id);
+  }
+  currentQuestion = await pickQuestion();
+  lastResult = null;
+  lastSelectedIndex = null;
+  feedbackPanel.innerHTML = '';
+  renderQuestion();
+  updateStatsBar();
+  updateHistoryList();
 }
 
-.builder-col {
-  flex: 1 1 280px;
-  min-width: 260px;
+async function goPreviousQuestion() {
+  if (!historyStack.length) return;
+  const prevId = historyStack.pop();
+
+  const qTx = db.transaction('questions', 'readonly');
+  const qStore = qTx.objectStore('questions');
+  const q = await new Promise(res => {
+    const req = qStore.get(prevId);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = () => res(null);
+  });
+  if (!q) return;
+
+  let lastAns = null;
+  try {
+    const aTx = db.transaction('answers', 'readonly');
+    const aStore = aTx.objectStore('answers');
+    const idx = aStore.index('by_question');
+    const answers = await new Promise(res => {
+      const req = idx.getAll(prevId);
+      req.onsuccess = e => res(e.target.result || []);
+      req.onerror = () => res([]);
+    });
+    if (answers && answers.length) {
+      answers.sort((a, b) => {
+        const aa = a.answeredAt || '';
+        const bb = b.answeredAt || '';
+        return aa.localeCompare(bb);
+      });
+      lastAns = answers[answers.length - 1];
+    }
+  } catch (e) {
+    lastAns = null;
+  }
+
+  currentQuestion = q;
+  const choices = q.choices || [];
+  const correctIdx = choices.findIndex(c => c && c.isCorrect);
+
+  if (lastAns) {
+    lastSelectedIndex = typeof lastAns.selectedIndex === 'number' ? lastAns.selectedIndex : null;
+    lastResult = !!lastAns.isCorrect;
+  } else {
+    lastSelectedIndex = null;
+    lastResult = null;
+  }
+
+  renderQuestion();
+
+  if (lastAns && lastSelectedIndex !== null && correctIdx >= 0) {
+    showFeedback(correctIdx, lastSelectedIndex, q.explanation);
+  } else {
+    feedbackPanel.innerHTML = '';
+  }
 }
 
-.builder-col textarea {
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 12px;
+async function submitAnswer() {
+  if (!currentQuestion) return;
+  const radios = document.querySelectorAll('input[name="choice"]');
+  let selectedIdx = null;
+  radios.forEach(r => {
+    if (r.checked) selectedIdx = parseInt(r.value, 10);
+  });
+  if (selectedIdx === null) {
+    alert('اختر إجابة أولاً.');
+    return;
+  }
+  lastSelectedIndex = selectedIdx;
+  const correctIdx = (currentQuestion.choices || []).findIndex(c => c.isCorrect);
+  const isCorrect = (selectedIdx === correctIdx);
+
+  // Guess check
+  const guessCheck = document.getElementById('guessCheck');
+  const isGuessing = guessCheck ? guessCheck.checked : false;
+
+  const now = new Date().toISOString();
+  lastActivityAt = now;
+  saveMeta('lastActivityAt', now);
+
+  const tx = db.transaction(['questions','answers'], 'readwrite');
+  const qStore = tx.objectStore('questions');
+  const aStore = tx.objectStore('answers');
+
+  const q = Object.assign({}, currentQuestion);
+  q.timesSeen = (q.timesSeen || 0) + 1;
+  q.timesCorrect = (q.timesCorrect || 0) + (isCorrect ? 1 : 0);
+  q.timesWrong = (q.timesWrong || 0) + (!isCorrect ? 1 : 0);
+  q.lastSeenAt = now;
+  
+  // Spaced Repetition
+  if (isGuessing && isCorrect) {
+     nextSpaced(q, false); // Penalize guess
+  } else {
+     nextSpaced(q, isCorrect);
+  }
+  
+  qStore.put(q);
+
+  aStore.add({
+    questionId: q.id,
+    answeredAt: now,
+    selectedIndex: selectedIdx,
+    isCorrect
+  });
+
+  tx.oncomplete = () => {
+    currentQuestion = q;
+    lastResult = isCorrect;
+    showFeedback(correctIdx, selectedIdx, q.explanation);
+    updateStatsBar();
+    updateHistoryList();
+    refreshBackupLabels();
+  };
 }
 
-.builder-inline {
-  margin: 6px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+function renderQuestion() {
+  if (!currentQuestion) {
+    questionPanel.innerHTML = '<div class="muted">No questions yet. Import JSON to start.</div>';
+    relatedBox.innerHTML = 'No related questions yet.';
+    if(userNoteArea) userNoteArea.value = '';
+    const st = document.getElementById('searchTools');
+    if(st) st.innerHTML = '';
+    return;
+  }
+  const q = currentQuestion;
+  const letters = ['A','B','C','D','E','F','G'];
+  currentChoices = q.choices || [];
+
+  let html = '';
+  html += `<div class="q-text">Q#${q.id ?? ''} – ${q.text || ''}</div>`;
+  if (q.chapter || q.source || q.maintenance || q.flagged || q.pinned || (q.tags && q.tags.length)) {
+    html += '<div class="tag-chapter">';
+    if (q.chapter) html += `<span>${q.chapter}</span>`;
+    if (q.source) html += ` · <span>${q.source}</span>`;
+    if (q.tags && q.tags.length) html += ` · <span>${q.tags.join(', ')}</span>`;
+    if (q.pinned) html += ` · <span class="pill pill-pin">Pin</span>`;
+    if (q.flagged) html += ` · <span class="pill pill-flag">Flag</span>`;
+    if (q.maintenance) html += ` · <span class="pill pill-maint">Maint</span>`;
+    html += '</div>';
+  }
+
+  if (q.imageData || q.imageUrl) {
+    const src = q.imageData || q.imageUrl;
+    html += `<div class="img-preview"><a href="${src}" target="_blank" rel="noopener noreferrer"><img src="${src}" alt="question image"></a></div>`;
+  }
+
+  html += '<div style="margin-top:0.4rem;">';
+  currentChoices.forEach((c, idx) => {
+    const letter = letters[idx] || '?';
+    const checked = (idx === lastSelectedIndex) ? 'checked' : '';
+    html += `
+    <div class="choice-container">
+      <label class="choice" id="choice-${idx}">
+        <input type="radio" name="choice" value="${idx}" ${checked}>
+        <div><strong>${letter}.</strong> ${c.text || ''}</div>
+      </label>
+      <button class="btn-strike" onclick="toggleStrike(${idx})">✕</button>
+    </div>`;
+  });
+  html += '</div>';
+
+  questionPanel.innerHTML = html;
+
+  // Notes load
+  if(userNoteArea) {
+    userNoteArea.value = q.userNotes || '';
+    document.getElementById('saveNoteStatus').textContent = '';
+  }
+
+  // Reset Guess
+  const gc = document.getElementById('guessCheck');
+  if(gc) gc.checked = false;
+
+  // Smart Search
+  const searchTools = document.getElementById('searchTools');
+  if(searchTools) {
+    let term = (q.tags && q.tags.length) ? q.tags[0] : (q.chapter || '').replace(/Ch\d+\s*/, '');
+    if(!term) term = 'Medical';
+    searchTools.innerHTML = `
+      <span class="tiny muted">Search:</span>
+      <a href="https://www.google.com/search?q=${encodeURIComponent(term + ' medical')}" target="_blank" class="search-btn">Google</a>
+      <a href="https://www.uptodate.com/contents/search?search=${encodeURIComponent(term)}" target="_blank" class="search-btn">UpToDate</a>
+    `;
+  }
+
+  renderRelated();
 }
 
-.builder-preview {
-  margin-top: 8px;
-  max-height: 260px;
-  overflow-y: auto;
-  border: 1px solid #ddd;
-  padding: 4px 6px;
-  background: #fafafa;
+// Global Strike function
+window.toggleStrike = function(idx) {
+  const el = document.getElementById(`choice-${idx}`);
+  if(el) el.classList.toggle('strikethrough');
 }
+
+async function saveCurrentNote() {
+  if (!currentQuestion || !userNoteArea) return;
+  const note = userNoteArea.value;
+  currentQuestion.userNotes = note;
+  const tx = db.transaction('questions', 'readwrite');
+  tx.objectStore('questions').put(currentQuestion);
+  document.getElementById('saveNoteStatus').textContent = 'Saved.';
+  setTimeout(() => document.getElementById('saveNoteStatus').textContent='', 1500);
+}
+
+
+// --- BUILDER LOGIC ---
+function makeBuilderPrompt() {
+  const src = (document.getElementById('builderSourceText')?.value || '').trim();
+  const num = parseInt(document.getElementById('builderNumQuestions')?.value || '0', 10) || 10;
+  const outEl = document.getElementById('builderPromptOut');
+  if (!outEl) return;
+  if (!src) {
+    outEl.value = 'Paste source text first.';
+    return;
+  }
+  const corePrompt = `You are an expert ICU / Internal Medicine board-exam question generator. Use ONLY the following source text (any language) to create ${num} difficult, board-level MCQs in advanced academic English. Follow strictly this JSON schema: an array of objects with fields id (int), text, chapter, source, explanation, choices[{text,isCorrect}], tags, optional difficulty and images. Questions, choices, explanations, tags, chapter, and source MUST ALL be in ENGLISH. Do NOT add any keys outside this schema. Output ONLY a JSON array, nothing else.`;
+  outEl.value = corePrompt + "\n\nSOURCE TEXT:\n\n" + src;
+}
+
+async function builderPreviewFromJson() {
+  const raw = (document.getElementById('builderJsonInput')?.value || '').trim();
+  const previewEl = document.getElementById('builderPreview');
+  if (!previewEl) return;
+  if (!raw) {
+    previewEl.textContent = 'Paste JSON first.';
+    return;
+  }
+  try {
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) throw new Error('JSON must be an array of questions.');
+    builderPreviewCache = data;
+    let html = '<table class="q-table tiny"><thead><tr><th><input type="checkbox" id="builderSelectAll"></th><th>ID</th><th>Text</th><th>Chapter</th><th>Tags</th></tr></thead><tbody>';
+    data.forEach((q, idx) => {
+      const tagsStr = Array.isArray(q.tags) ? q.tags.join(', ') : '';
+      const txt = (q.text || '').slice(0, 120) + ((q.text || '').length > 120 ? '…' : '');
+      html += `<tr>
+        <td><input type="checkbox" class="builder-row-select" data-idx="${idx}" checked></td>
+        <td>${q.id ?? idx + 1}</td>
+        <td>${txt}</td>
+        <td>${q.chapter || ''}</td>
+        <td>${tagsStr}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    previewEl.innerHTML = html;
+    const selAll = document.getElementById('builderSelectAll');
+    if (selAll) {
+      selAll.addEventListener('change', e => {
+        document.querySelectorAll('.builder-row-select').forEach(ch => {
+          ch.checked = e.target.checked;
+        });
+      });
+    }
+  } catch (err) {
+    previewEl.textContent = 'Error: ' + err.message;
+  }
+}
+
+async function builderImportSelected() {
+  if (!builderPreviewCache || !builderPreviewCache.length) {
+    alert('No preview data to import.');
+    return;
+  }
+  const checks = Array.from(document.querySelectorAll('.builder-row-select'));
+  const selected = checks
+    .map((ch, idx) => (ch.checked ? idx : -1))
+    .filter(i => i >= 0)
+    .map(i => builderPreviewCache[i]);
+  if (!selected.length) {
+    alert('No questions selected.');
+    return;
+  }
+  const tx = db.transaction('questions', 'readwrite');
+  const store = tx.objectStore('questions');
+  selected.forEach((q, idx) => {
+    const obj = {
+      text: q.text,
+      chapter: q.chapter || '',
+      source: q.source || '',
+      explanation: q.explanation || '',
+      choices: q.choices || [],
+      timesSeen: 0,
+      timesCorrect: 0,
+      timesWrong: 0,
+      lastSeenAt: null,
+      createdAt: new Date().toISOString(),
+      flagged: !!q.flagged,
+      maintenance: !!q.maintenance,
+      active: q.active !== false,
+      tags: Array.isArray(q.tags) ? q.tags : [],
+      pinned: !!q.pinned,
+      imageUrl: q.imageUrl || '',
+      imageData: q.imageData || '',
+      srEase: 2.5,
+      srInterval: 0,
+      srReps: 0,
+      dueAt: null
+    };
+    if (q.id != null) obj.id = q.id;
+    store.put(obj);
+  });
+  tx.oncomplete = () => {
+    alert('Imported ' + selected.length + ' questions into bank.');
+    refreshChapterOptions();
+    reloadAllQuestionsTable();
+    loadNextQuestion(true);
+  };
+}
+
+// --- TABLE REFRESH (Updated with Notes Filter) ---
+async function reloadAllQuestionsTable() {
+  const tbody = document.getElementById('allTableBody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+  
+  const all = await getAllQuestions();
+  const searchVal = document.getElementById('allSearch').value.toLowerCase().trim();
+  const filter = document.getElementById('allFilter').value;
+  const sortVal = document.getElementById('allSort').value;
+
+  let arr = all.filter(q => {
+    const txt = (q.text + ' ' + q.chapter).toLowerCase();
+    if (searchVal && !txt.includes(searchVal)) return false;
+    
+    if (filter === 'flagged' && !q.flagged) return false;
+    if (filter === 'wrong' && !q.timesWrong) return false;
+    if (filter === 'notes' && (!q.userNotes || !q.userNotes.trim())) return false;
+    if (filter === 'maintenance' && !q.maintenance) return false;
+    
+    return true;
+  });
+
+  // Sort
+  arr.sort((a, b) => {
+    if (sortVal === 'created_desc') return (b.id - a.id); // approx
+    if (sortVal === 'text_asc') return a.text.localeCompare(b.text);
+    if (sortVal === 'wrong_desc') return (b.timesWrong || 0) - (a.timesWrong || 0);
+    return (b.id - a.id);
+  });
+
+  const total = arr.length;
+  allTotalPages = Math.max(1, Math.ceil(total / ALL_PAGE_SIZE));
+  if (allCurrentPage > allTotalPages) allCurrentPage = allTotalPages;
+
+  const startIdx = (allCurrentPage - 1) * ALL_PAGE_SIZE;
+  const endIdx = Math.min(startIdx + ALL_PAGE_SIZE, total);
+  const pageItems = arr.slice(startIdx, endIdx);
+
+  tbody.innerHTML = '';
+  pageItems.forEach((q) => {
+    const tr = document.createElement('tr');
+    const tagsStr = Array.isArray(q.tags) ? q.tags.join(', ') : '';
+    const noteIcon = q.userNotes ? '📝' : '';
+    tr.innerHTML = `
+      <td><input type="checkbox" class="row-select" data-id="${q.id}"></td>
+      <td>${q.id}</td>
+      <td>${(q.text || '').slice(0, 60)}... ${noteIcon}</td>
+      <td>${q.chapter || ''}</td>
+      <td>${q.timesSeen || 0}</td>
+      <td><button class="pill-btn btn-edit" onclick="editQuestion(${q.id})">Edit</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  document.getElementById('allPageInfo').textContent = `Page ${allCurrentPage} / ${allTotalPages} (Total ${total})`;
+  updateAllSelectedCount();
+}
+
+// --- GITHUB FIX (New Logic) ---
+function saveGitHubConfigFromUI() {
+  const token = document.getElementById('ghTokenInput').value.trim();
+  const repo = document.getElementById('ghRepoInput').value.trim() || 'Awad1992/mcq-data';
+  const filename = document.getElementById('ghFileInput').value.trim() || 'mcq_backup.json';
+
+  if (!token) { alert("Token is empty!"); return; }
+  
+  const cfg = { token, repo, filename };
+  saveGitHubConfig(cfg);
+  refreshCloudInfo();
+  alert("✅ Settings Saved!");
+}
+
+async function cloudUpload() {
+  try {
+    const cfg = loadGitHubConfig();
+    if (!cfg.token) throw new Error("No settings saved.");
+    const btn = document.getElementById('btnCloudUpload');
+    btn.textContent = "Uploading..."; btn.disabled = true;
+
+    const backup = await buildBackupObject();
+    const contentStr = JSON.stringify(backup, null, 2);
+    const contentB64 = encodeBase64(contentStr);
+
+    const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
+    let sha = null;
+    try {
+      const check = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
+      if(check.ok) sha = (await check.json()).sha;
+    } catch(e) {}
+
+    const body = { message: "Backup", content: contentB64 };
+    if(sha) body.sha = sha;
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { Authorization: `token ${cfg.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    if(!res.ok) throw new Error("GitHub API Error");
+    alert("✅ Upload Success!");
+  } catch(e) {
+    alert("Upload Failed: " + e.message);
+  } finally {
+    const btn = document.getElementById('btnCloudUpload');
+    btn.textContent = "Upload → GitHub"; btn.disabled = false;
+  }
+}
+
+async function cloudDownload() {
+  try {
+    const cfg = loadGitHubConfig();
+    if (!cfg.token) throw new Error("No settings saved.");
+    const btn = document.getElementById('btnCloudDownload');
+    btn.textContent = "Downloading..."; btn.disabled = true;
+
+    const url = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.file}`;
+    const res = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
+    if(!res.ok) throw new Error("Fetch failed.");
+
+    const json = await res.json();
+    const data = JSON.parse(decodeBase64(json.content));
+    await importBackupObject(data);
+    alert("✅ Downloaded & Merged!");
+    loadNextQuestion(true);
+  } catch(e) {
+    alert("Download Failed: " + e.message);
+  } finally {
+    const btn = document.getElementById('btnCloudDownload');
+    btn.textContent = "Download ← GitHub"; btn.disabled = false;
+  }
+}
+
+// --- EDIT MODAL (Restored & Globalized) ---
+window.editQuestion = function(id) {
+  const tx = db.transaction('questions', 'readonly');
+  tx.objectStore('questions').get(id).onsuccess = e => {
+    const q = e.target.result;
+    if(!q) return;
+    editingQuestionId = id;
+    document.getElementById('editText').value = q.text;
+    document.getElementById('editChapter').value = q.chapter;
+    document.getElementById('editTags').value = (q.tags||[]).join(', ');
+    document.getElementById('editExplanation').value = q.explanation;
+    
+    const div = document.getElementById('editChoices');
+    div.innerHTML = '';
+    (q.choices||[]).forEach(c => addChoiceRow(c.text, c.isCorrect));
+    
+    document.getElementById('editModal').classList.remove('hidden');
+  };
+}
+
+// Initial DB open
+openDB().then(() => {
+  loadTheme();
+  refreshBackupLabels();
+  refreshCloudInfo();
+  loadGitHubConfigIntoUI();
+  refreshChapterOptions();
+  loadPracticePrefs();
+  loadNextQuestion(true);
+  buildFlashcardPool();
+  reloadAllQuestionsTable(); // Ensure table loads
+}).catch(err => {
+  console.error(err);
+  alert('Failed to open local database.');
+});
