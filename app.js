@@ -1,10 +1,10 @@
-/**
- * MCQ Ultra-Pro v14.0 (Final Integrity)
+    /**
+ * MCQ Ultra-Pro v15.1 (Final Integrity)
  * Validated: All Buttons, IDs, Null Checks, Imports, Nav Logic.
  */
 
-const DB_NAME = 'mcq_pro_v13';
-const DB_VERSION = 23; // Force Clean Init
+const DB_NAME = 'mcq_pro_v15';
+const DB_VERSION = 25; // Force Clean Init
 let db = null;
 
 const App = {
@@ -37,6 +37,10 @@ function safeSetText(id, val) {
     const el = document.getElementById(id);
     if(el) el.textContent = val;
 }
+function safeSetVal(id, val) {
+    const el = document.getElementById(id);
+    if(el) el.value = val;
+}
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
 // --- 1. INIT ---
@@ -53,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
-        showToast('System v14.0 Ready 💎');
+        showToast('System v15.1 Ready 💎');
         
         // Update Streak
         safeSetText('streakCount', App.user.streak);
@@ -96,7 +100,8 @@ function loadNextQuestion(reset) {
     App.selectedChoice = null;
 
     const m = document.getElementById('modeSelect').value;
-    document.getElementById('chapterBox').style.display = (m==='chapter')?'block':'none';
+    const box = document.getElementById('chapterBox');
+    if(box) box.style.display = (m==='chapter')?'block':'none';
     const c = document.getElementById('chapterSelect').value;
     const skip = document.getElementById('prefSkipSolved').checked;
 
@@ -112,23 +117,16 @@ function loadNextQuestion(reset) {
     });
 
     const panel = document.getElementById('questionPanel');
+    if(!panel) return;
+
     if(pool.length === 0) {
-        if(panel) panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
+        panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
         return;
     }
 
     const rand = Math.floor(Math.random() * pool.length);
     App.currentQ = pool[rand];
     renderQ();
-}
-
-function loadPrevQuestion() {
-    if (App.history.length === 0) return showToast("No history", "warn");
-    App.currentQ = App.history.pop();
-    renderQ();
-    if(App.currentQ.lastChoice !== undefined) {
-        showFeedback(App.currentQ.lastChoice, App.currentQ);
-    }
 }
 
 function renderQ() {
@@ -146,7 +144,7 @@ function renderQ() {
         btnFlag.textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
         btnFlag.style.color = q.flagged ? "red" : "";
     }
-    document.getElementById('userNoteArea').value = q.userNotes || "";
+    safeSetVal('userNoteArea', q.userNotes || "");
 
     let h = `<div style="font-weight:500; font-size:1.1rem; margin-bottom:15px;">[#${q.id}] ${q.text}</div>`;
     if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; margin-bottom:10px; border-radius:8px;">`;
@@ -165,8 +163,11 @@ function selectChoice(idx) {
         e.style.borderColor = 'transparent';
         e.style.background = 'var(--bg)';
     });
-    document.getElementById('c_'+idx).style.borderColor = 'var(--primary)';
-    document.getElementById('c_'+idx).style.background = '#eff6ff';
+    const el = document.getElementById('c_'+idx);
+    if(el) {
+        el.style.borderColor = 'var(--primary)';
+        el.style.background = '#eff6ff';
+    }
     App.selectedChoice = idx;
 }
 
@@ -209,11 +210,11 @@ function showFeedback(idx, q) {
     document.getElementById('srsButtons').classList.remove('hidden');
 }
 
-function updateXP(amount) {
-    App.user.xp = (App.user.xp || 0) + amount;
-    safeSetText('userXP', App.user.xp);
-    const tx = db.transaction('user', 'readwrite');
-    tx.objectStore('user').put({ key: 'stats', ...App.user });
+function loadPrevQuestion() {
+    if (App.history.length === 0) return showToast("No history", "warn");
+    App.currentQ = App.history.pop();
+    renderQ();
+    if(App.currentQ.lastChoice !== undefined) showFeedback(App.currentQ.lastChoice, App.currentQ);
 }
 
 // --- 4. LIBRARY TABLE ---
@@ -237,7 +238,6 @@ function applyTableFilters() {
 function sortTable(field) {
     App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
     App.sort.field = field;
-    
     App.tableQs.sort((a,b) => {
         let valA = a[field] || 0; let valB = b[field] || 0;
         if(typeof valA==='string') { valA=valA.toLowerCase(); valB=valB.toLowerCase(); }
@@ -255,7 +255,6 @@ function renderTable() {
     data.forEach(q => {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
-        
         let status = '';
         if(q.maintenance) status += '<span class="tag-maint">🔧 MAINT</span> ';
         if(q.flagged) status += '🚩 ';
@@ -304,8 +303,10 @@ function toggleSelectAll(cb) {
 function toggleRangeMode() {
     App.rangeMode = !App.rangeMode;
     const btn = document.getElementById('btnRangeMode');
-    btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
-    btn.classList.toggle('range-active', App.rangeMode);
+    if(btn) {
+        btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
+        btn.classList.toggle('range-active', App.rangeMode);
+    }
     showToast(App.rangeMode ? "Shift-select ON" : "Range OFF");
 }
 
@@ -314,9 +315,7 @@ function setupEvents() {
     bind('btnSubmit', 'click', submitAnswer);
     bind('btnNext', 'click', () => loadNextQuestion(false));
     bind('btnPrev', 'click', loadPrevQuestion);
-    bind('btnFlag', 'click', () => { 
-        if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } 
-    });
+    bind('btnFlag', 'click', () => { if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } });
     bind('btnMaintain', 'click', toggleMaintenance);
     bind('btnSaveMaint', 'click', saveMaintenanceNote);
     bind('btnSaveNoteManual', 'click', saveNoteManual);
@@ -347,25 +346,19 @@ function setupEvents() {
     bind('btnStartExam', 'click', startExam);
     bind('btnExamNext', 'click', () => examMove(1));
     bind('btnExamFinish', 'click', finishExam);
-    bind('btnExamClose', 'click', () => { document.getElementById('examResults').classList.add('hidden'); switchTab('home'); });
+    bind('btnExamClose', 'click', () => { 
+        document.getElementById('examResults').classList.add('hidden'); 
+        switchTab('home'); 
+    });
 
     bind('btnSaveEdit', 'click', saveEditModal);
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
     bind('btnAddChoice', 'click', addEditChoice);
     bind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
-    
-    // Global Key Shortcuts
-    document.addEventListener('keydown', (e) => {
-       if(e.key === '[') loadPrevQuestion();
-       if(e.key === ']') document.getElementById('btnNext').click();
-       if(e.key === 'Escape') document.getElementById('editModal').classList.add('hidden');
-    });
 
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-    document.querySelectorAll('.sortable').forEach(th => {
-        th.addEventListener('click', () => sortTable(th.dataset.key));
-    });
-
+    document.querySelectorAll('.sortable').forEach(th => { th.addEventListener('click', () => sortTable(th.dataset.key)); });
+    
     bind('allPrevPage', 'click', () => { if(App.page>1){App.page--; renderTable();} });
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
 
@@ -458,13 +451,19 @@ async function fixDuplicates() {
     App.duplicates.forEach(q => tx.objectStore('questions').delete(q.id));
     tx.oncomplete = async () => { await loadData(); scanDuplicates(); showToast('Fixed Duplicates'); };
 }
+async function execBulk(act) {
+    if(!confirm(`Bulk ${act}?`)) return;
+    const tx = db.transaction('questions', 'readwrite');
+    App.selectedIds.forEach(id => { if(act==='delete') tx.objectStore('questions').delete(id); });
+    tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
+}
 
 // --- CLOUD ---
 function loadSettings() {
     const t = localStorage.getItem('gh_token');
     if(t) {
-        document.getElementById('ghToken').value = t;
-        document.getElementById('ghRepo').value = localStorage.getItem('gh_repo');
+        safeSetVal('ghToken', t);
+        safeSetVal('ghRepo', localStorage.getItem('gh_repo'));
     }
 }
 function saveSettings() {
@@ -611,3 +610,11 @@ function refreshUI() {
     const h = '<option value="">All Chapters</option>' + chaps.map(c=>`<option value="${c}">${c}</option>`).join('');
     document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
 }
+function updateXP(amount) {
+    App.user.xp = (App.user.xp || 0) + amount;
+    safeSetText('userXP', App.user.xp);
+    const tx = db.transaction('user', 'readwrite');
+    tx.objectStore('user').put({ key: 'stats', ...App.user });
+}
+
+
