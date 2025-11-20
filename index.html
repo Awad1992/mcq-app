@@ -5,6 +5,7 @@
   <title>MCQ Ultra-Pro v13.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
+  <link rel="icon" href="data:,"> <!-- Fixes Favicon 404 -->
   <link rel="manifest" href="manifest.json?v=13.0.0">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -188,7 +189,7 @@
       </div>
     </section>
 
-    <!-- 3. FLASHCARDS -->
+    <!-- 3. FLASHCARDS (IDs Fixed Here: fcFront, fcBack) -->
     <section id="tab-flashcards" class="tab-content">
        <div class="card center-layout">
           <h3>Flashcards</h3>
@@ -256,13 +257,15 @@
           <h3>GitHub Config</h3>
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
+          <input id="ghFile" value="mcq_backup.json" class="std-input" style="width:100%; margin-bottom:10px;">
+          
           <button id="btnSaveGh" class="primary-btn">Save Settings</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
        </div>
        <div class="card" style="margin-top:20px;">
-          <h3>Danger Zone</h3>
+          <h3>System</h3>
           <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
           <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
           <button id="btnForceReload" class="ghost-btn">Force Reload</button>
