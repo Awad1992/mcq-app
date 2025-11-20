@@ -1,21 +1,21 @@
 /**
- * MCQ Ultra-Pro v13.0 (Bug-Free Integrity Edition)
- * Fixes: Flashcards IDs, Import Syntax, Null Updates.
+ * MCQ Ultra-Pro v13.0 (Final Integrity)
+ * Verified: Logic fixes for Submit, Nav, Layout.
  */
 
-const DB_NAME = 'mcq_pro_v11';
-const DB_VERSION = 22; // Force clean start
+const DB_NAME = 'mcq_pro_v13';
+const DB_VERSION = 22; // Force Clean Init
 let db = null;
 
 const App = {
-    questions: [], tableQs: [], selectedIds: new Set(), currentQ: null, 
+    questions: [], tableQs: [], selectedIds: new Set(), currentQ: null, selectedChoice: null,
     filter: { search: '', status: 'all', chapter: '', mode: 'due' },
     sort: { field: 'id', asc: true },
     page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
     history: [], duplicates: []
 };
 
-// --- HELPER FUNCTIONS ---
+// --- HELPER ---
 function showToast(msg, type='success') {
     const c = document.getElementById('toastContainer');
     if(!c) return;
@@ -29,7 +29,7 @@ function showToast(msg, type='success') {
 function bind(id, ev, fn) { 
     const el = document.getElementById(id); 
     if(el) el.addEventListener(ev, fn); 
-    else console.warn("Missing Element:", id);
+    else console.warn("Missing ID:", id);
 }
 function safeSetText(id, val) {
     const el = document.getElementById(id);
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
-        showToast('System v13.0 Online 💎');
+        showToast('System v13.0 Ready 💎');
     } catch(e) { 
         console.error(e);
         alert("Init Error: "+e.message); 
@@ -86,10 +86,11 @@ function loadNextQuestion(reset) {
     if(reset) App.history = [];
     if(App.currentQ && !reset) App.history.push(App.currentQ);
 
+    // RESET SELECTION STATE
+    App.selectedChoice = null;
+
     const m = document.getElementById('modeSelect').value;
-    const box = document.getElementById('chapterBox');
-    if(box) box.style.display = (m==='chapter')?'block':'none';
-    
+    document.getElementById('chapterBox').style.display = (m==='chapter')?'block':'none';
     const c = document.getElementById('chapterSelect').value;
     const skip = document.getElementById('prefSkipSolved').checked;
 
@@ -106,22 +107,13 @@ function loadNextQuestion(reset) {
 
     const panel = document.getElementById('questionPanel');
     if(pool.length === 0) {
-        if(panel) panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
+        panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
         return;
     }
 
     const rand = Math.floor(Math.random() * pool.length);
     App.currentQ = pool[rand];
     renderQ();
-}
-
-function loadPrevQuestion() {
-    if (App.history.length === 0) return showToast("No history", "warn");
-    App.currentQ = App.history.pop();
-    renderQ();
-    if(App.currentQ.lastChoice !== undefined) {
-        showFeedback(App.currentQ.lastChoice, App.currentQ);
-    }
 }
 
 function renderQ() {
@@ -134,11 +126,8 @@ function renderQ() {
     document.getElementById('btnNext').classList.add('hidden');
     document.getElementById('maintBox').classList.add('hidden');
     
-    const btnFlag = document.getElementById('btnFlag');
-    if(btnFlag) {
-        btnFlag.textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
-        btnFlag.style.color = q.flagged ? "red" : "";
-    }
+    document.getElementById('btnFlag').textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
+    document.getElementById('btnFlag').style.color = q.flagged ? "red" : "";
     document.getElementById('userNoteArea').value = q.userNotes || "";
 
     let h = `<div style="font-weight:500; font-size:1.1rem; margin-bottom:15px;">[#${q.id}] ${q.text}</div>`;
@@ -164,40 +153,58 @@ function selectChoice(idx) {
 }
 
 function submitAnswer() {
-    if(App.selectedChoice === undefined) return alert("Select an answer");
+    // FIX: Check explicitly for null/undefined
+    if(App.selectedChoice === null || App.selectedChoice === undefined) return alert("Please select an answer first!");
+    
     const q = App.currentQ;
-    q.lastChoice = App.selectedChoice; 
+    const idx = App.selectedChoice; 
+    const correctIdx = q.choices.findIndex(c => c.isCorrect);
+    const isCorrect = (idx === correctIdx);
     
-    showFeedback(App.selectedChoice, q);
+    q.lastChoice = idx; // Save state
+
+    const fb = document.getElementById('feedbackPanel');
+    fb.classList.remove('hidden');
+    fb.innerHTML = `<strong style="color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect?'Correct!':'Wrong'}</strong><br>${q.explanation||''}`;
     
-    const isCorrect = q.choices[App.selectedChoice].isCorrect;
-    q.timesSeen = (q.timesSeen||0) + 1;
+    document.getElementById('c_'+correctIdx).classList.add('correct');
+    if(!isCorrect) document.getElementById('c_'+idx).classList.add('wrong');
+    
+    document.getElementById('btnSubmit').classList.add('hidden');
+    document.getElementById('btnNext').classList.remove('hidden');
+    document.getElementById('srsButtons').classList.remove('hidden');
+    
+    q.timesSeen = (q.timesSeen||0)+1;
     if(isCorrect) q.timesCorrect = (q.timesCorrect||0)+1; else q.timesWrong = (q.timesWrong||0)+1;
     
     if(!q.dueDate) q.dueDate = Date.now();
     saveQ(q);
 }
 
-function showFeedback(idx, q) {
-    const correctIdx = q.choices.findIndex(c => c.isCorrect);
-    const isCorrect = (idx === correctIdx);
+function loadPrevQuestion() {
+    if (App.history.length === 0) return showToast("No history", "warn");
+    App.currentQ = App.history.pop();
+    renderQ();
     
-    const fb = document.getElementById('feedbackPanel');
-    fb.classList.remove('hidden');
-    fb.innerHTML = `<strong style="color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect?'Correct!':'Wrong'}</strong><br>${q.explanation||''}`;
-    
-    const cEl = document.getElementById('c_'+correctIdx);
-    if(cEl) cEl.classList.add('correct');
-    
-    const iEl = document.getElementById('c_'+idx);
-    if(iEl && !isCorrect) iEl.classList.add('wrong');
-    
-    document.getElementById('btnSubmit').classList.add('hidden');
-    document.getElementById('btnNext').classList.remove('hidden');
-    document.getElementById('srsButtons').classList.remove('hidden');
+    // Restore state
+    if(App.currentQ.lastChoice !== undefined) {
+        const idx = App.currentQ.lastChoice;
+        const correctIdx = App.currentQ.choices.findIndex(c => c.isCorrect);
+        const isCorrect = (idx === correctIdx);
+        
+        const fb = document.getElementById('feedbackPanel');
+        fb.classList.remove('hidden');
+        fb.innerHTML = `<strong style="color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect?'Correct!':'Wrong'}</strong><br>${App.currentQ.explanation||''}`;
+        
+        document.getElementById('c_'+correctIdx).classList.add('correct');
+        if(!isCorrect) document.getElementById('c_'+idx).classList.add('wrong');
+        
+        document.getElementById('btnSubmit').classList.add('hidden');
+        document.getElementById('btnNext').classList.remove('hidden');
+    }
 }
 
-// --- 4. LIBRARY TABLE ---
+// --- 4. TABLE LOGIC ---
 function applyTableFilters() {
     const txt = document.getElementById('allSearch').value.toLowerCase();
     const type = document.getElementById('allFilter').value;
@@ -236,7 +243,6 @@ function renderTable() {
     data.forEach(q => {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
-        
         let status = '';
         if(q.maintenance) status += '<span class="tag-maint">🔧 MAINT</span> ';
         if(q.flagged) status += '🚩 ';
@@ -295,7 +301,9 @@ function setupEvents() {
     bind('btnSubmit', 'click', submitAnswer);
     bind('btnNext', 'click', () => loadNextQuestion(false));
     bind('btnPrev', 'click', loadPrevQuestion);
-    bind('btnFlag', 'click', toggleFlagCurrent);
+    bind('btnFlag', 'click', () => { 
+        if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } 
+    });
     bind('btnMaintain', 'click', toggleMaintenance);
     bind('btnSaveMaint', 'click', saveMaintenanceNote);
     bind('btnSaveNoteManual', 'click', saveNoteManual);
@@ -332,8 +340,13 @@ function setupEvents() {
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
     bind('btnAddChoice', 'click', addEditChoice);
     
+    // Tabs
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-    document.querySelectorAll('.sortable').forEach(th => { th.addEventListener('click', () => sortTable(th.dataset.key)); });
+    
+    // Headers
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => sortTable(th.dataset.key));
+    });
 
     bind('allPrevPage', 'click', () => { if(App.page>1){App.page--; renderTable();} });
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
@@ -347,7 +360,6 @@ function saveQ(q) {
     const tx = db.transaction('questions','readwrite');
     tx.objectStore('questions').put(q);
 }
-function toggleFlagCurrent() { if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } }
 function toggleMaintenance() {
     const box = document.getElementById('maintBox');
     box.style.display = (box.style.display === 'block') ? 'none' : 'block';
@@ -373,10 +385,8 @@ function saveNote() {
 function saveNoteManual() {
     saveNote();
     const btn = document.getElementById('btnSaveNoteManual');
-    if(btn) {
-        btn.textContent = "Saved! ✅";
-        setTimeout(()=>btn.textContent="💾 Save Note", 2000);
-    }
+    btn.textContent = "Saved! ✅";
+    setTimeout(()=>btn.textContent="💾 Save Note", 2000);
 }
 function checkCloud() {
     const t = localStorage.getItem('gh_token');
@@ -473,22 +483,19 @@ async function cloudDownload() {
     } catch(e) { alert(e.message); }
 }
 
-// Flashcards (CORRECTED IDs)
+// Flashcards
 let fcPool = [], fcIdx = 0;
 function buildFlashcardPool() {
     fcPool = App.questions.filter(q => q.active !== false);
     fcIdx = 0; renderFC();
 }
 function renderFC() {
-    const front = document.getElementById('fcFront');
-    if(!front) return; // Safety check
-    
-    if(fcPool.length===0) { front.textContent="Empty"; return; }
+    if(fcPool.length===0) { document.getElementById('flashcardFront').textContent="Empty"; return; }
     const q = fcPool[fcIdx];
     const cor = q.choices.find(c=>c.isCorrect);
-    front.textContent = q.text;
-    document.getElementById('fcBack').innerHTML = `<b>Answer:</b> ${cor?cor.text:'?'}`;
-    document.getElementById('fcBack').style.display = 'none';
+    document.getElementById('flashcardFront').textContent = q.text;
+    document.getElementById('flashcardBack').innerHTML = `<b>Answer:</b> ${cor?cor.text:'?'}`;
+    document.getElementById('flashcardBack').style.display = 'none';
 }
 function nextFlashcard(good) { if(fcIdx < fcPool.length -1) fcIdx++; else fcIdx = 0; renderFC(); }
 
