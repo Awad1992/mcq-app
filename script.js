@@ -1,361 +1,118 @@
-
-const STORAGE_KEY = "ULTRA_PRO_MAX_V5_DB";
-let state = { questions: [] };
-
-function nowIso() { return new Date().toISOString(); }
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    state.questions = raw ? (JSON.parse(raw).questions || []) : [];
-  } catch {
-    state.questions = [];
-  }
+/* MCQ Ultra-Pro v9.0 CSS */
+:root {
+  --primary: #2563eb; --primary-hover: #1d4ed8;
+  --bg: #f8fafc; --card: #ffffff; --text: #0f172a;
+  --border: #e2e8f0; --success: #10b981; --danger: #ef4444;
+  --highlight: #fef08a;
 }
 
-function saveState(showStatus = true) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    questions: state.questions,
-    savedAt: nowIso(),
-  }));
-  if (showStatus) {
-    const el = document.getElementById("saveStatus");
-    if (el) {
-      el.textContent = "Saved " + new Date().toLocaleTimeString();
-      setTimeout(() => el.textContent = "", 3000);
-    }
-  }
+body.dark {
+  --primary: #3b82f6; --bg: #0f172a; --card: #1e293b;
+  --text: #f1f5f9; --border: #334155; --highlight: #854d0e;
 }
 
-function generateNextId() {
-  if (state.questions.length === 0) return "Q001";
-  const nums = state.questions
-    .map(q => q.id)
-    .filter(id => /^Q\d+$/.test(id))
-    .map(id => parseInt(id.slice(1), 10))
-    .filter(n => !isNaN(n));
-  const max = nums.length ? Math.max(...nums) : 0;
-  const next = max + 1;
-  return next < 1000 ? "Q" + String(next).padStart(3, "0") : "Q" + String(next);
-}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
 
-function switchView(viewId) {
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  const t = document.getElementById("view-" + viewId);
-  if (t) t.classList.add("active");
-  if (viewId === "list") renderQuestionsTable();
-}
+/* LAYOUT */
+.app { max-width: 1400px; margin: 0 auto; width: 100%; height: 100%; display: flex; flex-direction: column; }
+.top-bar { padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.brand-area h1 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+.ver { font-size: 0.7rem; background: var(--text); color: var(--bg); padding: 2px 6px; border-radius: 4px; }
 
-function clearForm() {
-  document.getElementById("questionForm").reset();
-  document.getElementById("qId").value = "";
-}
+/* XP BAR */
+.xp-container { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; font-weight: 600; margin-top: 5px; }
+.xp-bar-bg { width: 120px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.xp-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #8b5cf6); width: 0%; transition: width 0.5s; }
 
-function getFormData() {
-  const id = document.getElementById("qId").value.trim();
-  const stem = document.getElementById("qStem").value.trim();
-  const explanation = document.getElementById("qExplanation").value.trim();
-  const topic = document.getElementById("qTopic").value.trim();
-  const subtopic = document.getElementById("qSubtopic").value.trim();
-  const difficulty = document.getElementById("qDifficulty").value || "moderate";
-  const tags = document.getElementById("qTags").value.split(",").map(t => t.trim()).filter(Boolean);
-  const source = document.getElementById("qSource").value.trim();
-  const flagged = document.getElementById("qFlagged").checked;
-  const correctOptionId = document.getElementById("correctOptionId").value || null;
-  const options = Array.from(document.querySelectorAll(".optText")).map(i => ({
-    id: i.dataset.optId,
-    text: i.value.trim(),
-  }));
-  return { id, stem, explanation, topic, subtopic, difficulty, tags, source, flagged, correctOptionId, options };
-}
+.chips { display: flex; gap: 10px; align-items: center; }
+.chip-time { background: #7c3aed; color: white; border: none; padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 0.75rem; }
+.chip-time:hover { opacity: 0.9; }
 
-function validateQuestion(q) {
-  if (!q.stem) { alert("Question stem is required."); return false; }
-  if (!q.correctOptionId) { alert("Please choose a correct option."); return false; }
-  const hasText = q.options.some(o => o.id === q.correctOptionId && o.text);
-  if (!hasText) { alert("Correct option must have text."); return false; }
-  return true;
-}
+/* TABS */
+.tabs { display: flex; gap: 5px; padding: 10px 20px; background: var(--bg); overflow-x: auto; border-bottom: 1px solid var(--border); }
+.tab-button { padding: 8px 16px; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+.tab-button.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: bold; }
 
-function upsertQuestion() {
-  const data = getFormData();
-  let id = data.id;
-  if (!id) { id = generateNextId(); data.id = id; }
-  if (!validateQuestion(data)) return;
+.tab-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
+.tab-content { display: none; animation: fade 0.2s; }
+.tab-content.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-  const idx = state.questions.findIndex(q => q.id === id);
-  const baseMeta = {
-    timesAnswered: 0,
-    timesCorrect: 0,
-    lastAnsweredAt: null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
+/* CARDS & GRID */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+.warning-border { border-left: 4px solid var(--warning); }
+.row { display: flex; gap: 20px; }
+.col-main { flex: 3; }
+.col-side { flex: 1; min-width: 250px; }
 
-  if (idx === -1) {
-    state.questions.push({ ...baseMeta, ...data });
-  } else {
-    const old = state.questions[idx];
-    state.questions[idx] = {
-      ...old,
-      ...data,
-      createdAt: old.createdAt || baseMeta.createdAt,
-      updatedAt: nowIso(),
-    };
-  }
-  saveState();
-  alert("Saved: " + id);
-  renderQuestionsTable();
-}
+/* CONTROLS */
+.row-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 15px; }
+.std-input, .std-select, .std-textarea { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; width: 100%; }
+.search-box { min-width: 250px; }
+.check-label { font-size: 0.85rem; display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
-function loadQuestionToForm(id) {
-  const q = state.questions.find(x => x.id === id);
-  if (!q) return;
-  switchView("editor");
-  document.getElementById("qId").value = q.id || "";
-  document.getElementById("qStem").value = q.stem || "";
-  document.getElementById("qExplanation").value = q.explanation || "";
-  document.getElementById("qTopic").value = q.topic || "";
-  document.getElementById("qSubtopic").value = q.subtopic || "";
-  document.getElementById("qDifficulty").value = q.difficulty || "moderate";
-  document.getElementById("qTags").value = (q.tags || []).join(", ");
-  document.getElementById("qSource").value = q.source || "";
-  document.getElementById("qFlagged").checked = !!q.flagged;
-  document.getElementById("correctOptionId").value = q.correctOptionId || "";
-  const map = {};
-  (q.options || []).forEach(o => map[o.id] = o.text);
-  document.querySelectorAll(".optText").forEach(i => i.value = map[i.dataset.optId] || "");
-}
+/* BUTTONS */
+button { cursor: pointer; border: none; font-family: inherit; border-radius: 8px; transition: 0.2s; font-weight: 600; }
+.primary-btn { background: var(--primary); color: white; padding: 10px 20px; }
+.secondary-btn, .nav-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; }
+.danger-btn { background: var(--danger); color: white; padding: 8px 16px; }
+.action-btn { background: var(--text); color: var(--bg); padding: 8px 16px; }
+.pill-btn { border-radius: 20px; padding: 4px 12px; font-size: 0.75rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+.ghost-btn { background: none; color: var(--text); opacity: 0.6; }
 
-function applyFilters(q) {
-  const search = document.getElementById("filterSearch").value.toLowerCase();
-  const topic = document.getElementById("filterTopic").value.toLowerCase();
-  const diff = document.getElementById("filterDifficulty").value;
-  const flag = document.getElementById("filterFlagged").value;
-  const answered = document.getElementById("filterAnswered").value;
+/* QUESTION UI & HIGHLIGHTER */
+.question-panel { font-size: 1.15rem; line-height: 1.6; margin-bottom: 20px; position: relative; }
+.q-text { margin-bottom: 15px; }
+/* Highlighter Styles */
+.highlight-yellow { background-color: rgba(253, 224, 71, 0.4); border-bottom: 2px solid #facc15; }
+.highlight-green { background-color: rgba(134, 239, 172, 0.4); border-bottom: 2px solid #4ade80; }
+.highlight-pink { background-color: rgba(249, 168, 212, 0.4); border-bottom: 2px solid #f472b6; }
 
-  if (search) {
-    const blob = (q.stem + " " + (q.tags || []).join(" ") + " " + (q.topic || "")).toLowerCase();
-    if (!blob.includes(search)) return false;
-  }
-  if (topic && (!q.topic || !q.topic.toLowerCase().includes(topic))) return false;
-  if (diff && q.difficulty !== diff) return false;
-  if (flag === "true" && !q.flagged) return false;
-  if (flag === "false" && q.flagged) return false;
+.color-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #ccc; cursor: pointer; }
+.color-dot.yellow { background: #facc15; }
+.color-dot.green { background: #4ade80; }
+.color-dot.pink { background: #f472b6; }
+.tools-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 5px; background: var(--bg); border-radius: 8px; }
 
-  const tAns = q.timesAnswered || 0;
-  const tOK = q.timesCorrect || 0;
-  if (answered === "never" && tAns > 0) return false;
-  if (answered === "wrong" && !(tAns > 0 && tOK < tAns)) return false;
-  if (answered === "perfect" && !(tAns > 0 && tOK === tAns)) return false;
+.choice-container { display: flex; gap: 10px; margin-bottom: 8px; }
+.choice { flex: 1; padding: 15px; background: var(--bg); border: 2px solid transparent; border-radius: 8px; cursor: pointer; }
+.choice:hover { border-color: var(--border); }
+.choice.selected { border-color: var(--primary); background: #eff6ff; }
+.choice.correct { background: #dcfce7; border-color: var(--success); color: #000; }
+.choice.wrong { background: #fee2e2; border-color: var(--danger); color: #000; }
+.strikethrough { text-decoration: line-through; opacity: 0.5; }
+.btn-strike { padding: 0 10px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; opacity: 0.5; }
 
-  return true;
-}
+.feedback-panel { background: #f0f9ff; border-left: 4px solid var(--primary); padding: 15px; margin-top: 15px; border-radius: 4px; color: #0f172a; }
+.notes-textarea { width: 100%; background: #fffbeb; border-color: #fcd34d; color: #451a03; min-height: 60px; padding: 10px; border-radius: 8px; }
 
-function renderQuestionsTable() {
-  const tbody = document.querySelector("#questionsTable tbody");
-  tbody.innerHTML = "";
-  const lastNVal = parseInt(document.getElementById("filterLastN").value || "0", 10);
-  let filtered = state.questions.filter(applyFilters);
+/* TABLE */
+.table-wrapper { overflow-x: auto; max-height: 60vh; border: 1px solid var(--border); border-radius: 8px; margin-top: 15px; }
+.q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; }
+.q-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+.q-table tr:hover { background: var(--bg); }
 
-  // default sort by id asc
-  filtered.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+/* DASHBOARD */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+.dash-card { background: var(--card); border: 1px solid var(--border); padding: 20px; border-radius: 12px; text-align: center; }
+.big-num { font-size: 2rem; font-weight: 800; color: var(--primary); margin-top: 10px; }
+.bars-list { margin-top: 15px; }
+.bar-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.85rem; }
+.bar-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--success); }
 
-  // Last N added filter using createdAt desc
-  if (lastNVal > 0) {
-    filtered.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-    filtered = filtered.slice(0, lastNVal);
-  }
+/* MODALS */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+.modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 500px; max-width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px rgba(0,0,0,0.15); }
+.large { width: 800px; }
+.snap-list { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+.snap-item { display: flex; justify-content: space-between; padding: 10px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); align-items: center; }
 
-  for (const q of filtered) {
-    const tr = document.createElement("tr");
+/* TOAST */
+.toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+.toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
 
-    const tdSel = document.createElement("td");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.className = "rowSelector";
-    cb.dataset.id = q.id;
-    tdSel.appendChild(cb);
-    tr.appendChild(tdSel);
-
-    const tdId = document.createElement("td");
-    tdId.textContent = q.id;
-    tr.appendChild(tdId);
-
-    const tdStem = document.createElement("td");
-    tdStem.textContent = q.stem.length > 120 ? q.stem.slice(0, 117) + "..." : q.stem;
-    tr.appendChild(tdStem);
-
-    const tdTopic = document.createElement("td");
-    tdTopic.textContent = q.topic || "";
-    tr.appendChild(tdTopic);
-
-    const tdDiff = document.createElement("td");
-    tdDiff.textContent = q.difficulty || "";
-    tr.appendChild(tdDiff);
-
-    const tdFlag = document.createElement("td");
-    tdFlag.textContent = q.flagged ? "★" : "";
-    tr.appendChild(tdFlag);
-
-    const tdStats = document.createElement("td");
-    const tAns = q.timesAnswered || 0;
-    const tOK = q.timesCorrect || 0;
-    tdStats.textContent = tOK + "/" + tAns;
-    tr.appendChild(tdStats);
-
-    const tdLast = document.createElement("td");
-    tdLast.textContent = q.lastAnsweredAt ? new Date(q.lastAnsweredAt).toLocaleDateString() : "";
-    tr.appendChild(tdLast);
-
-    const tdActions = document.createElement("td");
-    tdActions.className = "actions";
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit";
-    editBtn.onclick = () => loadQuestionToForm(q.id);
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "Delete";
-    delBtn.onclick = () => {
-      if (!confirm("Delete " + q.id + "?")) return;
-      state.questions = state.questions.filter(x => x.id !== q.id);
-      saveState();
-      renderQuestionsTable();
-    };
-    const flagBtn = document.createElement("button");
-    flagBtn.textContent = q.flagged ? "Unflag" : "Flag";
-    flagBtn.onclick = () => {
-      q.flagged = !q.flagged;
-      saveState(false);
-      renderQuestionsTable();
-    };
-    tdActions.appendChild(editBtn);
-    tdActions.appendChild(delBtn);
-    tdActions.appendChild(flagBtn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  }
-}
-
-function getSelectedIds() {
-  return Array.from(document.querySelectorAll(".rowSelector"))
-    .filter(cb => cb.checked)
-    .map(cb => cb.dataset.id);
-}
-
-function bulkDelete(ids) {
-  if (!ids.length) return;
-  if (!confirm("Delete " + ids.length + " questions?")) return;
-  state.questions = state.questions.filter(q => !ids.includes(q.id));
-  saveState();
-  renderQuestionsTable();
-}
-
-function bulkFlag(ids, val) {
-  if (!ids.length) return;
-  state.questions.forEach(q => { if (ids.includes(q.id)) q.flagged = val; });
-  saveState(false);
-  renderQuestionsTable();
-}
-
-function exportJson() {
-  const payload = { questions: state.questions, exportedAt: nowIso(), formatVersion: 1 };
-  const json = JSON.stringify(payload, null, 2);
-  document.getElementById("rawJsonArea").value = json;
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "Ultra_Pro_Max_V5_Questions.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function importJsonFromText(text) {
-  try {
-    const parsed = JSON.parse(text);
-    if (!parsed.questions || !Array.isArray(parsed.questions)) {
-      alert("Invalid JSON: expected { questions: [...] }");
-      return;
-    }
-    const map = new Map();
-    state.questions.forEach(q => map.set(q.id, q));
-    parsed.questions.forEach(q => {
-      if (!q.id) return;
-      if (!q.createdAt) q.createdAt = nowIso();
-      if (!q.updatedAt) q.updatedAt = nowIso();
-      if (typeof q.timesAnswered !== "number") q.timesAnswered = 0;
-      if (typeof q.timesCorrect !== "number") q.timesCorrect = 0;
-      map.set(q.id, { ...(map.get(q.id) || {}), ...q });
-    });
-    state.questions = Array.from(map.values());
-    saveState();
-    renderQuestionsTable();
-    alert("Import done. Total: " + state.questions.length);
-  } catch (e) {
-    console.error(e);
-    alert("Failed to parse JSON.");
-  }
-}
-
-function init() {
-  loadState();
-
-  document.querySelectorAll("header nav button").forEach(b => {
-    b.onclick = () => switchView(b.dataset.view);
-  });
-  document.getElementById("saveAllBtn").onclick = () => saveState(true);
-  document.getElementById("generateIdBtn").onclick = () => {
-    document.getElementById("qId").value = generateNextId();
-  };
-  document.getElementById("questionForm").onsubmit = e => {
-    e.preventDefault();
-    upsertQuestion();
-  };
-  document.getElementById("resetFormBtn").onclick = clearForm;
-
-  ["filterSearch","filterTopic","filterDifficulty","filterFlagged","filterAnswered","filterLastN"]
-    .forEach(id => {
-      const el = document.getElementById(id);
-      el.oninput = renderQuestionsTable;
-      el.onchange = renderQuestionsTable;
-    });
-
-  document.getElementById("masterCheckbox").onchange = e => {
-    const c = e.target.checked;
-    document.querySelectorAll(".rowSelector").forEach(cb => cb.checked = c);
-  };
-  document.getElementById("bulkSelectAllBtn").onclick = () => {
-    document.querySelectorAll(".rowSelector").forEach(cb => cb.checked = true);
-    document.getElementById("masterCheckbox").checked = true;
-  };
-  document.getElementById("bulkClearSelectionBtn").onclick = () => {
-    document.querySelectorAll(".rowSelector").forEach(cb => cb.checked = false);
-    document.getElementById("masterCheckbox").checked = false;
-  };
-  document.getElementById("bulkDeleteBtn").onclick = () => bulkDelete(getSelectedIds());
-  document.getElementById("bulkFlagBtn").onclick = () => bulkFlag(getSelectedIds(), true);
-  document.getElementById("bulkUnflagBtn").onclick = () => bulkFlag(getSelectedIds(), false);
-
-  document.getElementById("exportJsonBtn").onclick = exportJson;
-  document.getElementById("importJsonBtn").onclick = () => {
-    const fileInput = document.getElementById("importJsonInput");
-    if (fileInput.files && fileInput.files[0]) {
-      const reader = new FileReader();
-      reader.onload = e => importJsonFromText(e.target.result);
-      reader.readAsText(fileInput.files[0]);
-    } else {
-      const text = document.getElementById("rawJsonArea").value.trim();
-      if (!text) {
-        alert("Paste JSON or choose file.");
-        return;
-      }
-      importJsonFromText(text);
-    }
-  };
-
-  switchView("editor");
-  renderQuestionsTable();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+.hidden { display: none !important; }
+@media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }
