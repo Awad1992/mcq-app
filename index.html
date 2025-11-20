@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v15.0</title>
+  <title>MCQ Ultra-Pro v15.1</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=15.0.0">
+  <link rel="manifest" href="manifest.json?v=15.1.0">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:,"> <!-- Fixes Favicon 404 -->
+  <link rel="icon" href="data:,">
 </head>
 <body>
 
@@ -15,12 +15,11 @@
 
 <div class="app" id="appRoot">
   
-  <!-- Header -->
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v15.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v15.1</span></h1>
         <div class="xp-wrapper">
            <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
         </div>
@@ -30,14 +29,10 @@
       <span class="chip" id="dbStatus">DB: Init...</span>
       <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
       <button id="btnHeaderBackup" class="chip header-btn">☁️ Backup</button>
-      <select id="themeSelect" class="chip chip-theme">
-        <option value="light">☀︎ Light</option>
-        <option value="dark">🌙 Dark</option>
-      </select>
+      <button id="themeToggle" class="chip header-btn">🌗 Theme</button>
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
     <button class="tab-button" data-tab="all">Library</button>
@@ -49,7 +44,7 @@
 
   <main class="tab-container">
 
-    <!-- 1. PRACTICE TAB -->
+    <!-- 1. PRACTICE -->
     <section id="tab-home" class="tab-content active">
       <div class="card main-layout">
         <div class="row">
@@ -65,9 +60,11 @@
                 <option value="chapter">📂 By Chapter</option>
                 <option value="all">🔀 Random All</option>
               </select>
-              <select id="chapterSelect" class="std-select chapter-list" style="display:none;">
-                  <option value="">All Chapters</option>
-              </select>
+              <div id="chapterBox" style="display:none;">
+                  <select id="chapterSelect" class="std-select chapter-list">
+                      <option value="">All Chapters</option>
+                  </select>
+              </div>
               <button id="btnRefreshPractice" class="refresh-btn">↻ Apply</button>
               <label class="check-label">
                  <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
@@ -136,7 +133,7 @@
       </div>
     </section>
 
-    <!-- 2. LIBRARY TAB -->
+    <!-- 2. LIBRARY -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
           
@@ -154,7 +151,6 @@
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
-              <!-- ALL ACTIONS MOVED HERE -->
               <div class="row-controls action-area">
                  <div class="action-group">
                     <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
@@ -171,7 +167,6 @@
                  </div>
               </div>
               
-              <!-- Drag Drop Zone Overlay (Hidden by default) -->
               <div id="dropZone" class="drop-zone hidden">Drop JSON file here to Import</div>
           </div>
 
@@ -202,7 +197,7 @@
       </div>
     </section>
 
-    <!-- 3. FLASHCARDS TAB -->
+    <!-- 3. FLASHCARDS -->
     <section id="tab-flashcards" class="tab-content">
        <div class="card center-layout">
           <h3>Flashcards</h3>
@@ -224,7 +219,7 @@
        </div>
     </section>
 
-    <!-- 4. EXAM TAB -->
+    <!-- 4. EXAM -->
     <section id="tab-exam" class="tab-content">
        <div class="card">
           <h2>Exam Simulator</h2>
@@ -249,7 +244,7 @@
        </div>
     </section>
 
-    <!-- 5. DASHBOARD TAB -->
+    <!-- 5. DASHBOARD -->
     <section id="tab-dashboard" class="tab-content">
        <div class="card">
           <h2>Statistics</h2>
@@ -265,7 +260,7 @@
        </div>
     </section>
 
-    <!-- 6. SETTINGS TAB -->
+    <!-- 6. SETTINGS -->
     <section id="tab-settings" class="tab-content">
        <div class="card">
           <h3>GitHub Config</h3>
