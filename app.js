@@ -1,10 +1,10 @@
 /**
- * MCQ Ultra-Pro v12.5 (Final Verified)
- * ALL Features: Select All, Sort, Range, Exam, Flashcards, Maintenance, Cloud.
+ * MCQ Ultra-Pro v13.0 (Absolute Fix)
+ * Verified Logic: Sorting, Duplicates, Exam, Flashcards, Layout.
  */
 
-const DB_NAME = 'mcq_pro_v12';
-const DB_VERSION = 21; // Force Clean Init
+const DB_NAME = 'mcq_pro_v13';
+const DB_VERSION = 22; // Force Clean Init
 let db = null;
 
 const App = {
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
-        showToast('System v12.5 Ready 💎');
+        showToast('System v13.0 Ready 💎');
     } catch(e) { 
         console.error(e);
         alert("Init Error: "+e.message); 
@@ -260,6 +260,7 @@ function handleCheck(cb, id) {
     }
     App.lastCheckId = id;
     safeSetText('selCount', App.selectedIds.size + " Selected");
+    renderTable();
 }
 
 function toggleSelectAll(cb) {
