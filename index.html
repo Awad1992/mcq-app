@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v14.0</title>
+  <title>MCQ Ultra-Pro v15.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=14.0.0">
+  <link rel="manifest" href="manifest.json?v=15.0.0">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
 </head>
@@ -15,12 +15,11 @@
 
 <div class="app" id="appRoot">
   
-  <!-- Header -->
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v14.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v15.0</span></h1>
         <div class="xp-wrapper">
            <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
         </div>
@@ -37,7 +36,6 @@
     </div>
   </header>
 
-  <!-- Tabs -->
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
     <button class="tab-button" data-tab="all">Library</button>
@@ -104,7 +102,7 @@
               <button class="primary-btn large" id="btnSubmit">Submit</button>
               <button class="primary-btn large hidden" id="btnNext">Next →</button>
               <label class="check-label guess-box">
-                <input type="checkbox" id="guessCheck"> I'm Guessing
+                <input type="checkbox" id="guessCheck"> Guessing
               </label>
             </div>
 
@@ -276,6 +274,15 @@
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
+          
+          <!-- RESTORE PREVIOUS BACKUP (New Feature) -->
+          <div style="margin-top:15px;">
+             <label class="small-label">Restore from History</label>
+             <select id="backupHistorySelect" class="std-select" style="width:100%; margin-bottom:5px;">
+                <option value="">Select a previous backup...</option>
+             </select>
+             <button id="btnRestoreHistory" class="secondary-btn">Restore Selected</button>
+          </div>
        </div>
        <div class="card" style="margin-top:20px;">
           <h3>System</h3>
