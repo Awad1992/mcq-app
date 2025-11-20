@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v5.5</title>
+  <title>MCQ Legendary v6.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <link rel="manifest" href="manifest.json?v=5.5.0">
-  <link rel="stylesheet" href="style.css?v=5.5.0">
+  <link rel="stylesheet" href="style.css?v=6.0.1">
 </head>
 <body>
 
@@ -16,103 +15,94 @@
   
   <header class="top-bar">
     <div class="brand">
-      <h1>MCQ Ultra-Pro <span class="ver">v5.5</span></h1>
-      <div class="subtitle">Classic Structure • Modern Power</div>
+      <h1>MCQ Legendary <span class="ver">v6.0</span></h1>
+      <div class="subtitle">The Complete Medical Study Engine</div>
     </div>
     <div class="chips">
-      <span class="chip" id="dbStatus">🟢 DB Ready</span>
-      <span class="chip chip-sync" id="syncStatus">☁️ Cloud: Check</span>
-      <select id="themeSelect" class="chip chip-theme">
-        <option value="light">☀︎ Light</option>
-        <option value="dark">🌙 Dark</option>
-        <option value="night">🖤 Night</option>
-        <option value="calm">🌿 Calm</option>
-      </select>
+      <span class="chip">DB: Online</span>
+      <span class="chip chip-sync" id="syncStatus">Cloud: Idle</span>
+      <button id="themeToggle" class="chip chip-theme">🌗 Theme</button>
     </div>
   </header>
 
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
+    <button class="tab-button" data-tab="all">Data Center (All Qs)</button>
     <button class="tab-button" data-tab="flashcards">Flashcards</button>
     <button class="tab-button" data-tab="exam">Exam Sim</button>
-    <button class="tab-button" data-tab="dashboard">Dashboard</button>
-    <button class="tab-button" data-tab="all">All Questions</button>
-    <button class="tab-button" data-tab="backup">Backup & Cloud</button>
-    <button class="tab-button" data-tab="settings">Settings</button>
+    <button class="tab-button" data-tab="dashboard">Stats</button>
+    <button class="tab-button" data-tab="settings">Settings & Cloud</button>
   </nav>
 
   <main class="tab-container">
 
     <section class="tab-content active" id="tab-home">
-      <div class="card stats-card">
-        <div class="stats-row" id="statsBar">Loading Stats...</div>
-      </div>
-
-      <div class="card main-card">
+      <div class="card">
         <div class="row">
           <div class="col-main">
             <div class="row-controls">
               <div>
-                <label class="small-label">Study Mode</label>
-                <select id="modeSelect" class="modern-select">
-                  <option value="due">Spaced Repetition (Due)</option>
-                  <option value="all">All Active</option>
-                  <option value="new">New Only</option>
-                  <option value="wrong">Wrong History</option>
-                  <option value="flagged">Flagged</option>
-                  <option value="weak">Weak Spots</option>
-                  <option value="chapter">By Chapter</option>
+                <label class="small-label">Source</label>
+                <select id="modeSelect" class="control-input">
+                  <option value="due">Spaced Repetition (Smart)</option>
+                  <option value="all">Random Shuffle</option>
+                  <option value="new">Unseen Only</option>
+                  <option value="wrong">Mistakes History</option>
+                  <option value="flagged">Flagged Only</option>
+                  <option value="chapter">Specific Chapter</option>
                 </select>
-                <select id="chapterSelect" class="chapter-dropdown modern-select" style="display:none;">
-                  <option value="">Select Chapter...</option>
+                <select id="chapterSelect" class="control-input" style="display:none; max-width:150px;">
+                  <option value="">All Chapters</option>
                 </select>
               </div>
               
-              <div class="check-group">
-                 <label class="tiny-check">
-                   <input type="checkbox" id="prefSkipSolved" checked> Skip Solved
+              <div style="display:flex; align-items:center; gap:10px; margin-top:15px;">
+                 <label class="check-label">
+                   <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
                  </label>
               </div>
 
               <div class="all-actions">
-                <button class="pill-btn" id="btnStartDaily">Daily 10</button>
-                <button class="pill-btn" id="btnFocusMode">🧘 Focus</button>
+                 <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
               </div>
             </div>
 
             <div id="questionPanel" class="question-panel"></div>
-            <div id="searchTools" class="search-tools"></div>
-
-            <div class="notes-area-container">
-              <label class="small-label">My Notes 📝</label>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Type your notes here (Auto-saved)..."></textarea>
-              <div id="saveNoteStatus" class="save-note-status"></div>
+            
+            <div class="tools-bar">
+               <div id="searchTools"></div>
+               <button id="btnFlag" class="ghost-btn">Flag 🚩</button>
             </div>
 
-            <div id="feedbackPanel" class="feedback-panel"></div>
+            <div class="notes-box">
+              <label class="small-label">Clinical Notes 📝</label>
+              <textarea id="userNoteArea" class="notes-input" placeholder="Add note..."></textarea>
+              <span id="saveNoteStatus" class="save-status"></span>
+            </div>
 
-            <div class="btn-row-main">
-              <button class="primary-btn" id="btnSubmit">Submit Answer</button>
-              <label class="guess-label">
-                <input type="checkbox" id="guessCheck"> I'm Guessing
+            <div id="feedbackPanel" class="feedback-panel hidden"></div>
+
+            <div class="action-bar">
+              <button class="primary-btn" id="btnSubmit">Submit (Enter)</button>
+              <label class="check-label" style="margin-left:10px;">
+                <input type="checkbox" id="guessCheck"> Guess
               </label>
-              <button id="btnExitFocus" class="danger-btn hidden">Exit Focus</button>
+              <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
             </div>
             
-            <div class="nav-row">
-               <button class="nav-btn" id="btnPrev">Previous</button>
-               <button class="nav-btn" id="btnNext">Next</button>
-               <button class="ghost-btn" id="btnFlag">Flag 🚩</button>
+            <div class="nav-bar">
+               <button class="nav-btn" id="btnPrev">← Prev</button>
+               <button class="nav-btn" id="btnNext">Next →</button>
             </div>
           </div>
 
           <div class="col-side">
-            <div class="card side-card">
-               <div class="small-label">Concept Link</div>
-               <div id="relatedBox" class="related-box tiny muted">No related questions.</div>
+            <div class="card side-box">
+               <div class="small-label">Session Stats</div>
+               <div id="sessionStats">0 Correct / 0 Wrong</div>
             </div>
-            <div class="card side-card">
-               <div class="small-label">Session History</div>
+            <div class="card side-box">
+               <div class="small-label">Recent History</div>
                <div class="history-list" id="historyList"></div>
             </div>
           </div>
@@ -120,259 +110,214 @@
       </div>
     </section>
 
-    <section class="tab-content" id="tab-flashcards">
-      <div class="card">
-        <div class="row-controls">
-           <select id="fcSource" class="modern-select">
-             <option value="due">Due Cards</option>
-             <option value="weak">Weak Topics</option>
-             <option value="all">All Cards</option>
-           </select>
-           <select id="fcMode" class="modern-select">
-             <option value="q-first">Question → Answer</option>
-             <option value="a-first">Answer → Question</option>
-           </select>
-           <button id="btnFcReload" class="pill-btn">Shuffle</button>
-        </div>
-      </div>
-      <div class="card flashcard-card">
-        <div id="flashcardInner" class="flashcard-inner">
-           <div class="flashcard-front" id="flashcardFront">Empty</div>
-           <div class="flashcard-back" id="flashcardBack" style="display:none;"></div>
-        </div>
-        <div class="btn-row-main flashcard-controls">
-           <button id="btnFcShow" class="nav-btn">Show Answer</button>
-           <button id="btnFcAgain" class="danger-btn">Again</button>
-           <button id="btnFcGood" class="primary-btn">Good</button>
-           <button id="btnFcNext" class="nav-btn">Next</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="tab-content" id="tab-exam">
-      <div class="card">
-         <h2>Exam Simulator</h2>
-         <div class="row-controls">
-           <select id="examPool" class="modern-select">
-             <option value="all">All Questions</option>
-             <option value="weak">Weak Areas</option>
-             <option value="chapter">Specific Chapter</option>
-           </select>
-           <select id="examChapterSelect" class="chapter-dropdown modern-select" style="display:none;">
-             <option value="">All</option>
-           </select>
-           <input id="examCount" type="number" value="40" class="modern-input" style="width:70px;">
-           <button id="btnStartExam" class="primary-btn">Start Exam</button>
-         </div>
-      </div>
-      <div class="card" id="examActiveCard" style="display:none;">
-         <div class="exam-header">
-           <span id="examIndexLabel">Q 0/0</span>
-           <span id="examTimerLabel" class="timer-badge">00:00</span>
-         </div>
-         <div id="examQuestionPanel" class="question-panel"></div>
-         <div class="btn-row-main">
-           <button id="btnExamPrev" class="nav-btn">Prev</button>
-           <button id="btnExamNext" class="nav-btn">Next</button>
-           <button id="btnExamFinish" class="danger-btn">Finish</button>
-         </div>
-      </div>
-      <div class="card" id="examResultCard" style="display:none;">
-        <div id="examSummary"></div>
-        <button id="btnExamClose" class="pill-btn">Close</button>
-      </div>
-    </section>
-
-    <section class="tab-content" id="tab-dashboard">
-      <div class="card">
-         <h2>Performance Analytics</h2>
-         <div class="dashboard-grid">
-           <div class="dash-box" id="dashOverall">Loading...</div>
-           <div class="dash-box">
-              <h4>Progress Bar</h4>
-              <div id="dashProgressBar" class="progress-container"></div>
-           </div>
-           <div class="dash-box" id="dashWeakChapters">Loading...</div>
-         </div>
-      </div>
-    </section>
-
     <section class="tab-content" id="tab-all">
-      
       <div class="subnav">
-        <button class="subnav-btn subnav-btn-active" data-allview="bank">Question Bank</button>
-        <button class="subnav-btn" data-allview="builder">AI Builder</button>
+        <button class="subnav-btn active" id="viewBankBtn">Question Bank</button>
+        <button class="subnav-btn" id="viewBuilderBtn">AI Builder</button>
       </div>
 
       <div id="allViewBank">
         <div class="card">
-          <div class="row-controls">
-             <input id="allSearch" placeholder="Search text, ID..." class="modern-input" style="width:200px;">
-             <select id="allFilter" class="modern-select">
-               <option value="all">All</option>
-               <option value="notes">With Notes 📝</option>
-               <option value="wrong">Has Errors ❌</option>
-               <option value="flagged">Flagged 🚩</option>
+          <div class="filter-bar">
+             <input id="allSearch" placeholder="Search text, ID, tags..." class="filter-input">
+             <select id="allFilter" class="filter-input">
+               <option value="all">Status: All</option>
+               <option value="notes">Has Notes</option>
+               <option value="wrong">Has Errors</option>
+               <option value="flagged">Flagged</option>
                <option value="unseen">Unseen</option>
              </select>
-             <select id="allChapterSelect" class="chapter-dropdown modern-select" style="width:200px;">
-               <option value="">All Chapters</option>
+             <select id="allChapterSelect" class="filter-input chapter-list">
+               <option value="">Chapter: All</option>
              </select>
-             <button id="btnAllApply" class="primary-btn">Apply Filters</button>
+             <button id="btnAllApply" class="action-btn">Apply Filter</button>
           </div>
 
-          <div class="row-controls toolbar">
-             <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
-             <button id="btnAllDelete" class="danger-btn">Delete Selected</button>
-             <div class="import-box">
-                <input type="file" id="fileInput" accept=".json" class="file-input">
-                <button id="btnImport" class="action-btn">Import JSON</button>
-                <button id="btnExport" class="action-btn">Export JSON</button>
+          <div id="bulkActionsBar" class="bulk-bar hidden">
+             <span id="selectedCountLabel">0 Selected</span>
+             <div class="bulk-tools">
+               <button id="btnBulkDelete" class="danger-btn small">Delete</button>
+               <button id="btnBulkFlag" class="action-btn small">Flag/Unflag</button>
+               <button id="btnBulkReset" class="action-btn small">Reset Stats</button>
+               <button id="btnBulkChapter" class="action-btn small">Move Chapter</button>
              </div>
           </div>
 
-          <div class="table-wrapper">
-            <table class="q-table">
+          <div class="table-container">
+            <table class="pro-table">
               <thead>
                 <tr>
-                  <th width="40"><input type="checkbox" id="allSelectAll"></th>
-                  <th class="sortable" data-sort="id" width="70">ID ↕</th>
-                  <th class="sortable" data-sort="createdAt" width="100">Date ↕</th>
+                  <th width="30"><input type="checkbox" id="allSelectAll"></th>
+                  <th class="sortable" data-sort="id" width="60">ID ↕</th>
                   <th class="sortable" data-sort="text">Question ↕</th>
-                  <th class="sortable" data-sort="chapter" width="150">Chapter ↕</th>
-                  <th class="sortable" data-sort="timesSeen" width="60">Seen ↕</th>
-                  <th class="sortable" data-sort="timesWrong" width="60">Err ↕</th>
-                  <th width="60">Edit</th>
+                  <th class="sortable" data-sort="chapter" width="120">Chapter ↕</th>
+                  <th class="sortable" data-sort="timesSeen" width="50">View ↕</th>
+                  <th class="sortable" data-sort="timesWrong" width="50">Err ↕</th>
+                  <th width="60">Action</th>
                 </tr>
               </thead>
               <tbody id="allTableBody"></tbody>
             </table>
           </div>
-          <div class="all-footer">
-            <span id="allSelectedCount">0 Selected</span>
-            <div class="all-pager">
-              <button id="allPrevPage" class="nav-btn">Prev</button>
-              <span id="allPageInfo">1/1</span>
-              <button id="allNextPage" class="nav-btn">Next</button>
+          
+          <div class="pagination">
+             <button id="allPrevPage" class="page-btn">Previous</button>
+             <span id="allPageInfo">Page 1</span>
+             <button id="allNextPage" class="page-btn">Next</button>
+          </div>
+          
+          <div class="io-bar">
+            <div class="io-group">
+              <input type="file" id="fileInput" accept=".json" class="hidden">
+              <button id="btnImportTrigger" class="secondary-btn">📂 Import JSON</button>
+              <button id="btnExportTrigger" class="secondary-btn">💾 Export JSON</button>
+            </div>
+            <div class="io-group">
+              <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
             </div>
           </div>
         </div>
       </div>
 
-      <div id="allViewBuilder" style="display:none;">
-         <div class="card">
-           <h2>AI Question Builder</h2>
-           <div class="builder-row">
-             <div class="builder-col">
-               <label class="small-label">Source Text</label>
-               <textarea id="builderSourceText" rows="8" class="modern-textarea" placeholder="Paste text here..."></textarea>
-               <div class="builder-inline">
-                 <label>Count:</label>
-                 <input id="builderNumQuestions" type="number" value="10" class="modern-input" style="width:60px;">
-                 <button id="btnBuilderMakePrompt" class="action-btn">Generate Prompt</button>
+      <div id="allViewBuilder" class="hidden">
+         <div class="card builder-card">
+           <h3>AI Question Generator</h3>
+           <div class="split-view">
+             <div class="split-col">
+               <label>1. Paste Source Text</label>
+               <textarea id="builderSourceText" placeholder="Paste content here..."></textarea>
+               <div class="builder-controls">
+                 <input id="builderNumQuestions" type="number" value="10">
+                 <button id="btnBuilderMakePrompt" class="primary-btn">Generate Prompt</button>
                </div>
-               <textarea id="builderPromptOut" rows="6" class="modern-textarea" readonly></textarea>
+               <textarea id="builderPromptOut" readonly placeholder="Prompt will appear here. Copy to ChatGPT/Gemini."></textarea>
              </div>
-             <div class="builder-col">
-               <label class="small-label">JSON Result</label>
-               <textarea id="builderJsonInput" rows="8" class="modern-textarea" placeholder="Paste JSON here..."></textarea>
-               <div class="builder-inline">
+             <div class="split-col">
+               <label>2. Paste AI Response (JSON)</label>
+               <textarea id="builderJsonInput" placeholder="Paste the JSON array here..."></textarea>
+               <div class="builder-controls">
                  <button id="btnBuilderPreview" class="action-btn">Preview</button>
-                 <button id="btnBuilderImportSelected" class="primary-btn">Import</button>
+                 <button id="btnBuilderImportSelected" class="primary-btn">Import Questions</button>
                </div>
-               <div id="builderPreview" class="builder-preview">No preview.</div>
+               <div id="builderPreview" class="preview-box"></div>
              </div>
            </div>
          </div>
       </div>
     </section>
 
-    <section class="tab-content" id="tab-backup">
-      <div class="card">
-        <h2>Local Backup</h2>
-        <div class="row-controls">
-           <button id="btnBackupExport" class="primary-btn">Download Backup</button>
-           <span>OR</span>
-           <input type="file" id="backupFileInput" accept=".json" class="file-input">
-           <button id="btnBackupImport" class="action-btn">Restore File</button>
-        </div>
-      </div>
+    <section class="tab-content" id="tab-flashcards">
+       <div class="card center-card">
+         <div class="fc-controls">
+           <select id="fcSource"><option value="due">Due</option><option value="weak">Weak</option></select>
+           <select id="fcMode"><option value="q">Q → A</option><option value="a">A → Q</option></select>
+           <button id="btnFcShuffle" class="action-btn">Shuffle</button>
+         </div>
+         <div class="flashcard">
+            <div id="fcFront" class="fc-face">Empty</div>
+            <div id="fcBack" class="fc-face hidden"></div>
+         </div>
+         <div class="fc-actions">
+            <button id="btnFcShow" class="primary-btn">Show Answer (Space)</button>
+            <div id="fcGrading" class="hidden">
+               <button class="grade-btn bad" onclick="gradeCard(1)">Hard</button>
+               <button class="grade-btn good" onclick="gradeCard(3)">Good</button>
+               <button class="grade-btn easy" onclick="gradeCard(5)">Easy</button>
+            </div>
+         </div>
+       </div>
+    </section>
 
+    <section class="tab-content" id="tab-exam">
       <div class="card">
-        <h2>GitHub Cloud Sync</h2>
-        <div id="cloudStatus" class="status-text">Not Connected</div>
-        <div class="row-controls">
-          <button id="btnCloudUpload" class="action-btn">Upload ☁️</button>
-          <button id="btnCloudDownload" class="action-btn">Download 🌩️</button>
+        <div class="exam-setup">
+           <h2>Exam Simulator</h2>
+           <div class="setup-row">
+             <select id="examChapterSelect" class="chapter-list"><option value="">All Chapters</option></select>
+             <input id="examCount" type="number" value="50" placeholder="Qty">
+             <button id="btnStartExam" class="primary-btn">Start Exam</button>
+           </div>
         </div>
-        <div id="cloudLoading" class="loading-text hidden">Working...</div>
+        
+        <div id="examInterface" class="hidden">
+           <div class="exam-hud">
+             <span id="examProgress">Q 1/50</span>
+             <span id="examTimer">00:00</span>
+           </div>
+           <div id="examQPanel" class="q-panel"></div>
+           <div class="exam-nav">
+             <button id="btnExamPrev">Prev</button>
+             <button id="btnExamNext">Next</button>
+             <button id="btnExamFinish" class="danger-btn">Finish</button>
+           </div>
+        </div>
+
+        <div id="examResults" class="hidden">
+           <h3>Results</h3>
+           <div id="examScore"></div>
+           <button id="btnExamClose" class="action-btn">Close</button>
+        </div>
       </div>
     </section>
 
-    <section class="tab-content" id="tab-settings">
-       <div class="card">
-         <h2>GitHub Config</h2>
-         <div class="settings-grid">
-           <label>Token: <input type="password" id="ghTokenInput" class="modern-input"></label>
-           <label>Repo: <input id="ghRepoInput" class="modern-input" placeholder="User/Repo"></label>
-           <label>File: <input id="ghFileInput" class="modern-input" value="mcq_backup.json"></label>
-         </div>
-         <div class="btn-row-main">
-            <button id="btnSaveGitHub" class="primary-btn">Save Settings</button>
-            <button id="btnClearGitHub" class="ghost-btn">Clear</button>
-         </div>
+    <section class="tab-content" id="tab-dashboard">
+       <div class="dashboard-grid">
+          <div class="stat-box">
+             <h3>Total Questions</h3>
+             <span id="dashTotal" class="big-num">0</span>
+          </div>
+          <div class="stat-box">
+             <h3>Mastery</h3>
+             <span id="dashMastery" class="big-num">0%</span>
+          </div>
+          <div class="stat-box">
+             <h3>Weakest Chapter</h3>
+             <span id="dashWeakest" class="med-text">-</span>
+          </div>
        </div>
+    </section>
 
-       <div class="card">
-         <h2>Management</h2>
-         <div class="btn-row-main">
-            <button id="btnResetProgress" class="danger-btn">Reset Progress</button>
-         </div>
-       </div>
-       <div class="card">
-          <p class="tiny">MCQ Ultra-Pro v5.5.0 (Hybrid)</p>
-       </div>
+    <section class="tab-content" id="tab-settings">
+      <div class="card">
+        <h3>GitHub Sync</h3>
+        <div class="settings-row">
+           <input type="password" id="ghToken" placeholder="Token (ghp_...)">
+           <input id="ghRepo" placeholder="User/Repo">
+           <button id="btnSaveGh" class="primary-btn">Save Config</button>
+        </div>
+        <div class="cloud-actions">
+           <button id="btnUpload" class="action-btn">⬆ Upload</button>
+           <button id="btnDownload" class="action-btn">⬇ Download</button>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>Data Management</h3>
+        <button id="btnResetProgress" class="danger-btn">Reset All Progress</button>
+        <button id="btnForceReload" class="ghost-btn">Force App Reload</button>
+      </div>
     </section>
 
   </main>
 </div>
 
 <div id="editModal" class="modal hidden">
-  <div class="modal-backdrop" id="editModalBackdrop"></div>
-  <div class="modal-body">
-    <h3>Edit Question</h3>
-    <div class="modal-content">
-       <label>Text: <textarea id="editText" rows="3" class="modern-textarea"></textarea></label>
-       <div class="split-row">
-         <label>Chapter: <input id="editChapter" class="modern-input"></label>
-         <label>Tags: <input id="editTags" class="modern-input"></label>
-       </div>
-       <label>Explanation: <textarea id="editExplanation" rows="3" class="modern-textarea"></textarea></label>
-       <label>Image URL: <input id="editImageUrl" class="modern-input"></label>
-       
-       <div class="small-label">Choices:</div>
-       <div id="editChoices"></div>
-       <button id="btnAddChoice" class="pill-btn">+ Add Choice</button>
-
-       <div class="modal-flags">
-          <label><input type="checkbox" id="editFlagged"> Flagged</label>
-          <label><input type="checkbox" id="editMaint"> Maintenance</label>
-       </div>
-    </div>
-    <div class="modal-actions">
-       <button id="btnEditSave" class="primary-btn">Save</button>
-       <button id="btnEditCancel" class="secondary-btn">Cancel</button>
-    </div>
+  <div class="modal-content">
+     <h3>Edit Question</h3>
+     <textarea id="editText" class="full-text" rows="3"></textarea>
+     <div class="row-inputs">
+       <input id="editChapter" placeholder="Chapter">
+       <input id="editTags" placeholder="Tags">
+     </div>
+     <textarea id="editExplanation" class="full-text" rows="3" placeholder="Explanation"></textarea>
+     <div id="editChoicesList"></div>
+     <div class="modal-footer">
+        <button id="btnSaveEdit" class="primary-btn">Save</button>
+        <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
+     </div>
   </div>
 </div>
 
-<button id="btnForceUpdate" class="floating-update-btn">↻ Reload</button>
-
-<script src="app.js?v=5.5.0"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-     navigator.serviceWorker.register('./service-worker.js?v=5.5.0').catch(()=>{});
-  }
-</script>
+<script src="app.js?v=6.0.1"></script>
 </body>
 </html>
