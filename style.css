@@ -1,4 +1,4 @@
-/* MCQ Ultra-Pro v11.1.0 CSS */
+/* MCQ Ultra-Pro v11.5.0 CSS */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -16,6 +16,8 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 /* LAYOUT */
 .app { display: flex; flex-direction: column; height: 100%; max-width: 1400px; margin: 0 auto; }
 .top-bar { padding: 0.8rem 1.5rem; background: var(--card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.brand-area { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 1.5rem; }
 .brand-area h1 { margin: 0; font-size: 1.2rem; color: var(--primary); }
 .ver { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: var(--primary); color: white; }
 .chips { display: flex; gap: 10px; align-items: center; }
@@ -40,6 +42,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 .row-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px; }
 .std-select, .std-input, .std-textarea { padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; }
 .small-label { font-size: 0.7rem; font-weight: 700; color: var(--text); opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px; }
+.flex-grow { flex: 1; }
 
 /* BUTTONS */
 button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; padding: 8px 16px; transition: 0.2s; font-family: inherit; }
@@ -52,7 +55,7 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .ghost-btn { background: none; color: var(--text); }
 .warning-text { color: var(--warning); }
 
-/* TABLE (FIXED) */
+/* TABLE (FIXED LAYOUT) */
 .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-top: 15px; background: var(--card); max-height: 60vh; }
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
@@ -62,13 +65,16 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 
 /* UI ELEMENTS */
 .question-panel { font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px; background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
-.choice { padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border: 2px solid transparent; margin-bottom: 8px; }
+.choice { padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border: 2px solid transparent; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 8px; }
 .choice.selected { border-color: var(--primary); background: #eff6ff; }
 .choice.correct { background: #dcfce7; border-color: var(--success); }
 .choice.wrong { background: #fee2e2; border-color: var(--danger); }
 .feedback-panel { background: #f0f9ff; border-left: 4px solid var(--primary); padding: 15px; margin-top: 15px; border-radius: 4px; }
 .maint-box { background: var(--maint-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--danger); margin-bottom: 15px; }
 .notes-textarea { width: 100%; min-height: 60px; margin-top: 5px; background: #fffbeb; color: #451a03; border: 1px solid var(--border); border-radius: 6px; }
+.srs-row { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; }
+.srs-btn { flex: 1; color: white; }
+.again { background: var(--danger); } .hard { background: var(--warning); } .good { background: var(--success); } .easy { background: var(--primary); }
 
 /* DASHBOARD */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
@@ -82,5 +88,6 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
+.range-active { background: var(--primary); color: white; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }
