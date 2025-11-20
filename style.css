@@ -1,4 +1,4 @@
-/* MCQ Ultra-Pro v15.0.0 CSS */
+/* MCQ Ultra-Pro v14.0.0 CSS */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -56,14 +56,14 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .warning-text { color: var(--warning); }
 .range-active { background: var(--primary); color: white; border-color: var(--primary); }
 
-/* TABLE */
+/* TABLE (FIXED LAYOUT) */
 .library-card { display: flex; flex-direction: column; height: 100%; max-height: 80vh; overflow: hidden; padding: 0; }
 .library-sticky-header { padding: 1.5rem 1.5rem 0 1.5rem; background: var(--card); z-index: 20; border-bottom: 1px solid var(--border); }
 .table-wrapper { overflow-x: auto; flex: 1; padding: 0 1.5rem; }
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
 .q-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.q-table td.wrap-text { white-space: normal; line-height: 1.4; }
+.q-table td.wrap-text { white-space: normal; line-height: 1.4; } /* Text Wrap for Question */
 .tag-maint { background: var(--maint-bg); color: var(--maint-text); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--maint-text); display: inline-block; }
 
 /* ACTION AREA */
@@ -96,6 +96,8 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; justify-content: center; align-items: center; }
 .modal-content { background: var(--card); padding: 25px; border-radius: 12px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
 .hidden { display: none !important; }
+
+/* DRAG DROP */
 .drop-zone { position: absolute; inset: 0; background: rgba(37,99,235,0.9); color: white; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; z-index: 50; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }
