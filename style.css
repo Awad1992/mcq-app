@@ -1,4 +1,4 @@
-/* MCQ Ultra-Pro v16.1.0 CSS */
+/* MCQ Ultra-Pro v17 CSS (Practice History + Focus Mode) */
 :root {
   --primary: #2563eb; --bg: #f8fafc; --card: #ffffff;
   --text: #0f172a; --border: #e2e8f0; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
@@ -12,6 +12,19 @@ body.dark {
 
 * { box-sizing: border-box; }
 body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; transition: 0.3s; }
+
+/* FOCUS MODE */
+body.focus-mode .top-bar,
+body.focus-mode .tabs,
+body.focus-mode .col-side {
+  display: none;
+}
+body.focus-mode .tab-container {
+  padding: 10px;
+}
+body.focus-mode .col-main {
+  flex: 1 1 100%;
+}
 
 /* LAYOUT */
 .app { display: flex; flex-direction: column; height: 100%; max-width: 1400px; margin: 0 auto; }
@@ -79,15 +92,26 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 /* UI ELEMENTS */
 .question-panel { font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px; background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
 .choice { padding: 12px; background: var(--bg); border-radius: 8px; cursor: pointer; border: 2px solid transparent; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 8px; }
-.choice.selected { border-color: var(--primary); background: #eff6ff; }
+.choice.selected { border-color: var(--primary); background: rgba(37,99,235,0.12); }
 .choice.correct { background: #dcfce7; border-color: var(--success); }
 .choice.wrong { background: #fee2e2; border-color: var(--danger); }
+body.dark .choice.selected { background: rgba(37,99,235,0.45); color: #f9fafb; }
 .feedback-panel { background: #f0f9ff; border-left: 4px solid var(--primary); padding: 15px; margin-top: 15px; border-radius: 4px; }
 .maint-box { background: var(--maint-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--danger); margin-bottom: 15px; }
 .notes-textarea { width: 100%; min-height: 60px; margin-top: 5px; background: #fffbeb; color: #451a03; border: 1px solid var(--border); border-radius: 6px; }
 .srs-row { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; }
 .srs-btn { flex: 1; color: white; }
 .again { background: var(--danger); } .hard { background: var(--warning); } .good { background: var(--success); } .easy { background: var(--primary); }
+
+/* PRACTICE HISTORY BADGES */
+.history-list { display:flex; flex-wrap:wrap; gap:4px; font-size:0.75rem; }
+.hist-item { padding:4px 8px; border-radius:999px; border:1px solid var(--border); cursor:pointer; background:var(--bg); }
+.hist-unseen { opacity:0.7; }
+.hist-correct { background:#dcfce7; border-color:#16a34a; }
+.hist-wrong { background:#fee2e2; border-color:#ef4444; }
+.hist-current { box-shadow:0 0 0 2px var(--primary); }
+body.dark .hist-correct { background:#166534; }
+body.dark .hist-wrong { background:#7f1d1d; }
 
 /* DASHBOARD */
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }

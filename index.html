@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v16.1</title>
+  <title>MCQ Ultra-Pro v17</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=16.1.0">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
 </head>
@@ -14,12 +13,12 @@
 <div id="toastContainer" class="toast-container"></div>
 
 <div class="app" id="appRoot">
-  
+
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v16.1</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v17</span></h1>
         <div class="xp-wrapper">
            <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
         </div>
@@ -116,13 +115,13 @@
                <button class="srs-btn good" id="btnSrsGood">Good</button>
                <button class="srs-btn easy" id="btnSrsEasy">Easy</button>
             </div>
-            
+
             <div class="nav-row">
                <button class="secondary-btn" id="btnPrev">← Previous</button>
                <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
             </div>
           </div>
-          
+
           <div class="col-side">
              <div class="card side-card">
                 <div class="small-label">Session</div>
@@ -140,7 +139,7 @@
     <!-- 2. LIBRARY -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
-          
+
           <div class="library-sticky-header">
               <div class="filter-bar">
                  <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
@@ -159,7 +158,6 @@
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
-              <!-- ALL ACTIONS MOVED HERE -->
               <div class="row-controls action-area">
                  <div class="action-group">
                     <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
@@ -177,8 +175,7 @@
                     <button id="btnUndoReset" class="secondary-btn hidden">↩️ Undo Reset</button>
                  </div>
               </div>
-              
-              <!-- Drag Drop Zone Overlay (Hidden by default) -->
+
               <div id="dropZone" class="drop-zone hidden">Drop JSON file here to Import</div>
           </div>
 
@@ -199,7 +196,7 @@
               <tbody id="allTableBody"></tbody>
             </table>
           </div>
-          
+
           <div class="all-footer">
              <span id="selCount">0 Selected</span>
              <div class="pagination">
@@ -266,7 +263,7 @@
              <div class="dash-box"><h3>Total</h3><span id="dashTotal" class="dash-val">0</span></div>
              <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
              <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
-             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div>
+             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" classdash-val">0/day</span></div>
           </div>
           <div style="margin-top:20px; text-align:center;">
              <button id="btnRefreshStats" class="refresh-btn">↻ Refresh Stats</button>
@@ -281,7 +278,7 @@
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghFile" value="mcq_backup" class="std-input" style="width:100%; margin-bottom:10px;" title="Base backup name, timestamp will be added automatically">
-          
+
           <button id="btnSaveGh" class="primary-btn">Save Settings</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
@@ -319,11 +316,11 @@
      </div>
      <textarea id="editExplanation" class="std-textarea" rows="3" placeholder="Explanation"></textarea>
      <textarea id="editIssueNote" class="std-textarea" rows="2" placeholder="Issue note (why maintenance/error)"></textarea>
-     
+
      <div class="small-label">Choices:</div>
      <div id="editChoicesList"></div>
      <button id="btnAddChoice" class="pill-btn small" style="margin-top:5px;">+ Choice</button>
-     
+
      <div class="modal-footer">
         <button id="btnSaveEdit" class="primary-btn">Save</button>
         <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
