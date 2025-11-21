@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v16.0</title>
+  <title>MCQ Ultra-Pro v18.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=16.0.0">
+  <link rel="manifest" href="manifest.json?v=18.0.0">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
 </head>
@@ -19,7 +19,7 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v16.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">v18.0</span></h1>
         <div class="xp-wrapper">
            <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
         </div>
@@ -44,7 +44,7 @@
 
   <main class="tab-container">
 
-    <!-- 1. PRACTICE -->
+    <!-- 1. PRACTICE TAB -->
     <section id="tab-home" class="tab-content active">
       <div class="card main-layout">
         <div class="row">
@@ -70,6 +70,11 @@
                  <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
               </label>
               <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
+            </div>
+
+            <!-- Question Info Bar -->
+            <div id="qInfoBar" class="info-bar hidden">
+                <span id="qInfoID"></span> • <span id="qInfoChapter"></span> • <span id="qInfoStats"></span> • <span id="qInfoDate"></span>
             </div>
 
             <div id="maintBox" class="maint-box hidden">
@@ -125,7 +130,7 @@
                 <div id="sessionStats" class="stats-text">0 Correct</div>
              </div>
              <div class="card side-card">
-                <div class="small-label">History</div>
+                <div class="small-label">Session Questions</div>
                 <div class="history-list" id="historyList"></div>
              </div>
           </div>
@@ -148,6 +153,11 @@
                    <option value="flagged">Flagged</option>
                  </select>
                  <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
+                 
+                 <!-- Date Filters -->
+                 <input type="date" id="allDateFrom" class="std-input date-input" title="From Date">
+                 <input type="date" id="allDateTo" class="std-input date-input" title="To Date">
+                 
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
@@ -178,10 +188,13 @@
                 <tr>
                   <th width="40"><input type="checkbox" id="allSelectAll"></th>
                   <th class="sortable" data-key="id" width="60">ID ↕</th>
-                  <th class="sortable" data-key="text" width="50%">Question ↕</th>
-                  <th class="sortable" data-key="chapter" width="20%">Chapter ↕</th>
-                  <th width="80">Status</th>
-                  <th width="60">Edit</th>
+                  <th class="sortable" data-key="importedAt" width="90">Date ↕</th>
+                  <th class="sortable" data-key="text" width="40%">Question ↕</th>
+                  <th class="sortable" data-key="chapter" width="15%">Chapter ↕</th>
+                  <th width="10%">Notes</th>
+                  <th width="10%">Issue</th>
+                  <th width="60">Status</th>
+                  <th width="50">Edit</th>
                 </tr>
               </thead>
               <tbody id="allTableBody"></tbody>
@@ -274,6 +287,15 @@
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
           <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
+          
+           <!-- Backup History -->
+          <div style="margin-top:15px;">
+              <label class="small-label">Restore History</label>
+              <select id="backupHistoryList" class="std-select" style="width:100%; margin-bottom:5px;">
+                 <option value="">No backups available</option>
+              </select>
+              <button id="btnRestoreBackup" class="secondary-btn">Restore Selected</button>
+          </div>
        </div>
        <div class="card" style="margin-top:20px;">
           <h3>System</h3>
