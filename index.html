@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <title>MCQ Ultra-Pro v18.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="theme-color" content="#2563eb">
@@ -65,16 +65,16 @@
                       <option value="">All Chapters</option>
                   </select>
               </div>
-              <button id="btnRefreshPractice" class="refresh-btn">↻ Apply</button>
+              <button id="btnRefreshPractice" class="refresh-btn" title="Apply Filters">↻ Apply</button>
               <label class="check-label">
                  <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
               </label>
               <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
             </div>
 
-            <!-- Question Info Bar -->
+            <!-- Info Bar -->
             <div id="qInfoBar" class="info-bar hidden">
-                <span id="qInfoID"></span> • <span id="qInfoChapter"></span> • <span id="qInfoStats"></span> • <span id="qInfoDate"></span>
+                <span id="qInfoID"></span> • <span id="qInfoChapter"></span> • <span id="qInfoStats"></span>
             </div>
 
             <div id="maintBox" class="maint-box hidden">
@@ -240,7 +240,7 @@
           <h2>Exam Simulator</h2>
           <div class="row-controls">
              <select id="examChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
-             <input id="examCount" type="number" value="40" class="std-input" style="width:70px">
+             <input id="examCount" type="number" value="40" class="std-input" style="width:70px" placeholder="Qty">
              <button id="btnStartExam" class="primary-btn">Start Exam</button>
           </div>
        </div>
@@ -268,6 +268,10 @@
              <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
              <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
              <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div>
+             <div class="dash-box" style="grid-column: span 2;">
+                <h3>Daily Activity</h3>
+                <canvas id="activityChart" style="width:100%; height:100px;"></canvas>
+             </div>
           </div>
           <div style="margin-top:20px; text-align:center;">
              <button id="btnRefreshStats" class="refresh-btn">↻ Refresh Stats</button>
@@ -290,7 +294,7 @@
           
            <!-- Backup History -->
           <div style="margin-top:15px;">
-              <label class="small-label">Restore History</label>
+              <label class="small-label">Restore History (Last 10)</label>
               <select id="backupHistoryList" class="std-select" style="width:100%; margin-bottom:5px;">
                  <option value="">No backups available</option>
               </select>

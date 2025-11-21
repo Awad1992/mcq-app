@@ -42,6 +42,7 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 /* CONTROLS */
 .row-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 15px; }
 .std-select, .std-input, .std-textarea { padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; }
+.std-input.full { width: 100%; margin-bottom: 10px; }
 .small-label { font-size: 0.7rem; font-weight: 700; color: var(--text); opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px; }
 .flex-grow { flex: 1; }
 .date-input { max-width: 140px; }
@@ -65,11 +66,12 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
 .q-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.q-table td.wrap-text { white-space: normal; line-height: 1.4; }
+.q-table td.wrap-text { white-space: normal; line-height: 1.4; } 
 .tag-maint { background: var(--maint-bg); color: var(--maint-text); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--maint-text); display: inline-block; }
+.tag-flag { color: #dc2626; }
 
 /* ACTION AREA */
-.action-area { background: #f1f5f9; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid var(--border); }
+.action-area { background: #f1f5f9; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid var(--border); margin-top: 10px; }
 .action-group { display: flex; gap: 5px; align-items: center; }
 .spacer { flex: 1; }
 

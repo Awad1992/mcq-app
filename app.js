@@ -14,7 +14,8 @@ const App = {
     sort: { field: 'id', asc: true },
     page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
     history: [], sessionLog: [], duplicates: [],
-    user: { xp: 0, streak: 0 }
+    user: { xp: 0, streak: 0 },
+    backupHistory: []
 };
 
 // --- HELPER FUNCTIONS ---
@@ -57,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeText('streakCount', App.user.streak || 0);
         safeText('userXP', App.user.xp || 0);
+        loadBackupHistory();
         
     } catch(e) { 
         console.error(e);
@@ -109,6 +111,12 @@ function loadNextQuestion(reset) {
         if(m === 'flagged' && !q.flagged) return false;
         if(m === 'new' && q.timesSeen > 0) return false;
         if(skip && m!=='new' && m!=='maintain' && m!=='wrong' && q.timesSeen > 0) return false;
+        
+        // SM-2 Due logic
+        if(m === 'due') {
+             if(!q.dueDate || q.dueDate <= Date.now()) return true;
+             return false;
+        }
         return true;
     });
 
@@ -116,7 +124,7 @@ function loadNextQuestion(reset) {
     if(!panel) return;
 
     if(pool.length === 0) {
-        panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
+        panel.innerHTML = '<div style="padding:40px; text-align:center; color:#888;"><h3>All Caught Up! 🎉</h3><p>No questions match your filters.</p></div>';
         return;
     }
 
@@ -139,7 +147,7 @@ function renderQ() {
     const btnFlag = el('btnFlag');
     if(btnFlag) {
         btnFlag.textContent = q.flagged ? "Flagged 🚩" : "Flag ⚐";
-        btnFlag.style.color = q.flagged ? "red" : "";
+        btnFlag.style.color = q.flagged ? "var(--danger)" : "";
     }
     safeVal('userNoteArea', q.userNotes || "");
 
@@ -148,12 +156,12 @@ function renderQ() {
     safeText('qInfoID', info); 
     show('qInfoBar');
 
-    let h = `<div style="font-weight:500; font-size:1.2rem; margin-bottom:15px;">${q.text}</div>`;
-    if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; margin-bottom:10px; border-radius:8px;">`;
+    let h = `<div style="font-weight:500; font-size:1.2rem; margin-bottom:15px;">[#${q.id}] ${q.text}</div>`;
+    if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; margin-bottom:15px; border-radius:8px;">`;
 
-    (q.choices || []).forEach((c, i) => {
+    q.choices.forEach((c, i) => {
         h += `<div class="choice" id="c_${i}" onclick="selectChoice(${i})">
-          <b>${String.fromCharCode(65+i)}.</b> ${c.text}
+          <b style="margin-right:10px;">${String.fromCharCode(65+i)}</b> ${c.text}
         </div>`;
     });
     panel.innerHTML = h;
@@ -165,10 +173,10 @@ window.selectChoice = function(idx) {
         e.style.borderColor = 'transparent';
         e.style.background = 'var(--bg)';
     });
-    const elC = el('c_'+idx);
-    if(elC) {
-        elC.style.borderColor = 'var(--primary)';
-        elC.style.background = '#eff6ff';
+    const ele = el('c_'+idx);
+    if(ele) {
+        ele.style.borderColor = 'var(--primary)';
+        ele.style.background = '#eff6ff';
     }
     App.selectedChoice = idx;
 }
@@ -205,7 +213,12 @@ function showFeedback(idx, q) {
     const fb = el('feedbackPanel');
     show('feedbackPanel');
     
-    fb.innerHTML = `<strong style="color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect?'Correct!':'Wrong'}</strong><br>${q.explanation||'No explanation.'}`;
+    fb.innerHTML = `
+      <div style="padding:10px; border-radius:8px; background:${isCorrect?'#dcfce7':'#fee2e2'}; color:${isCorrect?'#166534':'#991b1b'}; font-weight:bold; margin-bottom:10px;">
+         ${isCorrect ? 'Correct! 🎉' : 'Incorrect ❌'}
+      </div>
+      <div class="explanation">${q.explanation||'No explanation provided.'}</div>
+    `;
     
     const cEl = el('c_'+correctIdx);
     if(cEl) { cEl.classList.add('correct'); cEl.style.borderColor = 'var(--success)'; }
@@ -219,7 +232,7 @@ function showFeedback(idx, q) {
 }
 
 function loadPrevQuestion() {
-    if (App.history.length === 0) return showToast("No history", "warn");
+    if (App.history.length === 0) return showToast("No history available", "warn");
     App.currentQ = App.history.pop();
     // Remove from log to avoid dupes in list
     App.sessionLog.pop(); 
@@ -252,6 +265,11 @@ function applyTableFilters() {
     const txt = el('allSearch').value.toLowerCase();
     const type = el('allFilter').value;
     const ch = el('allChapterSelect').value;
+    const dFrom = el('allDateFrom').value;
+    const dTo = el('allDateTo').value;
+
+    let fromTs = dFrom ? new Date(dFrom).getTime() : null;
+    let toTs = dTo ? new Date(dTo).getTime() : null;
     
     App.tableQs = App.questions.filter(q => {
         if(txt && !q.text.toLowerCase().includes(txt) && String(q.id) !== txt) return false;
@@ -259,20 +277,28 @@ function applyTableFilters() {
         if(type === 'maintain' && !q.maintenance) return false;
         if(type === 'notes' && !q.userNotes) return false;
         if(type === 'flagged' && !q.flagged) return false;
+        if(fromTs && (!q.importedAt || q.importedAt < fromTs)) return false;
+        if(toTs && (!q.importedAt || q.importedAt > toTs)) return false;
         return true;
     });
     App.page = 1;
+    sortCurrentTable();
     renderTable();
 }
 
-window.sortTable = function(field) {
-    App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
-    App.sort.field = field;
+function sortCurrentTable() {
+    const field = App.sort.field;
     App.tableQs.sort((a,b) => {
         let valA = a[field] || 0; let valB = b[field] || 0;
         if(typeof valA==='string') { valA=valA.toLowerCase(); valB=valB.toLowerCase(); }
         return (valA < valB ? -1 : 1) * (App.sort.asc ? 1 : -1);
     });
+}
+
+window.sortTable = function(field) {
+    App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
+    App.sort.field = field;
+    sortCurrentTable();
     renderTable();
 }
 
@@ -288,17 +314,20 @@ function renderTable() {
         const isSel = App.selectedIds.has(q.id);
         let status = '';
         if(q.maintenance) status += '<span class="tag-maint">🔧 MAINT</span> ';
-        if(q.flagged) status += '🚩 ';
+        if(q.flagged) status += '<span class="tag-flag">🚩</span> ';
         
-        const userNote = q.userNotes ? (q.userNotes.length > 20 ? '📝...' : '📝') : '';
+        const userNote = q.userNotes ? '📝' : '';
         const issue = q.maintenanceNote ? '⚠️' : '';
+        const dateStr = q.importedAt ? new Date(q.importedAt).toLocaleDateString() : '-';
 
         tr.innerHTML = `
            <td><input type="checkbox" class="row-cb" ${isSel?'checked':''} onclick="handleCheck(this, ${q.id})"></td>
            <td>${q.id}</td>
+           <td style="font-size:0.7rem; color:#666;">${dateStr}</td>
            <td class="wrap-text" title="${q.text}">${q.text.substring(0,60)}...</td>
            <td>${q.chapter||'-'}</td>
-           <td>${userNote} ${issue}</td>
+           <td>${userNote}</td>
+           <td>${issue}</td>
            <td>${status}</td>
            <td><button class="pill-btn tiny-btn" onclick="openEdit(${q.id})">✎</button></td>
         `;
@@ -320,6 +349,27 @@ window.handleCheck = function(cb, id) {
     }
     App.lastCheckId = id;
     safeText('selCount', App.selectedIds.size + " Selected");
+    renderTable();
+}
+
+window.toggleSelectAll = function(cb) {
+    const checked = cb.checked;
+    // Select ALL visible filtered items
+    App.tableQs.forEach(q => {
+        if(checked) App.selectedIds.add(q.id); else App.selectedIds.delete(q.id);
+    });
+    renderTable();
+    safeText('selCount', App.selectedIds.size + " Selected");
+}
+
+function toggleRangeMode() {
+    App.rangeMode = !App.rangeMode;
+    const btn = el('btnRangeMode');
+    if(btn) {
+        btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
+        btn.classList.toggle('range-active', App.rangeMode);
+    }
+    showToast(App.rangeMode ? "Shift-Click Enabled" : "Range OFF");
 }
 
 // --- 5. EVENTS ---
@@ -345,42 +395,42 @@ function setupEvents() {
     safeBind('btnImportTrigger', 'click', () => el('fileInput').click());
     safeBind('fileInput', 'change', handleImport);
     safeBind('btnExportTrigger', 'click', handleExport);
+    bind('btnResetDetails', 'click', openResetDialog);
     
     safeBind('btnSaveGh', 'click', saveSettings);
     safeBind('btnCloudUpload', 'click', cloudUpload);
-    safeBind('btnCloudDownload', 'click', cloudDownload);
-    safeBind('btnResetProgress', 'click', () => { if(confirm("Reset?")) { App.questions.forEach(q=>{q.timesSeen=0; saveQ(q)}); location.reload(); } });
+    safeBind('btnCloudDownload', 'click', cloudDownloadLatest);
+    safeBind('btnCloudDownloadSelected', 'click', cloudDownloadSelected);
+    safeBind('btnResetProgress', 'click', () => { if(confirm("Reset Stats?")) { App.questions.forEach(q=>{q.timesSeen=0; saveQ(q)}); location.reload(); } });
     safeBind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
     
     safeBind('btnFcShuffle', 'click', buildFlashcardPool);
-    safeBind('btnFcShow', 'click', () => show('fcBack'));
+    safeBind('btnFcShow', 'click', () => { 
+        const back = el('fcBack');
+        if(back) back.classList.remove('hidden'); 
+    });
     safeBind('btnFcAgain', 'click', () => nextFlashcard(false));
     safeBind('btnFcGood', 'click', () => nextFlashcard(true));
 
     safeBind('btnStartExam', 'click', startExam);
     safeBind('btnExamNext', 'click', () => examMove(1));
     safeBind('btnExamFinish', 'click', finishExam);
-    safeBind('btnExamClose', 'click', () => { hide('examResults'); switchTab('home'); });
+    safeBind('btnExamClose', 'click', () => { 
+        el('examResults').classList.add('hidden'); 
+        switchTab('home'); 
+    });
 
     safeBind('btnSaveEdit', 'click', saveEditModal);
-    safeBind('btnCancelEdit', 'click', () => hide('editModal'));
+    safeBind('btnCancelEdit', 'click', () => el('editModal').classList.add('hidden'));
     safeBind('btnAddChoice', 'click', () => addEditChoice('', false));
     safeBind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
 
     bind('allPrevPage', 'click', () => { if(App.page>1){App.page--; renderTable();} });
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
+    bind('allSelectAll', 'change', (e)=>toggleSelectAll(e.target));
 
     const note = el('userNoteArea');
     if(note) note.addEventListener('input', debounce(saveNote, 1000));
-
-    // Shortcuts
-    document.addEventListener('keydown', e => {
-        if(el('tab-home').classList.contains('active')) {
-             if(e.key === 'Enter') el('btnSubmit').click();
-             if(e.key === ']' || e.key === 'ArrowRight') el('btnNext').click();
-             if(e.key === '[' || e.key === 'ArrowLeft') el('btnPrev').click();
-        }
-    });
     
     // Drag Drop
     const zone = el('dropZone');
@@ -448,14 +498,21 @@ async function handleImportFile(file) {
     r.onload = async (e) => {
         try {
             const json = JSON.parse(e.target.result);
-            if(confirm(`Found ${json.length} items. Import?`)) {
-                const tx = db.transaction('questions','readwrite');
-                json.forEach(q => {
-                    q.id = parseInt(String(q.id).replace(/\D/g,'')) || Date.now();
-                    tx.objectStore('questions').put(q); 
-                });
-                tx.oncomplete = () => { loadData(); refreshUI(); showToast('Imported Successfully'); };
-            }
+            if(!confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
+
+            const tx = db.transaction('questions','readwrite');
+            const batchTs = Date.now();
+            json.forEach(q => {
+                // Always assign new ID if conflict or merge logic
+                if(!q.id || App.questions.some(x=>x.id===q.id)) q.id = batchTs + Math.floor(Math.random()*10000);
+                q.importedAt = batchTs;
+                tx.objectStore('questions').put(q);
+            });
+            tx.oncomplete = async () => { 
+                await loadData(); 
+                refreshUI(); 
+                showToast('Imported Successfully'); 
+            };
         } catch(err) { alert(err.message); }
     };
     r.readAsText(file);
@@ -464,7 +521,21 @@ function handleExport() {
     const b = new Blob([JSON.stringify(App.questions, null, 2)], {type:'application/json'});
     const u = URL.createObjectURL(b);
     const a = document.createElement('a');
-    a.href=u; a.download='MCQ_Backup.json'; a.click();
+    a.href=u; a.download='MCQ_Library_Full.json'; a.click();
+}
+
+// --- BACKUP HISTORY ---
+function loadBackupHistory() {
+    const hist = localStorage.getItem('backup_history');
+    try { App.backupHistory = JSON.parse(hist) || []; } catch(e) { App.backupHistory = []; }
+    const sel = el('backupHistoryList');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select from last 10...</option>';
+    App.backupHistory.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b; opt.textContent = b;
+        sel.appendChild(opt);
+    });
 }
 
 // --- DUPLICATES ---
@@ -489,13 +560,23 @@ async function execBulk(act) {
     tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
 }
 
+function openResetDialog() {
+    if(confirm("Reset ALL stats (Progress only)? Questions will remain.")) {
+         App.questions.forEach(q => { q.timesSeen=0; q.timesCorrect=0; q.timesWrong=0; saveQ(q); });
+         location.reload();
+    }
+}
+function undoReset() { alert("Undo not available for this action yet."); }
+
 // --- CLOUD ---
 function loadSettings() {
     const t = localStorage.getItem('gh_token');
     if(t) {
         safeSetVal('ghToken', t);
-        safeSetVal('ghRepo', localStorage.getItem('gh_repo'));
+        safeSetVal('ghRepo', localStorage.getItem('gh_repo') || '');
+        safeSetVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup');
     }
+    loadBackupHistory();
 }
 function saveSettings() {
     localStorage.setItem('gh_token', el('ghToken').value);
@@ -505,27 +586,56 @@ function saveSettings() {
 }
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deb64(s) { return decodeURIComponent(escape(atob(s))); }
+
+function makeBackupFileName() {
+    const base = el('ghFile').value || 'mcq_backup';
+    const d = new Date();
+    return `${base}_${d.getTime()}.json`;
+}
+
 async function cloudUpload() {
-    const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
-    if(!t) return alert("Check Settings");
+    const t = localStorage.getItem('gh_token') || el('ghToken').value;
+    const r = localStorage.getItem('gh_repo') || el('ghRepo').value;
+    if(!t || !r) return alert("Check Settings");
+    const f = makeBackupFileName();
     try {
         const c = b64(JSON.stringify(App.questions));
-        let sha = null;
-        try { const g = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {headers:{Authorization:`token ${t}`}}); if(g.ok) sha = (await g.json()).sha; } catch(e){}
-        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, { method:'PUT', headers:{Authorization:`token ${t}`, 'Content-Type':'application/json'}, body:JSON.stringify({message:'Backup', content:c, sha}) });
-        if(res.ok) showToast('Uploaded ✅'); else alert('Error');
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {
+            method:'PUT',
+            headers:{Authorization:`token ${t}`, 'Content-Type':'application/json'},
+            body:JSON.stringify({message:'MCQ Backup', content:c})
+        });
+        if(res.ok) {
+            App.backupHistory.unshift(f);
+            if(App.backupHistory.length > 10) App.backupHistory.pop();
+            localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
+            loadBackupHistory();
+            showToast('Uploaded ✅');
+        } else {
+            alert('Upload Error');
+        }
     } catch(e) { alert(e.message); }
 }
-async function cloudDownload() {
-    const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
-    if(!t) return alert("Check Settings");
+async function cloudDownloadLatest() {
+    if(App.backupHistory.length === 0) return alert("No history. Sync first.");
+    await cloudDownloadFile(App.backupHistory[0]);
+}
+async function cloudDownloadSelected() {
+    const val = el('backupHistoryList').value;
+    if(!val) return;
+    await cloudDownloadFile(val);
+}
+async function cloudDownloadFile(fn) {
+    const t = localStorage.getItem('gh_token');
+    const r = localStorage.getItem('gh_repo');
     try {
-        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {headers:{Authorization:`token ${t}`}});
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${fn}`, {headers:{Authorization:`token ${t}`}});
         if(!res.ok) throw new Error('Failed');
-        const d = JSON.parse(deb64((await res.json()).content));
+        const d = await res.json();
+        const decoded = JSON.parse(deb64(d.content));
         const tx = db.transaction('questions','readwrite');
-        d.forEach(q => tx.objectStore('questions').put(q));
-        tx.oncomplete = () => { loadData(); refreshUI(); showToast('Downloaded'); };
+        decoded.forEach(q => tx.objectStore('questions').put(q));
+        tx.oncomplete = () => { loadData().then(()=>{ refreshUI(); showToast('Restored!'); }); };
     } catch(e) { alert(e.message); }
 }
 
@@ -551,14 +661,14 @@ function nextFlashcard(good) { if(fcIdx < fcPool.length -1) fcIdx++; else fcIdx 
 let examSession = null;
 function startExam() {
     const count = parseInt(el('examCount').value) || 40;
-    const pool = App.questions.sort(() => Math.random()-0.5).slice(0, count);
+    const pool = [...App.questions].sort(() => Math.random()-0.5).slice(0, count);
     examSession = { qs: pool, answers: {}, index: 0 };
     show('examInterface');
     renderExamQ();
 }
 function renderExamQ() {
     const q = examSession.qs[examSession.index];
-    safeSetText('examProgress', `Q ${examSession.index+1}/${examSession.qs.length}`);
+    safeSetText('examProgress', `${examSession.index+1}/${examSession.qs.length}`);
     let h = `<div class="q-text">${q.text}</div>`;
     (q.choices||[]).forEach((c, i) => h += `<label class="choice"><input type="radio" name="exAns" value="${i}"> ${c.text}</label>`);
     el('examQPanel').innerHTML = h;
@@ -590,8 +700,10 @@ window.openEdit = (id) => {
     el('editModal').dataset.id = id;
     el('editText').value = q.text || '';
     el('editChapter').value = q.chapter || '';
-    el('editMaint').checked = !!q.maintenance;
+    el('editTags').value = q.tags || '';
     el('editExplanation').value = q.explanation || '';
+    el('editMaint').checked = !!q.maintenance;
+
     const list = el('editChoicesList'); list.innerHTML='';
     (q.choices||[]).forEach(c => addEditChoice(c.text, c.isCorrect));
 };
@@ -605,10 +717,15 @@ function saveEditModal() {
     const q = App.questions.find(x=>x.id===id);
     q.text = el('editText').value;
     q.chapter = el('editChapter').value;
+    q.tags = el('editTags').value;
     q.maintenance = el('editMaint').checked;
     q.explanation = el('editExplanation').value;
     const ch = [];
-    document.querySelectorAll('.edit-choice-row').forEach(r => ch.push({ text:r.querySelector('input.std-input').value, isCorrect:r.querySelector('input[type="radio"]').checked }));
+    document.querySelectorAll('.edit-choice-row').forEach(r => {
+        const txt = r.querySelector('input.std-input').value;
+        const isC = r.querySelector('input[type="radio"]').checked;
+        ch.push({ text:txt, isCorrect:isC });
+    });
     q.choices = ch;
     saveQ(q);
     hide('editModal');
@@ -628,11 +745,13 @@ function renderDashboard() {
     const mastered = App.questions.filter(q => (q.timesCorrect||0) > 3).length;
     safeSetText('dashTotal', total);
     safeSetText('dashMastery', Math.round((mastered/total)*100 || 0) + '%');
+    safeSetText('dashMaint', App.questions.filter(q=>q.maintenance).length);
 }
 function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
     el(`tab-${id}`).classList.add('active');
+    document.querySelector(`.tab-button[data-tab="${id}"]`).classList.add('active');
     if(id==='all') applyTableFilters();
     if(id==='dashboard') renderDashboard();
 }
