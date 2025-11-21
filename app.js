@@ -1,5 +1,5 @@
-    /**
- * MCQ Ultra-Pro v15.1 (Final Integrity)
+/**
+ * MCQ Ultra-Pro v15.0 (Final Integrity)
  * Validated: All Buttons, IDs, Null Checks, Imports, Nav Logic.
  */
 
@@ -13,8 +13,7 @@ const App = {
     filter: { search: '', status: 'all', chapter: '', mode: 'due' },
     sort: { field: 'id', asc: true },
     page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
-    history: [], duplicates: [],
-    user: { xp: 0, streak: 0 }
+    history: [], duplicates: [], user: { xp: 0, streak: 0 }
 };
 
 // --- HELPER FUNCTIONS ---
@@ -31,7 +30,6 @@ function showToast(msg, type='success') {
 function bind(id, ev, fn) { 
     const el = document.getElementById(id); 
     if(el) el.addEventListener(ev, fn); 
-    else console.warn("Missing ID:", id);
 }
 function safeSetText(id, val) {
     const el = document.getElementById(id);
@@ -57,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
-        showToast('System v15.1 Ready 💎');
+        showToast('System v15.0 Ready 💎');
         
         // Update Streak
         safeSetText('streakCount', App.user.streak);
@@ -210,11 +208,11 @@ function showFeedback(idx, q) {
     document.getElementById('srsButtons').classList.remove('hidden');
 }
 
-function loadPrevQuestion() {
-    if (App.history.length === 0) return showToast("No history", "warn");
-    App.currentQ = App.history.pop();
-    renderQ();
-    if(App.currentQ.lastChoice !== undefined) showFeedback(App.currentQ.lastChoice, App.currentQ);
+function updateXP(amount) {
+    App.user.xp = (App.user.xp || 0) + amount;
+    safeSetText('userXP', App.user.xp);
+    const tx = db.transaction('user', 'readwrite');
+    tx.objectStore('user').put({ key: 'stats', ...App.user });
 }
 
 // --- 4. LIBRARY TABLE ---
@@ -339,7 +337,10 @@ function setupEvents() {
     bind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
     
     bind('btnFcShuffle', 'click', buildFlashcardPool);
-    bind('btnFcShow', 'click', () => document.getElementById('fcBack').style.display='block');
+    bind('btnFcShow', 'click', () => { 
+        const back = document.getElementById('fcBack');
+        if(back) back.style.display='block'; 
+    });
     bind('btnFcAgain', 'click', () => nextFlashcard(false));
     bind('btnFcGood', 'click', () => nextFlashcard(true));
 
