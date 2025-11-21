@@ -40,6 +40,13 @@ function show(id) { const e=el(id); if(e) e.classList.remove('hidden'); }
 function hide(id) { const e=el(id); if(e) e.classList.add('hidden'); }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
+// NEW HELPERS
+function safeSetText(id, val) { const e = el(id); if (e) e.textContent = val; }
+function safeBind(id, ev, fn) {
+    const element = el(id);
+    if (element) element.addEventListener(ev, fn);
+}
+
 // --- 1. INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -86,6 +93,13 @@ async function loadData() {
         tx.objectStore('user').get('stats').onsuccess = (e) => { if(e.target.result) App.user = e.target.result; };
         tx.oncomplete = resolve;
     });
+}
+
+// --- SAVE USER ---
+function saveUser() {
+    if (!db) return;
+    const tx = db.transaction('user', 'readwrite');
+    tx.objectStore('user').put({ key: 'stats', ...App.user });
 }
 
 // --- 3. PRACTICE ENGINE ---
@@ -333,8 +347,8 @@ function renderTable() {
         `;
         tbody.appendChild(tr);
     });
-    safeText('allPageInfo', App.page);
-    safeText('selCount', App.selectedIds.size + " Selected");
+    safeSetText('allPageInfo', App.page);
+    safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
 window.handleCheck = function(cb, id) {
@@ -348,7 +362,7 @@ window.handleCheck = function(cb, id) {
         if(cb.checked) App.selectedIds.add(id); else App.selectedIds.delete(id);
     }
     App.lastCheckId = id;
-    safeText('selCount', App.selectedIds.size + " Selected");
+    safeSetText('selCount', App.selectedIds.size + " Selected");
     renderTable();
 }
 
@@ -359,13 +373,13 @@ window.toggleSelectAll = function(cb) {
         if(checked) App.selectedIds.add(q.id); else App.selectedIds.delete(q.id);
     });
     renderTable();
-    safeText('selCount', App.selectedIds.size + " Selected");
+    safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
 function toggleRangeMode() {
     App.rangeMode = !App.rangeMode;
     const btn = el('btnRangeMode');
-    if(btn) {
+    if (btn) {
         btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
         btn.classList.toggle('range-active', App.rangeMode);
     }
@@ -391,6 +405,12 @@ function setupEvents() {
     safeBind('btnScanDup', 'click', scanDuplicates);
     safeBind('btnFixDup', 'click', fixDuplicates);
     safeBind('btnBulkDelete', 'click', () => execBulk('delete'));
+
+    // SRS buttons
+    safeBind('btnSrsAgain', 'click', () => handleSRS(1));
+    safeBind('btnSrsHard',  'click', () => handleSRS(2));
+    safeBind('btnSrsGood',  'click', () => handleSRS(3));
+    safeBind('btnSrsEasy',  'click', () => handleSRS(4));
 
     safeBind('btnImportTrigger', 'click', () => el('fileInput').click());
     safeBind('fileInput', 'change', handleImport);
@@ -497,7 +517,8 @@ async function handleImportFile(file) {
     r.onload = async (e) => {
         try {
             const json = JSON.parse(e.target.result);
-            if(confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
+            // confirm before import
+            if(!confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
 
             const existingIds = new Set(App.questions.map(q=>q.id));
             const tx = db.transaction('questions','readwrite');
@@ -763,11 +784,4 @@ function refreshUI() {
     const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();
     const h = '<option value="">All Chapters</option>' + chaps.map(c=>`<option value="${c}">${c}</option>`).join('');
     document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
-}
-function toggleRangeMode() {
-    App.rangeMode = !App.rangeMode;
-    const btn = el('btnRangeMode');
-    btn.textContent = App.rangeMode ? "✨ Range: ON" : "✨ Range: OFF";
-    btn.classList.toggle('range-active', App.rangeMode);
-    showToast(App.rangeMode ? "Shift-Click Enabled" : "Range OFF");
 }
