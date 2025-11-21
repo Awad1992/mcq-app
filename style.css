@@ -44,6 +44,8 @@ body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: va
 .std-select, .std-input, .std-textarea { padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; }
 .small-label { font-size: 0.7rem; font-weight: 700; color: var(--text); opacity: 0.7; text-transform: uppercase; display: block; margin-bottom: 4px; }
 .flex-grow { flex: 1; }
+.date-input, .time-input { max-width: 130px; }
+.maint-type-row { display:flex; flex-wrap:wrap; gap:10px; font-size:0.8rem; margin:6px 0; }
 
 /* BUTTONS */
 button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; padding: 8px 16px; transition: 0.2s; font-family: inherit; }
@@ -64,16 +66,15 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .q-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; table-layout: fixed; }
 .q-table th { background: var(--bg); padding: 12px; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; position: sticky; top: 0; z-index: 10; white-space: nowrap; overflow: hidden; }
 .q-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
-.q-table td.wrap-text { white-space: normal; line-height: 1.4; } /* Text Wrap for Question */
+.q-table td.wrap-text { white-space: normal; line-height: 1.4; }
 .tag-maint { background: var(--maint-bg); color: var(--maint-text); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid var(--maint-text); display: inline-block; }
+.tag-error { background: #fef9c3; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid #f59e0b; display: inline-block; }
+.tag-flag { font-size:0.8rem; }
 
 /* ACTION AREA */
 .action-area { background: #f1f5f9; padding: 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid var(--border); }
 .action-group { display: flex; gap: 5px; align-items: center; }
 .spacer { flex: 1; }
-
-/* RESET AREA */
-.reset-area { background: #fefce8; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--warning); align-items: center; }
 
 /* UI ELEMENTS */
 .question-panel { font-size: 1.1rem; line-height: 1.6; margin-bottom: 20px; background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid var(--border); }
@@ -83,7 +84,6 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .choice.wrong { background: #fee2e2; border-color: var(--danger); }
 .feedback-panel { background: #f0f9ff; border-left: 4px solid var(--primary); padding: 15px; margin-top: 15px; border-radius: 4px; }
 .maint-box { background: var(--maint-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--danger); margin-bottom: 15px; }
-.maint-type-row { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
 .notes-textarea { width: 100%; min-height: 60px; margin-top: 5px; background: #fffbeb; color: #451a03; border: 1px solid var(--border); border-radius: 6px; }
 .srs-row { margin-top: 20px; display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 15px; }
 .srs-btn { flex: 1; color: white; }
@@ -95,12 +95,6 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 .dash-val { font-size: 2rem; font-weight: 800; color: var(--primary); }
 .dash-val.warning { color: var(--warning); }
 
-/* BACKUPS */
-.backup-list { margin-top: 10px; max-height: 200px; overflow-y: auto; font-size: 0.85rem; }
-.backup-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
-.backup-meta { flex: 1; }
-.backup-actions { display: flex; gap: 6px; }
-
 /* TOAST & MODAL */
 .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
 .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px rgba(0,0,0,0.2); }
@@ -110,5 +104,9 @@ button { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; pa
 
 /* DRAG DROP */
 .drop-zone { position: absolute; inset: 0; background: rgba(37,99,235,0.9); color: white; display: flex; justify-content: center; align-items: center; font-size: 1.5rem; z-index: 50; }
+
+/* FLASHCARDS */
+.flashcard { margin-top:20px; padding:20px; border-radius:12px; border:1px solid var(--border); background:var(--card); min-height:120px; }
+.fc-actions { margin-top:12px; display:flex; gap:10px; justify-content:center; }
 
 @media (max-width: 800px) { .row { flex-direction: column; } .top-bar { flex-direction: column; align-items: flex-start; } }

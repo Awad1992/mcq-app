@@ -1,33 +1,21 @@
 /**
- * MCQ Ultra-Pro v16.1 (Final Integrity + Error/Maintenance + Resets + Backups)
+ * MCQ Ultra-Pro v16.1 (Enhanced Issue + Import/Export + Reset/Backup)
  */
 
 const DB_NAME = 'mcq_pro_v15';
-const DB_VERSION = 25; 
+const DB_VERSION = 26; 
 let db = null;
 
 const App = {
-    questions: [],
-    tableQs: [],
-    selectedIds: new Set(),
-    currentQ: null,
+    questions: [], tableQs: [], selectedIds: new Set(), currentQ: null, 
     selectedChoice: null,
-    filter: { search: '', status: 'all', chapter: '', mode: 'due' },
+    filter: { search: '', status: 'all', chapter: '' },
     sort: { field: 'id', asc: true },
-    page: 1,
-    limit: 50,
-    rangeMode: false,
-    lastCheckId: null,
-    skipSolved: true,
-    history: [],
-    duplicates: [],
-    user: { xp: 0, streak: 0 },
-    sessionIds: new Set()
+    page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
+    history: [], duplicates: [], user: { xp: 0, streak: 0 },
+    lastResetBackup: null, resetTimer: null,
+    backupHistory: []
 };
-
-let resetTimer = null;
-let resetCountdownInterval = null;
-let lastResetPlan = null;
 
 // --- HELPER FUNCTIONS ---
 function showToast(msg, type='success') {
@@ -54,18 +42,7 @@ function safeSetVal(id, val) {
 }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
-function normalizeQuestions() {
-    const now = Date.now();
-    (App.questions || []).forEach(q => {
-        if(!q.createdAt) q.createdAt = now;
-        if(!q.importedAt) q.importedAt = q.createdAt;
-        if(q.timesSeen == null) q.timesSeen = 0;
-        if(q.timesCorrect == null) q.timesCorrect = 0;
-        if(q.timesWrong == null) q.timesWrong = 0;
-        if(q.error && q.maintenance) q.maintenance = false; // enforce mutual exclusivity
-        if(q.flagged == null) q.flagged = false;
-    });
-}
+function nowTs() { return Date.now(); }
 
 // --- 1. INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
@@ -76,7 +53,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadSettings();
         setupEvents();
         refreshUI();
-        renderBackupList();
         
         buildFlashcardPool();
         loadNextQuestion(true);
@@ -85,10 +61,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         checkCloud();
         showToast('System v16.1 Ready 💎');
         
-        // Update Streak / XP
         safeSetText('streakCount', App.user.streak || 0);
         safeSetText('userXP', App.user.xp || 0);
-        
+        loadBackupHistoryUI();
     } catch(e) { 
         console.error(e);
         alert("Init Error: "+e.message); 
@@ -117,6 +92,27 @@ async function loadData() {
     });
 }
 
+// normalize legacy fields -> new structure
+function normalizeQuestions() {
+    App.questions.forEach(q => {
+        if(!q.status) {
+            if(q.maintenance) q.status = 'maintenance';
+            else if(q.error) q.status = 'error';
+            else q.status = 'none';
+        }
+        if(!q.importedAt) {
+            // if created before import tracking, mark with 0
+            q.importedAt = q.importedAt || 0;
+        }
+        if(q.maintenanceNote && !q.issueNote) {
+            q.issueNote = q.maintenanceNote;
+        }
+        if(Array.isArray(q.tags)) {
+            q.tags = q.tags.join(', ');
+        }
+    });
+}
+
 // --- 3. PRACTICE ENGINE ---
 function loadNextQuestion(reset) {
     if(reset) App.history = [];
@@ -134,7 +130,7 @@ function loadNextQuestion(reset) {
         if(q.active === false) return false;
         if(m === 'chapter' && c && q.chapter !== c) return false;
         if(m === 'wrong' && (!q.timesWrong || q.timesWrong === 0)) return false;
-        if(m === 'maintain' && !q.maintenance) return false;
+        if(m === 'maintain' && q.status !== 'maintenance') return false;
         if(m === 'flagged' && !q.flagged) return false;
         if(m === 'new' && q.timesSeen > 0) return false;
         if(skip && m!=='new' && m!=='maintain' && m!=='wrong' && q.timesSeen > 0) return false;
@@ -157,7 +153,6 @@ function loadNextQuestion(reset) {
 function renderQ() {
     const q = App.currentQ;
     const panel = document.getElementById('questionPanel');
-    if(!panel || !q) return;
     
     document.getElementById('feedbackPanel').classList.add('hidden');
     document.getElementById('srsButtons').classList.add('hidden');
@@ -183,39 +178,36 @@ function renderQ() {
     panel.innerHTML = h;
 }
 
-function selectChoice(idx) {
+window.selectChoice = function(idx) {
     if(!document.getElementById('feedbackPanel').classList.contains('hidden')) return;
     document.querySelectorAll('.choice').forEach(e => {
-        e.style.borderColor = 'transparent';
-        e.style.background = 'var(--bg)';
+        e.classList.remove('selected');
     });
     const el = document.getElementById('c_'+idx);
     if(el) {
-        el.style.borderColor = 'var(--primary)';
-        el.style.background = '#eff6ff';
+        el.classList.add('selected');
     }
     App.selectedChoice = idx;
-}
+};
 
 function submitAnswer() {
     if(App.selectedChoice === null || App.selectedChoice === undefined) return alert("Select an answer");
     const q = App.currentQ;
-    if(!q) return;
     q.lastChoice = App.selectedChoice; 
     
     showFeedback(App.selectedChoice, q);
     
     const isCorrect = q.choices[App.selectedChoice].isCorrect;
     q.timesSeen = (q.timesSeen||0) + 1;
+    q.lastSeenAt = nowTs();
     if(isCorrect) {
         q.timesCorrect = (q.timesCorrect||0)+1;
         updateXP(10);
     } else {
         q.timesWrong = (q.timesWrong||0)+1;
     }
-    q.lastSeenAt = Date.now();
-    if(!q.dueDate) q.dueDate = Date.now();
-    App.sessionIds.add(q.id);
+    
+    if(!q.dueDate) q.dueDate = nowTs();
     saveQ(q);
 }
 
@@ -250,34 +242,68 @@ function applyTableFilters() {
     const txt = document.getElementById('allSearch').value.toLowerCase();
     const type = document.getElementById('allFilter').value;
     const ch = document.getElementById('allChapterSelect').value;
+    const dFrom = document.getElementById('allDateFrom').value;
+    const dTo = document.getElementById('allDateTo').value;
+    const tFrom = document.getElementById('allTimeFrom').value;
+    const tTo = document.getElementById('allTimeTo').value;
+
+    let fromTs = null, toTs = null;
+    if(dFrom) {
+        const base = new Date(dFrom + 'T00:00:00');
+        fromTs = base.getTime();
+        if(tFrom) {
+            const [h,m] = tFrom.split(':');
+            base.setHours(parseInt(h||'0'), parseInt(m||'0'), 0, 0);
+            fromTs = base.getTime();
+        }
+    }
+    if(dTo) {
+        const base = new Date(dTo + 'T23:59:59');
+        if(tTo) {
+            const [h,m] = tTo.split(':');
+            base.setHours(parseInt(h||'23'), parseInt(m||'59'), 59, 999);
+        }
+        toTs = base.getTime();
+    }
     
     App.tableQs = App.questions.filter(q => {
         if(txt && !q.text.toLowerCase().includes(txt) && String(q.id) !== txt) return false;
         if(ch && q.chapter !== ch) return false;
-        if(type === 'maintain' && !q.maintenance) return false;
-        if(type === 'error' && !q.error) return false;
+        if(type === 'maintain' && q.status !== 'maintenance') return false;
         if(type === 'notes' && !q.userNotes) return false;
+        if(type === 'error' && q.status !== 'error') return false;
         if(type === 'flagged' && !q.flagged) return false;
+        if(fromTs !== null) {
+            if(!q.importedAt || q.importedAt < fromTs) return false;
+        }
+        if(toTs !== null) {
+            if(!q.importedAt || q.importedAt > toTs) return false;
+        }
         return true;
     });
     App.page = 1;
+    sortCurrentTable();
     renderTable();
 }
 
-function sortTable(field) {
-    App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
-    App.sort.field = field;
+function sortCurrentTable() {
+    const field = App.sort.field;
     App.tableQs.sort((a,b) => {
         let valA = a[field] || 0; let valB = b[field] || 0;
         if(typeof valA==='string') { valA=valA.toLowerCase(); valB=valB.toLowerCase(); }
         return (valA < valB ? -1 : 1) * (App.sort.asc ? 1 : -1);
     });
+}
+
+function sortTable(field) {
+    App.sort.asc = (App.sort.field === field) ? !App.sort.asc : true;
+    App.sort.field = field;
+    sortCurrentTable();
     renderTable();
 }
 
 function renderTable() {
     const tbody = document.getElementById('allTableBody');
-    if(!tbody) return;
     tbody.innerHTML = '';
     const start = (App.page - 1) * App.limit;
     const data = App.tableQs.slice(start, start + App.limit);
@@ -285,16 +311,13 @@ function renderTable() {
     data.forEach(q => {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
-
-        let statusParts = [];
-        if(q.error) statusParts.push('<span class="tag-maint">❌ ERROR</span>');
-        else if(q.maintenance) statusParts.push('<span class="tag-maint">🔧 MAINT</span>');
-        if(q.flagged) statusParts.push('🚩');
-        const status = statusParts.join(' ');
-
+        let status = '';
+        if(q.status === 'maintenance') status += '<span class="tag-maint">🔧 MAINT</span> ';
+        if(q.status === 'error') status += '<span class="tag-error">⛔ ERROR</span> ';
+        if(q.flagged) status += '<span class="tag-flag">🚩</span> ';
+        
         const userNote = q.userNotes ? (q.userNotes.length > 30 ? q.userNotes.substring(0, 30) + '...' : q.userNotes) : '-';
-        const issueFull = q.error ? (q.errorNote || '') : (q.maintenanceNote || '');
-        const issuePreview = issueFull ? (issueFull.length > 30 ? issueFull.substring(0,30)+'...' : issueFull) : '-';
+        const issueNote = q.issueNote ? (q.issueNote.length > 30 ? q.issueNote.substring(0, 30) + '...' : q.issueNote) : '-';
 
         tr.innerHTML = `
            <td><input type="checkbox" class="row-cb" ${isSel?'checked':''} onclick="handleCheck(this, ${q.id})"></td>
@@ -302,7 +325,7 @@ function renderTable() {
            <td class="wrap-text" title="${q.text}">${q.text.substring(0,60)}...</td>
            <td>${q.chapter||'-'}</td>
            <td title="${q.userNotes || ''}">${userNote}</td>
-           <td title="${issueFull}">${issuePreview}</td>
+           <td title="${q.issueNote || ''}">${issueNote}</td>
            <td>${status}</td>
            <td><button class="pill-btn tiny-btn" onclick="openEdit(${q.id})">✎</button></td>
         `;
@@ -312,7 +335,7 @@ function renderTable() {
     safeSetText('selCount', App.selectedIds.size + " Selected");
 }
 
-function handleCheck(cb, id) {
+window.handleCheck = function(cb, id) {
     if(App.rangeMode && App.lastCheckId !== null && cb.checked) {
         const all = App.tableQs.map(q=>q.id);
         const s = all.indexOf(App.lastCheckId);
@@ -325,7 +348,7 @@ function handleCheck(cb, id) {
     App.lastCheckId = id;
     safeSetText('selCount', App.selectedIds.size + " Selected");
     renderTable();
-}
+};
 
 function toggleSelectAll(cb) {
     const checked = cb.checked;
@@ -352,7 +375,7 @@ function toggleRangeMode() {
 function setupEvents() {
     bind('btnSubmit', 'click', submitAnswer);
     bind('btnNext', 'click', () => loadNextQuestion(false));
-    bind('btnPrev', 'click', () => loadNextQuestion(false));
+    bind('btnPrev', 'click', () => { if(App.history.length>0){ App.currentQ = App.history.pop(); renderQ(); }});
     bind('btnFlag', 'click', () => { if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } });
     bind('btnMaintain', 'click', toggleMaintenance);
     bind('btnSaveMaint', 'click', saveMaintenanceNote);
@@ -369,22 +392,20 @@ function setupEvents() {
     bind('btnImportTrigger', 'click', () => document.getElementById('fileInput').click());
     bind('fileInput', 'change', handleImport);
     bind('btnExportTrigger', 'click', handleExport);
-
-    bind('btnApplyReset', 'click', handleResetClick);
+    bind('btnResetDetails', 'click', openResetDialog);
+    bind('btnUndoReset', 'click', undoReset);
     
     bind('btnSaveGh', 'click', saveSettings);
     bind('btnCloudUpload', 'click', cloudUpload);
-    bind('btnCloudDownload', 'click', cloudDownload);
-    bind('btnResetProgress', 'click', () => { if(confirm("Reset ALL stats?")) { App.questions.forEach(q=>{q.timesSeen=0; q.timesCorrect=0; q.timesWrong=0; q.dueDate=null; saveQ(q)}); location.reload(); } });
+    bind('btnCloudDownload', 'click', cloudDownloadLatest);
+    bind('btnCloudDownloadSelected', 'click', cloudDownloadSelected);
+    bind('btnResetProgress', 'click', () => { if(confirm("Reset all stats (timesSeen/timesWrong/timesCorrect)?")) { App.questions.forEach(q=>{q.timesSeen=0; q.timesWrong=0; q.timesCorrect=0; saveQ(q)}); location.reload(); } });
     bind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
-    bind('btnForceReload', 'click', () => location.reload());
-
-    bind('btnCreateLocalBackup', 'click', () => createLocalBackup('manual'));
     
     bind('btnFcShuffle', 'click', buildFlashcardPool);
     bind('btnFcShow', 'click', () => { 
         const back = document.getElementById('fcBack');
-        if(back) back.classList.remove('hidden');
+        if(back) back.classList.remove('hidden'); 
     });
     bind('btnFcAgain', 'click', () => nextFlashcard(false));
     bind('btnFcGood', 'click', () => nextFlashcard(true));
@@ -399,13 +420,8 @@ function setupEvents() {
 
     bind('btnSaveEdit', 'click', saveEditModal);
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
-    bind('btnAddChoice', 'click', () => addEditChoice());
+    bind('btnAddChoice', 'click', () => addEditChoice('', false));
     bind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
-
-    bind('btnRefreshStats', 'click', renderDashboard);
-
-    const selAll = document.getElementById('allSelectAll');
-    if(selAll) selAll.addEventListener('click', (e)=>toggleSelectAll(e.target));
 
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
     document.querySelectorAll('.sortable').forEach(th => { th.addEventListener('click', () => sortTable(th.dataset.key)); });
@@ -414,7 +430,9 @@ function setupEvents() {
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
 
     const note = document.getElementById('userNoteArea');
-    if(note) note.addEventListener('input', debounce(saveNote, 1000));
+    if(note) note.addEventListener('input', debounce(saveNote, 800));
+    
+    bind('allSelectAll', 'change', (e)=>toggleSelectAll(e.target));
 }
 
 // --- UTILS ---
@@ -425,38 +443,29 @@ function saveQ(q) {
 
 function toggleMaintenance() {
     const box = document.getElementById('maintBox');
-    if(!box || !App.currentQ) return;
     if(box.classList.contains('hidden')) {
         box.classList.remove('hidden');
-        const type = App.currentQ.error ? 'error' : (App.currentQ.maintenance ? 'maint' : 'maint');
+        document.getElementById('maintNote').value = App.currentQ.issueNote || '';
+        const type = App.currentQ.status || 'none';
         const radios = document.querySelectorAll('input[name="maintType"]');
-        radios.forEach(r => { r.checked = (r.value === type); });
-        document.getElementById('maintNote').value = App.currentQ.error ? (App.currentQ.errorNote||'') : (App.currentQ.maintenanceNote || '');
+        radios.forEach(r => { r.checked = (r.value === type) || (type==='none' && r.value==='maintenance'); });
     } else {
         box.classList.add('hidden');
     }
 }
 
 function saveMaintenanceNote() {
-    if(!App.currentQ) return;
-    const note = document.getElementById('maintNote').value.trim();
-    const typeEl = document.querySelector('input[name="maintType"]:checked');
-    if(!typeEl) { alert('Select Error or Maintenance'); return; }
-    const t = typeEl.value;
-    if(t === 'error') {
-        App.currentQ.error = true;
-        App.currentQ.errorNote = note;
-        App.currentQ.maintenance = false;
-    } else {
-        App.currentQ.maintenance = true;
-        App.currentQ.maintenanceNote = note;
-        App.currentQ.error = false;
+    if(App.currentQ) {
+        const radios = document.querySelectorAll('input[name="maintType"]');
+        let status = 'none';
+        radios.forEach(r => { if(r.checked) status = r.value; });
+        App.currentQ.status = status;
+        App.currentQ.issueNote = document.getElementById('maintNote').value || '';
+        saveQ(App.currentQ);
+        alert("Issue Mark Saved");
+        document.getElementById('maintBox').classList.add('hidden');
+        applyTableFilters();
     }
-    saveQ(App.currentQ);
-    showToast('Issue saved');
-    document.getElementById('maintBox').classList.add('hidden');
-    renderQ();
-    if(document.getElementById('tab-all').classList.contains('active')) applyTableFilters();
 }
 
 function saveNoteManual() {
@@ -475,23 +484,13 @@ function saveNote() {
         setTimeout(()=>safeSetText('saveNoteStatus', ""), 2000);
     }
 }
+
 function checkCloud() {
     const t = localStorage.getItem('gh_token');
     if(t) safeSetText('syncStatus', "Cloud: Linked");
 }
 
 // --- IMPORT/EXPORT ---
-function generateNewId(existingIds) {
-    let max = 0;
-    existingIds.forEach(id => {
-        if(typeof id === 'number' && id > max) max = id;
-    });
-    let next = max > 0 ? max + 1 : Date.now();
-    while(existingIds.has(next)) next++;
-    existingIds.add(next);
-    return next;
-}
-
 async function handleImport() {
     const f = document.getElementById('fileInput').files[0];
     if(!f) return;
@@ -499,37 +498,35 @@ async function handleImport() {
     r.onload = async (e) => {
         try {
             const json = JSON.parse(e.target.result);
-            if(!Array.isArray(json)) throw new Error('JSON must be an array of questions');
-            if(!confirm(`Found ${json.length} items. Import (merge, never replace)?`)) return;
+            if(!Array.isArray(json)) throw new Error("JSON must be an array of questions");
+            if(!confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
 
-            const existingIds = new Set(App.questions.map(q => q.id));
-            const now = Date.now();
+            const existingIds = new Set(App.questions.map(q=>q.id));
             const tx = db.transaction('questions','readwrite');
+            let maxId = Math.max(0, ...Array.from(existingIds));
+            const batchTs = nowTs();
 
             json.forEach(raw => {
-                const q = { ...raw };
-                let candidateId = parseInt(String(q.id || '').replace(/\D/g,''),10);
-                if(!candidateId || existingIds.has(candidateId)) {
-                    candidateId = generateNewId(existingIds);
-                } else {
-                    existingIds.add(candidateId);
+                const q = {...raw};
+                // never replace existing question
+                if(!q.id || existingIds.has(q.id)) {
+                    maxId += 1;
+                    q.id = maxId;
                 }
-                q.id = candidateId;
+                existingIds.add(q.id);
 
-                if(!q.createdAt) q.createdAt = now;
-                if(!q.importedAt) q.importedAt = now;
-                if(q.timesSeen == null) q.timesSeen = 0;
-                if(q.timesCorrect == null) q.timesCorrect = 0;
-                if(q.timesWrong == null) q.timesWrong = 0;
+                if(!q.importedAt || q.importedAt === 0) q.importedAt = batchTs;
+                if(!q.status) q.status = 'none';
+                if(q.maintenance && !q.status) q.status = 'maintenance';
+                if(Array.isArray(q.tags)) q.tags = q.tags.join(', ');
 
                 tx.objectStore('questions').put(q);
             });
-
             tx.oncomplete = async () => { 
                 await loadData(); 
                 normalizeQuestions();
                 refreshUI(); 
-                showToast('Imported Successfully (merged, no replacement)'); 
+                showToast('Imported Successfully'); 
             };
         } catch(err) { alert(err.message); }
     };
@@ -537,319 +534,219 @@ async function handleImport() {
 }
 function handleExport() {
     const enriched = App.questions.map(q => {
-        const copy = { ...q };
-        const seen = copy.timesSeen || 0;
-        const correct = copy.timesCorrect || 0;
-        copy.successRate = seen ? Math.round((correct/seen)*100) : null;
-        return copy;
+        const total = (q.timesSeen || 0);
+        const correct = (q.timesCorrect || 0);
+        const successRate = total > 0 ? Math.round((correct/total)*100) : null;
+        return { ...q, successRate };
     });
     const b = new Blob([JSON.stringify(enriched, null, 2)], {type:'application/json'});
     const u = URL.createObjectURL(b);
     const a = document.createElement('a');
-    a.href=u; a.download='MCQ_Backup.json'; a.click();
-    URL.revokeObjectURL(u);
+    a.href=u; a.download='MCQ_Library_Full.json'; a.click();
 }
 
 // --- DUPLICATES ---
 function scanDuplicates() {
     const map = new Map(); App.duplicates = [];
     App.questions.forEach(q => {
-        const k = (q.text||"").substring(0,40).toLowerCase();
+        const k = (q.text||"").substring(0,80).toLowerCase();
         if(map.has(k)) App.duplicates.push(q); else map.set(k, q);
     });
     safeSetText('dupResult', `${App.duplicates.length} Dups Found`);
-    if(App.duplicates.length > 0) {
-        const btnFix = document.getElementById('btnFixDup');
-        if(btnFix) btnFix.classList.remove('hidden');
-    }
+    if(App.duplicates.length > 0) document.getElementById('btnFixDup').classList.remove('hidden');
 }
 async function fixDuplicates() {
     const tx = db.transaction('questions','readwrite');
     App.duplicates.forEach(q => tx.objectStore('questions').delete(q.id));
-    tx.oncomplete = async () => { await loadData(); normalizeQuestions(); scanDuplicates(); showToast('Fixed Duplicates'); };
+    tx.oncomplete = async () => { await loadData(); scanDuplicates(); showToast('Fixed Duplicates'); };
 }
 async function execBulk(act) {
     if(!confirm(`Bulk ${act}?`)) return;
     const tx = db.transaction('questions', 'readwrite');
     App.selectedIds.forEach(id => { if(act==='delete') tx.objectStore('questions').delete(id); });
-    tx.oncomplete = async () => { await loadData(); normalizeQuestions(); applyTableFilters(); showToast("Bulk Done"); };
+    tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
 }
 
-// --- CLOUD (GitHub) ---
+// --- RESET DETAILS WITH BACKUP + UNDO ---
+function openResetDialog() {
+    if(App.selectedIds.size === 0) {
+        if(!confirm("No questions selected.\nApply reset to ALL questions that match current filter?")) return;
+    }
+    const mode = prompt("Reset mode:\n1 = Last session\n2 = By chapter\n3 = Wrong questions\n4 = By tag\nEnter number:");
+    if(!mode) return;
+    let chapter = null, tag = null;
+    if(mode === '2') chapter = prompt("Chapter name (exact match):");
+    if(mode === '4') tag = prompt("Tag text (will match inside tags string):");
+    
+    const target = App.questions.filter(q => {
+        if(App.selectedIds.size>0 && !App.selectedIds.has(q.id)) return false;
+        if(mode === '1') {
+            if(!q.lastSeenAt) return false;
+            const d = new Date(q.lastSeenAt);
+            const today = new Date();
+            return d.toDateString() === today.toDateString();
+        }
+        if(mode === '2') return chapter && q.chapter === chapter;
+        if(mode === '3') return q.timesWrong && q.timesWrong > 0;
+        if(mode === '4') return tag && typeof q.tags === 'string' && q.tags.toLowerCase().includes(tag.toLowerCase());
+        return true;
+    });
+    if(target.length === 0) { alert("No matching questions found for this reset."); return; }
+
+    if(!confirm(`Reset details for ${target.length} questions?`)) return;
+
+    App.lastResetBackup = JSON.parse(JSON.stringify(App.questions));
+    const undoBtn = document.getElementById('btnUndoReset');
+    if(undoBtn) undoBtn.classList.remove('hidden');
+    showToast("Reset will apply in 5 seconds. Click 'Undo Reset' to cancel.", 'warn');
+
+    if(App.resetTimer) clearTimeout(App.resetTimer);
+    App.resetTimer = setTimeout(() => {
+        target.forEach(q => {
+            q.timesSeen = 0;
+            q.timesWrong = 0;
+            q.timesCorrect = 0;
+            q.lastSeenAt = null;
+            // keep notes, but clear issue marks
+            q.status = 'none';
+            q.issueNote = '';
+        });
+        const tx = db.transaction('questions','readwrite');
+        target.forEach(q => tx.objectStore('questions').put(q));
+        tx.oncomplete = async () => {
+            App.resetTimer = null;
+            if(undoBtn) undoBtn.classList.add('hidden');
+            await loadData();
+            normalizeQuestions();
+            applyTableFilters();
+            showToast("Reset applied");
+        };
+    }, 5000);
+}
+function undoReset() {
+    if(!App.resetTimer || !App.lastResetBackup) return;
+    clearTimeout(App.resetTimer);
+    App.resetTimer = null;
+    const undoBtn = document.getElementById('btnUndoReset');
+    if(undoBtn) undoBtn.classList.add('hidden');
+    const tx = db.transaction('questions','readwrite');
+    App.lastResetBackup.forEach(q => tx.objectStore('questions').put(q));
+    tx.oncomplete = async () => {
+        await loadData();
+        normalizeQuestions();
+        applyTableFilters();
+        showToast("Reset cancelled", 'warn');
+    };
+}
+
+// --- CLOUD ---
 function loadSettings() {
     const t = localStorage.getItem('gh_token');
     if(t) {
         safeSetVal('ghToken', t);
-        safeSetVal('ghRepo', localStorage.getItem('gh_repo'));
-        safeSetVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup.json');
+        safeSetVal('ghRepo', localStorage.getItem('gh_repo') || '');
+        safeSetVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup');
+        const hist = localStorage.getItem('backup_history');
+        if(hist) {
+            try { App.backupHistory = JSON.parse(hist) || []; } catch(e){ App.backupHistory = []; }
+        }
     }
 }
 function saveSettings() {
     localStorage.setItem('gh_token', document.getElementById('ghToken').value);
     localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
     localStorage.setItem('gh_file', document.getElementById('ghFile').value);
+    localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
     alert("Settings Saved");
 }
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
 function deb64(s) { return decodeURIComponent(escape(atob(s))); }
+
+function makeBackupFileName() {
+    const base = document.getElementById('ghFile').value || 'mcq_backup';
+    const d = new Date();
+    const pad = (n)=>String(n).padStart(2,'0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return `${base}_${stamp}.json`;
+}
+
 async function cloudUpload() {
-    const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
-    if(!t || !r || !f) return alert("Check Settings");
+    const t = localStorage.getItem('gh_token') || document.getElementById('ghToken').value;
+    const r = localStorage.getItem('gh_repo') || document.getElementById('ghRepo').value;
+    if(!t || !r) return alert("Check Settings");
+    const f = makeBackupFileName();
     try {
-        const c = b64(JSON.stringify(App.questions || []));
-        let sha = null;
-        try { 
-            const g = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {headers:{Authorization:`token ${t}`}}); 
-            if(g.ok) sha = (await g.json()).sha; 
-        } catch(e){}
-        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, { 
-            method:'PUT', 
-            headers:{Authorization:`token ${t}`, 'Content-Type':'application/json'}, 
-            body:JSON.stringify({message:'Backup', content:c, sha}) 
+        const c = b64(JSON.stringify(App.questions));
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {
+            method:'PUT',
+            headers:{Authorization:`token ${t}`, 'Content-Type':'application/json'},
+            body:JSON.stringify({message:'MCQ Backup', content:c})
         });
-        if(res.ok) showToast('Uploaded ✅'); else alert('GitHub Error');
-    } catch(e) { alert(e.message); }
-}
-async function cloudDownload() {
-    const t = localStorage.getItem('gh_token'), r = localStorage.getItem('gh_repo'), f = localStorage.getItem('gh_file');
-    if(!t || !r || !f) return alert("Check Settings");
-    try {
-        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {headers:{Authorization:`token ${t}`}});
-        if(!res.ok) throw new Error('Failed');
-        const apiObj = await res.json();
-        const d = JSON.parse(deb64(apiObj.content));
-        const tx = db.transaction('questions','readwrite');
-        (d || []).forEach(q => tx.objectStore('questions').put(q));
-        tx.oncomplete = async () => { 
-            await loadData(); 
-            normalizeQuestions();
-            refreshUI(); 
-            showToast('Downloaded'); 
-        };
-    } catch(e) { alert(e.message); }
-}
-
-// --- LOCAL BACKUPS (LAST 10) ---
-function loadLocalBackups() {
-    try {
-        const raw = localStorage.getItem('mcq_local_backups_v1');
-        if(!raw) return [];
-        const arr = JSON.parse(raw);
-        return Array.isArray(arr) ? arr : [];
-    } catch(e) {
-        console.warn('loadLocalBackups failed', e);
-        return [];
-    }
-}
-function saveLocalBackups(arr) {
-    try {
-        localStorage.setItem('mcq_local_backups_v1', JSON.stringify(arr));
-    } catch(e) {
-        console.warn('saveLocalBackups failed', e);
-    }
-}
-function createLocalBackup(label='manual') {
-    const backups = loadLocalBackups();
-    const stamp = new Date();
-    const item = {
-        id: stamp.getTime(),
-        label,
-        createdAt: stamp.toISOString(),
-        questions: App.questions,
-        user: App.user
-    };
-    backups.unshift(item);
-    const trimmed = backups.slice(0,10);
-    saveLocalBackups(trimmed);
-    renderBackupList();
-    showToast('Local backup saved');
-}
-function renderBackupList() {
-    const listEl = document.getElementById('backupList');
-    if(!listEl) return;
-    const backups = loadLocalBackups();
-    if(backups.length === 0) {
-        listEl.innerHTML = '<div class="muted small-label">No backups yet.</div>';
-        return;
-    }
-    let html = '';
-    backups.forEach(b => {
-        html += `
-         <div class="backup-item">
-            <div class="backup-meta">
-               <div><strong>${new Date(b.createdAt).toLocaleString()}</strong></div>
-               <div class="muted">${b.label || ''}</div>
-            </div>
-            <div class="backup-actions">
-               <button class="secondary-btn tiny-btn" onclick="downloadBackup(${b.id})">Download</button>
-               <button class="primary-btn tiny-btn" onclick="applyBackup(${b.id})">Apply</button>
-            </div>
-         </div>
-        `;
-    });
-    listEl.innerHTML = html;
-}
-
-window.downloadBackup = (id) => {
-    const backups = loadLocalBackups();
-    const b = backups.find(x => x.id === id);
-    if(!b) return;
-    const blob = new Blob([JSON.stringify({questions:b.questions, user:b.user}, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mcq_backup_${id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-};
-
-window.applyBackup = (id) => {
-    const backups = loadLocalBackups();
-    const b = backups.find(x => x.id === id);
-    if(!b) return alert('Backup not found');
-    if(!confirm('Apply this backup? This will overwrite current questions and stats.')) return;
-    const tx = db.transaction(['questions','user'], 'readwrite');
-    const qStore = tx.objectStore('questions');
-    const uStore = tx.objectStore('user');
-    qStore.clear().onsuccess = () => {
-        (b.questions || []).forEach(q => qStore.put(q));
-    };
-    uStore.put({ key: 'stats', ...(b.user || {}) });
-    tx.oncomplete = async () => {
-        await loadData();
-        normalizeQuestions();
-        refreshUI();
-        renderDashboard();
-        showToast('Backup applied');
-    };
-};
-
-// --- RESET SYSTEM ---
-function buildResetPlan() {
-    const mode = document.getElementById('resetMode').value;
-    const tag = (document.getElementById('resetTagInput').value || '').toLowerCase();
-    let ids = [];
-    if(mode === 'lastSession') {
-        ids = Array.from(App.sessionIds);
-    } else if(mode === 'chapter') {
-        const ch = document.getElementById('allChapterSelect').value;
-        ids = App.questions.filter(q => !ch || q.chapter === ch).map(q=>q.id);
-    } else if(mode === 'wrongStats') {
-        ids = App.questions.filter(q => (q.timesWrong||0) > 0).map(q=>q.id);
-    } else if(mode === 'tag') {
-        if(!tag) { alert('Type a tag text'); return null; }
-        ids = App.questions.filter(q => {
-            if(!q.tags) return false;
-            const t = Array.isArray(q.tags) ? q.tags.join(' ').toLowerCase() : String(q.tags).toLowerCase();
-            return t.includes(tag);
-        }).map(q=>q.id);
-    } else if(mode === 'all') {
-        ids = App.questions.map(q=>q.id);
-    }
-    return { mode, ids };
-}
-
-function resetQuestionStatsByIds(ids) {
-    const idSet = new Set(ids);
-    const tx = db.transaction('questions','readwrite');
-    App.questions.forEach(q => {
-        if(!idSet.has(q.id)) return;
-        q.timesSeen = 0;
-        q.timesCorrect = 0;
-        q.timesWrong = 0;
-        q.dueDate = null;
-        q.lastSeenAt = null;
-        tx.objectStore('questions').put(q);
-    });
-    tx.oncomplete = () => {
-        showToast(`Reset ${ids.length} questions`);
-        applyTableFilters();
-    };
-}
-
-function handleResetClick() {
-    const statusEl = document.getElementById('resetStatus');
-    const btn = document.getElementById('btnApplyReset');
-
-    // If timer already running -> cancel
-    if(resetTimer) {
-        clearTimeout(resetTimer);
-        resetTimer = null;
-        if(resetCountdownInterval) { clearInterval(resetCountdownInterval); resetCountdownInterval = null; }
-        lastResetPlan = null;
-        if(statusEl) statusEl.textContent = 'Reset cancelled';
-        if(btn) btn.textContent = 'Reset Details';
-        return;
-    }
-
-    const plan = buildResetPlan();
-    if(!plan || !plan.ids || plan.ids.length === 0) {
-        alert('No questions found for this reset selection.');
-        return;
-    }
-    if(!confirm(`Reset stats for ${plan.ids.length} questions?`)) return;
-
-    // Backup before reset
-    createLocalBackup('auto-before-reset');
-
-    lastResetPlan = plan;
-    let seconds = 5;
-    if(btn) btn.textContent = `Cancel Reset (${seconds})`;
-    if(statusEl) statusEl.textContent = `Reset will run in ${seconds} seconds...`;
-
-    resetCountdownInterval = setInterval(() => {
-        seconds--;
-        if(seconds <= 0) {
-            clearInterval(resetCountdownInterval);
-            resetCountdownInterval = null;
+        if(res.ok) {
+            App.backupHistory.unshift(f);
+            App.backupHistory = App.backupHistory.slice(0,10);
+            localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
+            loadBackupHistoryUI();
+            showToast('Uploaded ✅');
+        } else {
+            alert('Upload Error');
         }
-        if(btn && resetTimer) btn.textContent = seconds>0 ? `Cancel Reset (${seconds})` : 'Resetting...';
-        if(statusEl && resetTimer) statusEl.textContent = seconds>0 ? `Reset will run in ${seconds} seconds...` : 'Applying reset...';
-    }, 1000);
-
-    resetTimer = setTimeout(() => {
-        resetTimer = null;
-        if(resetCountdownInterval) { clearInterval(resetCountdownInterval); resetCountdownInterval = null; }
-        const ids = lastResetPlan ? lastResetPlan.ids : [];
-        lastResetPlan = null;
-        if(btn) btn.textContent = 'Reset Details';
-        if(statusEl) statusEl.textContent = '';
-        if(ids.length > 0) resetQuestionStatsByIds(ids);
-    }, 5000);
+    } catch(e) { alert(e.message); }
+}
+async function cloudDownloadLatest() {
+    if(App.backupHistory.length === 0) return alert("No backup history stored.");
+    const latest = App.backupHistory[0];
+    await cloudDownloadFile(latest);
+}
+async function cloudDownloadSelected() {
+    const sel = document.getElementById('ghBackupList').value;
+    if(!sel) return alert("Select a backup first.");
+    await cloudDownloadFile(sel);
+}
+async function cloudDownloadFile(fileName) {
+    const t = localStorage.getItem('gh_token') || document.getElementById('ghToken').value;
+    const r = localStorage.getItem('gh_repo') || document.getElementById('ghRepo').value;
+    if(!t || !r) return alert("Check Settings");
+    try {
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${fileName}`, {headers:{Authorization:`token ${t}`}});
+        if(!res.ok) throw new Error('Failed');
+        const d = await res.json();
+        const decoded = JSON.parse(deb64(d.content));
+        const tx = db.transaction('questions','readwrite');
+        decoded.forEach(q => tx.objectStore('questions').put(q));
+        tx.oncomplete = () => { loadData().then(()=>{ normalizeQuestions(); refreshUI(); showToast('Downloaded & Applied'); }); };
+    } catch(e) { alert(e.message); }
+}
+function loadBackupHistoryUI() {
+    const sel = document.getElementById('ghBackupList');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select older backup...</option>';
+    App.backupHistory.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+    });
 }
 
 // Flashcards
 let fcPool = [], fcIdx = 0;
 function buildFlashcardPool() {
-    const srcSel = document.getElementById('fcSource');
-    const mode = srcSel ? srcSel.value : 'due';
-    if(mode === 'due') {
-        fcPool = App.questions.filter(q => q.active !== false && (q.timesSeen||0) > 0);
-    } else {
-        fcPool = App.questions.filter(q => q.active !== false);
-    }
+    fcPool = App.questions.filter(q => q.active !== false);
     fcIdx = 0; renderFC();
 }
 function renderFC() {
     const front = document.getElementById('fcFront');
     const back = document.getElementById('fcBack');
     if(!front || !back) return;
-    if(fcPool.length===0) { 
-        front.textContent="Empty"; 
-        back.textContent=""; 
-        back.classList.add('hidden');
-        return; 
-    }
+    if(fcPool.length===0) { front.textContent="Empty"; back.textContent=""; return; }
     const q = fcPool[fcIdx];
-    const cor = (q.choices || []).find(c=>c.isCorrect);
+    const cor = (q.choices||[]).find(c=>c.isCorrect);
     front.textContent = q.text;
     back.innerHTML = `<b>Answer:</b> ${cor?cor.text:'?'}`;
     back.classList.add('hidden');
 }
-function nextFlashcard(good) { 
-    if(fcIdx < fcPool.length -1) fcIdx++; else fcIdx = 0; 
-    renderFC(); 
-}
+function nextFlashcard(good) { if(fcIdx < fcPool.length -1) fcIdx++; else fcIdx = 0; renderFC(); }
 
 // Exam
 let examSession = null;
@@ -862,9 +759,9 @@ function startExam() {
 }
 function renderExamQ() {
     const q = examSession.qs[examSession.index];
-    safeSetText('examProgress', `Q ${examSession.index+1}/${examSession.qs.length}`);
+    safeSetText('examProgress', `${examSession.index+1}/${examSession.qs.length}`);
     let h = `<div class="q-text">${q.text}</div>`;
-    (q.choices || []).forEach((c, i) => h += `<label class="choice"><input type="radio" name="exAns" value="${i}"> ${c.text}</label>`);
+    (q.choices||[]).forEach((c, i) => h += `<label class="choice"><input type="radio" name="exAns" value="${i}"> ${c.text}</label>`);
     document.getElementById('examQPanel').innerHTML = h;
 }
 function examMove(dir) {
@@ -878,7 +775,7 @@ function finishExam() {
     let correct = 0;
     examSession.qs.forEach(q => {
        const ans = examSession.answers[q.id];
-       const cor = (q.choices || []).findIndex(c=>c.isCorrect);
+       const cor = (q.choices||[]).findIndex(c=>c.isCorrect);
        if(ans === cor) correct++;
     });
     document.getElementById('examInterface').classList.add('hidden');
@@ -894,41 +791,40 @@ window.openEdit = (id) => {
     document.getElementById('editModal').dataset.id = id;
     document.getElementById('editText').value = q.text || '';
     document.getElementById('editChapter').value = q.chapter || '';
-    document.getElementById('editTags').value = Array.isArray(q.tags) ? q.tags.join(', ') : (q.tags || '');
-    document.getElementById('editMaint').checked = !!q.maintenance;
+    document.getElementById('editTags').value = q.tags || '';
     document.getElementById('editExplanation').value = q.explanation || '';
+    document.getElementById('editIssueNote').value = q.issueNote || '';
+
+    const type = q.status || 'none';
+    document.querySelectorAll('input[name="editIssueType"]').forEach(r => {
+        r.checked = (r.value === type) || (type==='none' && r.value==='none');
+    });
+
     const list = document.getElementById('editChoicesList'); 
     list.innerHTML='';
     (q.choices||[]).forEach(c => addEditChoice(c.text, c.isCorrect));
 };
 function addEditChoice(txt='', cor=false) {
-    const d=document.createElement('div'); 
-    d.className='edit-choice-row';
-    d.style.display = 'flex';
-    d.style.gap = '6px';
-    d.style.marginBottom = '4px';
-    d.innerHTML=`
-        <input class="std-input" style="flex:1" type="text" value="${txt || ''}">
-        <input type="radio" name="ec" ${cor?'checked':''}>
-        <button type="button" onclick="this.parentElement.remove()" class="tiny-btn" style="background:red">X</button>`;
+    const d=document.createElement('div'); d.className='edit-choice-row';
+    d.innerHTML=`<input class="std-input" style="flex:1" value="${txt}"><input type="radio" name="ec" ${cor?'checked':''}><button onclick="this.parentElement.remove()" class="tiny-btn" style="background:red">X</button>`;
     document.getElementById('editChoicesList').appendChild(d);
 }
 function saveEditModal() {
     const id = parseInt(document.getElementById('editModal').dataset.id);
     const q = App.questions.find(x=>x.id===id);
-    if(!q) return;
     q.text = document.getElementById('editText').value;
     q.chapter = document.getElementById('editChapter').value;
-    q.maintenance = document.getElementById('editMaint').checked;
-    if(q.maintenance) q.error = false;
+    q.tags = document.getElementById('editTags').value;
     q.explanation = document.getElementById('editExplanation').value;
-    const tagsRaw = document.getElementById('editTags').value;
-    q.tags = tagsRaw ? tagsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    q.issueNote = document.getElementById('editIssueNote').value;
+    let status = 'none';
+    document.querySelectorAll('input[name="editIssueType"]').forEach(r => { if(r.checked) status = r.value; });
+    q.status = status;
     const ch = [];
     document.querySelectorAll('.edit-choice-row').forEach(r => {
-        const txt = r.querySelector('input[type="text"]').value;
-        const isCor = r.querySelector('input[type="radio"]').checked;
-        ch.push({ text: txt, isCorrect: isCor });
+        const txt = r.querySelector('input.std-input').value;
+        const isC = r.querySelector('input[type="radio"]').checked;
+        ch.push({ text:txt, isCorrect:isC });
     });
     q.choices = ch;
     saveQ(q);
@@ -936,22 +832,25 @@ function saveEditModal() {
     applyTableFilters();
     alert("Saved");
 }
+
+// SRS
 function handleSRS(grade) {
     const q = App.currentQ;
-    if(!q) return;
     let days = 1;
     if(grade===4) days=7; if(grade===3) days=4; if(grade===2) days=2;
-    q.dueDate = Date.now() + (days * 24 * 60 * 60 * 1000);
+    q.dueDate = nowTs() + (days * 24 * 60 * 60 * 1000);
     saveQ(q);
     loadNextQuestion(false);
 }
+
+// Dashboard
 function renderDashboard() {
     const total = App.questions.length;
-    const mastered = App.questions.filter(q => (q.timesCorrect || 0) > 3).length;
-    const issueCount = App.questions.filter(q => q.error || q.maintenance).length;
+    const mastered = App.questions.filter(q => (q.timesCorrect||0) > 3).length;
+    const maint = App.questions.filter(q => q.status === 'maintenance').length;
     safeSetText('dashTotal', total);
-    safeSetText('dashMastery', Math.round((mastered/Math.max(total,1))*100) + '%');
-    safeSetText('dashMaint', issueCount);
+    safeSetText('dashMastery', Math.round((mastered/total)*100 || 0) + '%');
+    safeSetText('dashMaint', maint);
 }
 function switchTab(id) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -960,7 +859,6 @@ function switchTab(id) {
     document.querySelector(`.tab-button[data-tab="${id}"]`).classList.add('active');
     if(id==='all') applyTableFilters();
     if(id==='dashboard') renderDashboard();
-    if(id==='settings') renderBackupList();
 }
 function refreshUI() {
     const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();

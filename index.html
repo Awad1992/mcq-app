@@ -73,17 +73,13 @@
             </div>
 
             <div id="maintBox" class="maint-box hidden">
-               <strong style="color:var(--danger)">Issue Marker</strong>
+               <strong style="color:var(--danger)">🔧 Issue Type</strong>
                <div class="maint-type-row">
-                  <label class="check-label">
-                    <input type="radio" name="maintType" value="error"> ❌ Error (invalid question)
-                  </label>
-                  <label class="check-label">
-                    <input type="radio" name="maintType" value="maint"> 🔧 Maintenance (needs polish)
-                  </label>
+                 <label><input type="radio" name="maintType" value="maintenance" checked> Maintenance (styling / structure / small fix)</label>
+                 <label><input type="radio" name="maintType" value="error"> Error (wrong content / logic / answer)</label>
                </div>
-               <textarea id="maintNote" class="maint-input" placeholder="Write short note about the issue..."></textarea>
-               <button id="btnSaveMaint" class="tiny-btn">Save Issue</button>
+               <textarea id="maintNote" class="maint-input" placeholder="Describe the issue..."></textarea>
+               <button id="btnSaveMaint" class="tiny-btn">Save Mark</button>
             </div>
 
             <div id="questionPanel" class="question-panel">
@@ -93,7 +89,7 @@
             <div class="tools-row">
                <div id="searchTools" class="search-tools"></div>
                <button class="ghost-btn" id="btnFlag">Flag ⚐</button>
-               <button class="ghost-btn warning-text" id="btnMaintain">🔧 Report</button>
+               <button class="ghost-btn warning-text" id="btnMaintain">🔧 Mark Issue</button>
             </div>
 
             <div class="notes-container">
@@ -151,13 +147,15 @@
                  <select id="allFilter" class="std-select">
                    <option value="all">All</option>
                    <option value="maintain">🔧 Maintenance</option>
-                   <option value="error">❌ Errors</option>
                    <option value="notes">With Notes</option>
+                   <option value="error">⛔ Errors</option>
                    <option value="flagged">Flagged</option>
                  </select>
-                 <select id="allChapterSelect" class="std-select chapter-list">
-                   <option value="">All Chapters</option>
-                 </select>
+                 <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
+                 <input type="date" id="allDateFrom" class="std-input date-input">
+                 <input type="date" id="allDateTo" class="std-input date-input">
+                 <input type="time" id="allTimeFrom" class="std-input time-input">
+                 <input type="time" id="allTimeTo" class="std-input time-input">
                  <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
               </div>
 
@@ -175,22 +173,9 @@
                     <input type="file" id="fileInput" accept=".json" class="hidden">
                     <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
                     <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
+                    <button id="btnResetDetails" class="danger-btn">🧹 Reset Details</button>
+                    <button id="btnUndoReset" class="secondary-btn hidden">↩️ Undo Reset</button>
                  </div>
-              </div>
-
-              <!-- RESET AREA -->
-              <div class="row-controls reset-area">
-                 <span class="small-label">Reset question details</span>
-                 <select id="resetMode" class="std-select">
-                   <option value="lastSession">Last Session</option>
-                   <option value="chapter">By Chapter</option>
-                   <option value="wrongStats">Wrong (stats)</option>
-                   <option value="tag">By Tag</option>
-                   <option value="all">All Questions</option>
-                 </select>
-                 <input id="resetTagInput" class="std-input" placeholder="Tag text (for 'By Tag')" style="max-width:180px;">
-                 <button id="btnApplyReset" class="danger-btn">Reset Details</button>
-                 <span id="resetStatus" class="muted small-label"></span>
               </div>
               
               <!-- Drag Drop Zone Overlay (Hidden by default) -->
@@ -231,10 +216,7 @@
        <div class="card center-layout">
           <h3>Flashcards</h3>
           <div class="row-controls" style="justify-content:center;">
-             <select id="fcSource" class="std-select">
-               <option value="due">Due</option>
-               <option value="all">All</option>
-             </select>
+             <select id="fcSource" class="std-select"><option value="due">Due</option><option value="all">All</option></select>
              <button id="btnFcShuffle" class="primary-btn">Shuffle</button>
           </div>
           <div id="fcCard" class="flashcard">
@@ -282,7 +264,7 @@
           <h2>Statistics</h2>
           <div class="dashboard-grid">
              <div class="dash-box"><h3>Total</h3><span id="dashTotal" class="dash-val">0</span></div>
-             <div class="dash-box"><h3>Maintenance / Errors</h3><span id="dashMaint" class="dash-val warning">0</span></div>
+             <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
              <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
              <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div>
           </div>
@@ -298,25 +280,22 @@
           <h3>GitHub Config</h3>
           <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
           <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
-          <input id="ghFile" value="mcq_backup.json" class="std-input" style="width:100%; margin-bottom:10px;">
+          <input id="ghFile" value="mcq_backup" class="std-input" style="width:100%; margin-bottom:10px;" title="Base backup name, timestamp will be added automatically">
           
           <button id="btnSaveGh" class="primary-btn">Save Settings</button>
           <hr>
           <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
-          <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
+          <button id="btnCloudDownload" class="secondary-btn">Force Download Latest</button>
+          <select id="ghBackupList" class="std-select" style="margin-top:10px; width:100%;">
+             <option value="">Select older backup...</option>
+          </select>
+          <button id="btnCloudDownloadSelected" class="secondary-btn" style="margin-top:10px;">Download Selected Backup</button>
        </div>
-
        <div class="card" style="margin-top:20px;">
           <h3>System</h3>
           <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
           <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
           <button id="btnForceReload" class="ghost-btn">Force Reload</button>
-       </div>
-
-       <div class="card" style="margin-top:20px;">
-          <h3>Local Backups (Last 10)</h3>
-          <button id="btnCreateLocalBackup" class="secondary-btn">Create Backup Now</button>
-          <div id="backupList" class="backup-list"></div>
        </div>
     </section>
 
@@ -331,10 +310,15 @@
      <textarea id="editText" class="std-textarea" rows="3"></textarea>
      <div class="row-inputs">
        <input id="editChapter" class="std-input" placeholder="Chapter">
-       <input id="editTags" class="std-input" placeholder="Tags">
+       <input id="editTags" class="std-input" placeholder="Tags (comma separated)">
      </div>
-     <label class="check-label warning-text"><input type="checkbox" id="editMaint"> 🔧 Maintenance</label>
+     <div class="maint-type-row" style="margin:8px 0;">
+       <label><input type="radio" name="editIssueType" value="none"> None</label>
+       <label><input type="radio" name="editIssueType" value="maintenance"> Maintenance</label>
+       <label><input type="radio" name="editIssueType" value="error"> Error</label>
+     </div>
      <textarea id="editExplanation" class="std-textarea" rows="3" placeholder="Explanation"></textarea>
+     <textarea id="editIssueNote" class="std-textarea" rows="2" placeholder="Issue note (why maintenance/error)"></textarea>
      
      <div class="small-label">Choices:</div>
      <div id="editChoicesList"></div>
