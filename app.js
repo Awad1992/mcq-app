@@ -156,10 +156,10 @@ function renderQ() {
     safeText('qInfoID', info); 
     show('qInfoBar');
 
-    let h = `<div style="font-weight:500; font-size:1.2rem; margin-bottom:15px;">[#${q.id}] ${q.text}</div>`;
+    let h = `<div style="font-weight:500; font-size:1.2rem; margin-bottom:15px;">${q.text}</div>`;
     if(q.imageUrl) h += `<img src="${q.imageUrl}" style="max-width:100%; margin-bottom:15px; border-radius:8px;">`;
 
-    q.choices.forEach((c, i) => {
+    (q.choices || []).forEach((c, i) => {
         h += `<div class="choice" id="c_${i}" onclick="selectChoice(${i})">
           <b style="margin-right:10px;">${String.fromCharCode(65+i)}</b> ${c.text}
         </div>`;
@@ -173,10 +173,10 @@ window.selectChoice = function(idx) {
         e.style.borderColor = 'transparent';
         e.style.background = 'var(--bg)';
     });
-    const ele = el('c_'+idx);
-    if(ele) {
-        ele.style.borderColor = 'var(--primary)';
-        ele.style.background = '#eff6ff';
+    const elC = el('c_'+idx);
+    if(elC) {
+        elC.style.borderColor = 'var(--primary)';
+        elC.style.background = '#eff6ff';
     }
     App.selectedChoice = idx;
 }
@@ -316,8 +316,8 @@ function renderTable() {
         if(q.maintenance) status += '<span class="tag-maint">🔧 MAINT</span> ';
         if(q.flagged) status += '<span class="tag-flag">🚩</span> ';
         
-        const userNote = q.userNotes ? '📝' : '';
-        const issue = q.maintenanceNote ? '⚠️' : '';
+        const userNote = q.userNotes ? (q.userNotes.length > 30 ? q.userNotes.substring(0, 30) + '...' : q.userNotes) : '-';
+        const issueNote = q.maintenanceNote ? (q.maintenanceNote.length > 30 ? q.maintenanceNote.substring(0, 30) + '...' : q.maintenanceNote) : '-';
         const dateStr = q.importedAt ? new Date(q.importedAt).toLocaleDateString() : '-';
 
         tr.innerHTML = `
@@ -326,8 +326,8 @@ function renderTable() {
            <td style="font-size:0.7rem; color:#666;">${dateStr}</td>
            <td class="wrap-text" title="${q.text}">${q.text.substring(0,60)}...</td>
            <td>${q.chapter||'-'}</td>
-           <td>${userNote}</td>
-           <td>${issue}</td>
+           <td title="${q.userNotes || ''}">${userNote}</td>
+           <td title="${q.maintenanceNote || ''}">${issueNote}</td>
            <td>${status}</td>
            <td><button class="pill-btn tiny-btn" onclick="openEdit(${q.id})">✎</button></td>
         `;
@@ -396,12 +396,13 @@ function setupEvents() {
     safeBind('fileInput', 'change', handleImport);
     safeBind('btnExportTrigger', 'click', handleExport);
     bind('btnResetDetails', 'click', openResetDialog);
+    bind('btnUndoReset', 'click', undoReset);
     
     safeBind('btnSaveGh', 'click', saveSettings);
     safeBind('btnCloudUpload', 'click', cloudUpload);
     safeBind('btnCloudDownload', 'click', cloudDownloadLatest);
     safeBind('btnCloudDownloadSelected', 'click', cloudDownloadSelected);
-    safeBind('btnResetProgress', 'click', () => { if(confirm("Reset Stats?")) { App.questions.forEach(q=>{q.timesSeen=0; saveQ(q)}); location.reload(); } });
+    safeBind('btnResetProgress', 'click', () => { if(confirm("Reset all stats (timesSeen/timesWrong/timesCorrect)?")) { App.questions.forEach(q=>{q.timesSeen=0; q.timesWrong=0; q.timesCorrect=0; saveQ(q)}); location.reload(); } });
     safeBind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
     
     safeBind('btnFcShuffle', 'click', buildFlashcardPool);
@@ -425,12 +426,14 @@ function setupEvents() {
     safeBind('btnAddChoice', 'click', () => addEditChoice('', false));
     safeBind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
 
+    document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+    document.querySelectorAll('.sortable').forEach(th => { th.addEventListener('click', () => sortTable(th.dataset.key)); });
+    
     bind('allPrevPage', 'click', () => { if(App.page>1){App.page--; renderTable();} });
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
-    bind('allSelectAll', 'change', (e)=>toggleSelectAll(e.target));
 
     const note = el('userNoteArea');
-    if(note) note.addEventListener('input', debounce(saveNote, 1000));
+    if(note) note.addEventListener('input', debounce(saveNote, 800));
     
     // Drag Drop
     const zone = el('dropZone');
@@ -449,10 +452,6 @@ function setupEvents() {
 function saveQ(q) {
     const tx = db.transaction('questions','readwrite');
     tx.objectStore('questions').put(q);
-}
-function saveUser() {
-    const tx = db.transaction('user', 'readwrite');
-    tx.objectStore('user').put({ key: 'stats', ...App.user });
 }
 function toggleMaintenance() { el('maintBox').classList.toggle('hidden'); }
 function saveMaintenanceNote() {
@@ -498,14 +497,25 @@ async function handleImportFile(file) {
     r.onload = async (e) => {
         try {
             const json = JSON.parse(e.target.result);
-            if(!confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
+            if(confirm(`Found ${json.length} items. Import as new questions (no replace)?`)) return;
 
+            const existingIds = new Set(App.questions.map(q=>q.id));
             const tx = db.transaction('questions','readwrite');
+            let maxId = Math.max(0, ...Array.from(existingIds));
             const batchTs = Date.now();
-            json.forEach(q => {
-                // Always assign new ID if conflict or merge logic
-                if(!q.id || App.questions.some(x=>x.id===q.id)) q.id = batchTs + Math.floor(Math.random()*10000);
+
+            json.forEach(raw => {
+                const q = {...raw};
+                // never replace existing question
+                if(!q.id || existingIds.has(q.id)) {
+                    maxId += 1;
+                    q.id = maxId;
+                }
+                existingIds.add(q.id);
                 q.importedAt = batchTs;
+                if(!q.status) q.status = 'none';
+                if(q.maintenance && !q.status) q.status = 'maintenance';
+                
                 tx.objectStore('questions').put(q);
             });
             tx.oncomplete = async () => { 
@@ -524,20 +534,6 @@ function handleExport() {
     a.href=u; a.download='MCQ_Library_Full.json'; a.click();
 }
 
-// --- BACKUP HISTORY ---
-function loadBackupHistory() {
-    const hist = localStorage.getItem('backup_history');
-    try { App.backupHistory = JSON.parse(hist) || []; } catch(e) { App.backupHistory = []; }
-    const sel = el('backupHistoryList');
-    if(!sel) return;
-    sel.innerHTML = '<option value="">Select from last 10...</option>';
-    App.backupHistory.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b; opt.textContent = b;
-        sel.appendChild(opt);
-    });
-}
-
 // --- DUPLICATES ---
 function scanDuplicates() {
     const map = new Map(); App.duplicates = [];
@@ -546,7 +542,7 @@ function scanDuplicates() {
         if(map.has(k)) App.duplicates.push(q); else map.set(k, q);
     });
     safeSetText('dupResult', `${App.duplicates.length} Dups Found`);
-    if(App.duplicates.length > 0) el('btnFixDup').classList.remove('hidden');
+    if(App.duplicates.length > 0) show('btnFixDup');
 }
 async function fixDuplicates() {
     const tx = db.transaction('questions','readwrite');
@@ -560,28 +556,24 @@ async function execBulk(act) {
     tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
 }
 
-function openResetDialog() {
-    if(confirm("Reset ALL stats (Progress only)? Questions will remain.")) {
-         App.questions.forEach(q => { q.timesSeen=0; q.timesCorrect=0; q.timesWrong=0; saveQ(q); });
-         location.reload();
-    }
-}
-function undoReset() { alert("Undo not available for this action yet."); }
-
 // --- CLOUD ---
 function loadSettings() {
     const t = localStorage.getItem('gh_token');
     if(t) {
-        safeSetVal('ghToken', t);
-        safeSetVal('ghRepo', localStorage.getItem('gh_repo') || '');
-        safeSetVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup');
+        safeVal('ghToken', t);
+        safeVal('ghRepo', localStorage.getItem('gh_repo') || '');
+        safeVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup');
+        const hist = localStorage.getItem('backup_history');
+        if(hist) {
+            try { App.backupHistory = JSON.parse(hist) || []; } catch(e){ App.backupHistory = []; }
+        }
     }
-    loadBackupHistory();
 }
 function saveSettings() {
     localStorage.setItem('gh_token', el('ghToken').value);
     localStorage.setItem('gh_repo', el('ghRepo').value);
     localStorage.setItem('gh_file', el('ghFile').value);
+    localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
     alert("Settings Saved");
 }
 function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
@@ -634,9 +626,22 @@ async function cloudDownloadFile(fn) {
         const d = await res.json();
         const decoded = JSON.parse(deb64(d.content));
         const tx = db.transaction('questions','readwrite');
-        decoded.forEach(q => tx.objectStore('questions').put(q));
+        decoded.forEach(q => {
+            delete q.lastChoice;
+            tx.objectStore('questions').put(q);
+        });
         tx.oncomplete = () => { loadData().then(()=>{ refreshUI(); showToast('Restored!'); }); };
     } catch(e) { alert(e.message); }
+}
+function loadBackupHistory() {
+    const sel = el('backupHistoryList');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select older backup...</option>';
+    App.backupHistory.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b; opt.textContent = b;
+        sel.appendChild(opt);
+    });
 }
 
 // Flashcards
@@ -717,7 +722,6 @@ function saveEditModal() {
     const q = App.questions.find(x=>x.id===id);
     q.text = el('editText').value;
     q.chapter = el('editChapter').value;
-    q.tags = el('editTags').value;
     q.maintenance = el('editMaint').checked;
     q.explanation = el('editExplanation').value;
     const ch = [];
