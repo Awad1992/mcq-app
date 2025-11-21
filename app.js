@@ -7,28 +7,18 @@ const DB_VERSION = 26;
 let db = null;
 
 const App = {
-    questions: [],
-    tableQs: [],
-    selectedIds: new Set(),
-    currentQ: null,
+    questions: [], tableQs: [], selectedIds: new Set(), currentQ: null, 
     selectedChoice: null,
     filter: { search: '', status: 'all', chapter: '' },
     sort: { field: 'id', asc: true },
-    page: 1,
-    limit: 50,
-    rangeMode: false,
-    lastCheckId: null,
-    skipSolved: true,
-    history: [],
-    duplicates: [],
-    user: { xp: 0, streak: 0 },
-    lastResetBackup: null,
-    resetTimer: null,
+    page: 1, limit: 50, rangeMode: false, lastCheckId: null, skipSolved: true,
+    history: [], duplicates: [], user: { xp: 0, streak: 0 },
+    lastResetBackup: null, resetTimer: null,
     backupHistory: [],
-    practiceSeq: [],
-    seqMap: {},
-    seqCounter: 0,
-    seqIndex: -1
+    // session tracking for Practice tab
+    sessionOrder: [],          // array of question IDs in first-seen order
+    sessionIndexById: {},      // map: questionId -> index in sessionOrder
+    currentSeqSlot: -1         // current index inside sessionOrder
 };
 
 // --- HELPER FUNCTIONS ---
@@ -67,14 +57,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadSettings();
         setupEvents();
         refreshUI();
-
+        
         buildFlashcardPool();
         loadNextQuestion(true);
-
+        
         safeSetText('dbStatus', "DB: Ready");
         checkCloud();
         showToast('System v16.1 Ready 💎');
-
+        
         safeSetText('streakCount', App.user.streak || 0);
         safeSetText('userXP', App.user.xp || 0);
         loadBackupHistoryUI();
@@ -128,36 +118,87 @@ function normalizeQuestions() {
 }
 
 // --- 3. PRACTICE ENGINE ---
+function resetSessionState() {
+    App.history = [];
+    App.sessionOrder = [];
+    App.sessionIndexById = {};
+    App.currentSeqSlot = -1;
+    const hist = document.getElementById('historyList');
+    if(hist) hist.innerHTML = '';
+    const stats = document.getElementById('sessionStats');
+    if(stats) stats.textContent = '0 Seen • 0 Correct';
+}
+
+function registerSessionPosition(qId) {
+    if(App.sessionIndexById[qId] === undefined) {
+        App.sessionOrder.push(qId);
+        App.sessionIndexById[qId] = App.sessionOrder.length - 1; // store zero-based index
+    }
+    App.currentSeqSlot = App.sessionIndexById[qId];
+}
+
+function getQuestionById(id) {
+    return App.questions.find(x => x.id === id);
+}
+
+function computeSessionStats() {
+    let seen = 0, correct = 0;
+    App.sessionOrder.forEach(id => {
+        const q = getQuestionById(id);
+        if(!q) return;
+        if(typeof q.lastChoice === 'number') {
+            seen++;
+            const corIdx = (q.choices || []).findIndex(c => c.isCorrect);
+            if(q.lastChoice === corIdx) correct++;
+        }
+    });
+    const stats = document.getElementById('sessionStats');
+    if(stats) stats.textContent = `${seen} Seen • ${correct} Correct`;
+}
+
+function renderSessionHistory() {
+    const cont = document.getElementById('historyList');
+    if(!cont) return;
+    cont.innerHTML = '';
+    App.sessionOrder.forEach((id, idx) => {
+        const q = getQuestionById(id);
+        if(!q) return;
+        const item = document.createElement('div');
+        let stateClass = 'state-unseen';
+        if(typeof q.lastChoice === 'number') {
+            const corIdx = (q.choices || []).findIndex(c => c.isCorrect);
+            if(q.lastChoice === corIdx) stateClass = 'state-correct';
+            else stateClass = 'state-wrong';
+        }
+        let markers = '';
+        if(q.flagged) markers += ' 🚩';
+        if(q.status === 'maintenance') markers += ' 🔧';
+        if(q.status === 'error') markers += ' ⛔';
+        const isActive = (idx === App.currentSeqSlot);
+        item.className = `hist-item ${stateClass}${isActive ? ' active' : ''}`;
+        item.textContent = `${idx+1}. #${q.id}${markers}`;
+        item.title = (q.text || '').slice(0, 120);
+        item.onclick = () => {
+            App.currentQ = q;
+            App.currentSeqSlot = idx;
+            renderQ();
+        };
+        cont.appendChild(item);
+    });
+    computeSessionStats();
+}
+
 function loadNextQuestion(reset) {
+    if(reset) resetSessionState();
+    if(App.currentQ && !reset) App.history.push(App.currentQ);
+
+    App.selectedChoice = null;
+
     const m = document.getElementById('modeSelect').value;
     const box = document.getElementById('chapterBox');
-    if (box) box.style.display = (m === 'chapter') ? 'block' : 'none';
-
-    if (reset) {
-        App.history = [];
-        App.practiceSeq = [];
-        App.seqMap = {};
-        App.seqCounter = 0;
-        App.seqIndex = -1;
-        App.currentQ = null;
-    }
-
+    if(box) box.style.display = (m==='chapter')?'block':'none';
     const c = document.getElementById('chapterSelect').value;
     const skip = document.getElementById('prefSkipSolved').checked;
-    const panel = document.getElementById('questionPanel');
-    if (!panel) return;
-
-    // If not reset and we have forward history, move forward in sequence
-    if (!reset && App.seqIndex < (App.practiceSeq.length - 1)) {
-        App.seqIndex++;
-        const entry = App.practiceSeq[App.seqIndex];
-        const qExist = App.questions.find(x => x.id === entry.id);
-        if (qExist) {
-            App.currentQ = qExist;
-            renderQ();
-            return;
-        }
-    }
 
     let pool = App.questions.filter(q => {
         if(q.active === false) return false;
@@ -170,23 +211,17 @@ function loadNextQuestion(reset) {
         return true;
     });
 
+    const panel = document.getElementById('questionPanel');
+    if(!panel) return;
+
     if(pool.length === 0) {
         panel.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">No questions found.<br>Try "Refresh" or change filters.</div>';
         return;
     }
 
     const rand = Math.floor(Math.random() * pool.length);
-    const q = pool[rand];
-    App.currentQ = q;
-
-    if (!App.seqMap[q.id]) {
-        App.seqCounter += 1;
-        App.seqMap[q.id] = App.seqCounter;
-    }
-    App.practiceSeq.push({ id: q.id, seq: App.seqMap[q.id] });
-    App.seqIndex = App.practiceSeq.length - 1;
-
-    App.selectedChoice = null;
+    App.currentQ = pool[rand];
+    registerSessionPosition(App.currentQ.id);
     renderQ();
 }
 
@@ -196,15 +231,11 @@ function renderQ() {
     if(!q || !panel) return;
 
     const fbPanel = document.getElementById('feedbackPanel');
-    const srs = document.getElementById('srsButtons');
+    const srsBox = document.getElementById('srsButtons');
+    const maintBox = document.getElementById('maintBox');
     const btnSubmit = document.getElementById('btnSubmit');
     const btnNext = document.getElementById('btnNext');
-    const maintBox = document.getElementById('maintBox');
 
-    if(fbPanel) fbPanel.classList.add('hidden');
-    if(srs) srs.classList.add('hidden');
-    if(btnSubmit) btnSubmit.classList.remove('hidden');
-    if(btnNext) btnNext.classList.add('hidden');
     if(maintBox) maintBox.classList.add('hidden');
 
     const btnFlag = document.getElementById('btnFlag');
@@ -224,20 +255,29 @@ function renderQ() {
     });
     panel.innerHTML = h;
 
-    // restore session state if answered
-    if (q.sessionAnswered && typeof q.sessionLastChoice === 'number') {
-        App.selectedChoice = q.sessionLastChoice;
-        showFeedback(q.sessionLastChoice, q);
-    } else {
-        App.selectedChoice = null;
+    // default: hide feedback + SRS, show Submit + Next
+    if(fbPanel) {
+        fbPanel.classList.add('hidden');
+        fbPanel.innerHTML = "";
+    }
+    if(srsBox) srsBox.classList.add('hidden');
+    if(btnSubmit) btnSubmit.classList.remove('hidden');
+    if(btnNext) btnNext.classList.remove('hidden'); // always show Next as skip
+
+    App.selectedChoice = null;
+
+    // if question was already answered in this session, restore its state
+    if(typeof q.lastChoice === 'number') {
+        App.selectedChoice = q.lastChoice;
+        showFeedback(q.lastChoice, q);
     }
 
-    updateHistoryUI();
+    renderSessionHistory();
 }
 
 window.selectChoice = function(idx) {
-    const fb = document.getElementById('feedbackPanel');
-    if(fb && !fb.classList.contains('hidden')) return;
+    const fbVisible = !document.getElementById('feedbackPanel').classList.contains('hidden');
+    if(fbVisible) return;
     document.querySelectorAll('.choice').forEach(e => {
         e.classList.remove('selected');
     });
@@ -252,14 +292,11 @@ function submitAnswer() {
     if(App.selectedChoice === null || App.selectedChoice === undefined) return alert("Select an answer");
     const q = App.currentQ;
     q.lastChoice = App.selectedChoice; 
-
+    
     showFeedback(App.selectedChoice, q);
-
+    
     const isCorrect = q.choices[App.selectedChoice].isCorrect;
     q.timesSeen = (q.timesSeen||0) + 1;
-    q.sessionAnswered = true;
-    q.sessionCorrect = isCorrect;
-    q.sessionLastChoice = App.selectedChoice;
     q.lastSeenAt = nowTs();
     if(isCorrect) {
         q.timesCorrect = (q.timesCorrect||0)+1;
@@ -267,28 +304,34 @@ function submitAnswer() {
     } else {
         q.timesWrong = (q.timesWrong||0)+1;
     }
-
+    
     if(!q.dueDate) q.dueDate = nowTs();
     saveQ(q);
+    renderSessionHistory();
 }
 
 function showFeedback(idx, q) {
     const correctIdx = q.choices.findIndex(c => c.isCorrect);
     const isCorrect = (idx === correctIdx);
-
+    
     const fb = document.getElementById('feedbackPanel');
+    if(!fb) return;
     fb.classList.remove('hidden');
     fb.innerHTML = `<strong style="color:${isCorrect?'#10b981':'#ef4444'}">${isCorrect?'Correct!':'Wrong'}</strong><br>${q.explanation||''}`;
-
+    
     const cEl = document.getElementById('c_'+correctIdx);
     if(cEl) cEl.classList.add('correct');
-
+    
     const iEl = document.getElementById('c_'+idx);
     if(iEl && !isCorrect) iEl.classList.add('wrong');
+    if(iEl && isCorrect) iEl.classList.add('selected');
 
-    document.getElementById('btnSubmit').classList.add('hidden');
-    document.getElementById('btnNext').classList.remove('hidden');
-    document.getElementById('srsButtons').classList.remove('hidden');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnNext = document.getElementById('btnNext');
+    const srsBox = document.getElementById('srsButtons');
+    if(btnSubmit) btnSubmit.classList.add('hidden');
+    if(btnNext) btnNext.classList.remove('hidden');
+    if(srsBox) srsBox.classList.remove('hidden');
 }
 
 function updateXP(amount) {
@@ -296,37 +339,6 @@ function updateXP(amount) {
     safeSetText('userXP', App.user.xp);
     const tx = db.transaction('user', 'readwrite');
     tx.objectStore('user').put({ key: 'stats', ...App.user });
-}
-
-// --- PRACTICE HISTORY SIDEBAR ---
-function updateHistoryUI() {
-    const list = document.getElementById('historyList');
-    if (!list) return;
-    list.innerHTML = '';
-    App.practiceSeq.forEach((entry, idx) => {
-        const q = App.questions.find(x => x.id === entry.id);
-        if (!q) return;
-        const div = document.createElement('div');
-        let cls = 'hist-item';
-        if (idx === App.seqIndex) cls += ' hist-current';
-        if (q.sessionAnswered) {
-            cls += q.sessionCorrect ? ' hist-correct' : ' hist-wrong';
-        } else {
-            cls += ' hist-unseen';
-        }
-        div.className = cls;
-        let badges = '';
-        if (q.flagged) badges += ' 🚩';
-        if (q.status === 'maintenance') badges += ' 🔧';
-        if (q.status === 'error') badges += ' ⛔';
-        div.textContent = entry.seq + badges;
-        div.onclick = () => {
-            App.seqIndex = idx;
-            App.currentQ = q;
-            renderQ();
-        };
-        list.appendChild(div);
-    });
 }
 
 // --- 4. LIBRARY TABLE ---
@@ -357,7 +369,7 @@ function applyTableFilters() {
         }
         toTs = base.getTime();
     }
-
+    
     App.tableQs = App.questions.filter(q => {
         if(txt && !q.text.toLowerCase().includes(txt) && String(q.id) !== txt) return false;
         if(ch && q.chapter !== ch) return false;
@@ -399,7 +411,7 @@ function renderTable() {
     tbody.innerHTML = '';
     const start = (App.page - 1) * App.limit;
     const data = App.tableQs.slice(start, start + App.limit);
-
+    
     data.forEach(q => {
         const tr = document.createElement('tr');
         const isSel = App.selectedIds.has(q.id);
@@ -407,7 +419,7 @@ function renderTable() {
         if(q.status === 'maintenance') status += '<span class="tag-maint">🔧 MAINT</span> ';
         if(q.status === 'error') status += '<span class="tag-error">⛔ ERROR</span> ';
         if(q.flagged) status += '<span class="tag-flag">🚩</span> ';
-
+        
         const userNote = q.userNotes ? (q.userNotes.length > 30 ? q.userNotes.substring(0, 30) + '...' : q.userNotes) : '-';
         const issueNote = q.issueNote ? (q.issueNote.length > 30 ? q.issueNote.substring(0, 30) + '...' : q.issueNote) : '-';
 
@@ -467,22 +479,12 @@ function toggleRangeMode() {
 function setupEvents() {
     bind('btnSubmit', 'click', submitAnswer);
     bind('btnNext', 'click', () => loadNextQuestion(false));
-    bind('btnPrev', 'click', () => {
-        if (App.seqIndex > 0) {
-            App.seqIndex--;
-            const entry = App.practiceSeq[App.seqIndex];
-            const q = App.questions.find(x => x.id === entry.id);
-            if (q) {
-                App.currentQ = q;
-                renderQ();
-            }
-        }
-    });
+    bind('btnPrev', 'click', () => { if(App.history.length>0){ App.currentQ = App.history.pop(); registerSessionPosition(App.currentQ.id); renderQ(); }});
     bind('btnFlag', 'click', () => { if(App.currentQ) { App.currentQ.flagged = !App.currentQ.flagged; saveQ(App.currentQ); renderQ(); } });
     bind('btnMaintain', 'click', toggleMaintenance);
     bind('btnSaveMaint', 'click', saveMaintenanceNote);
     bind('btnSaveNoteManual', 'click', saveNoteManual);
-
+    
     bind('btnRefreshPractice', 'click', () => loadNextQuestion(true));
     bind('btnAllApply', 'click', applyTableFilters);
     bind('btnHeaderBackup', 'click', cloudUpload);
@@ -496,20 +498,20 @@ function setupEvents() {
     bind('btnExportTrigger', 'click', handleExport);
     bind('btnResetDetails', 'click', openResetDialog);
     bind('btnUndoReset', 'click', undoReset);
-
+    
     bind('btnSaveGh', 'click', saveSettings);
     bind('btnCloudUpload', 'click', cloudUpload);
     bind('btnCloudDownload', 'click', cloudDownloadLatest);
     bind('btnCloudDownloadSelected', 'click', cloudDownloadSelected);
-    bind('btnResetProgress', 'click', () => { if(confirm("Reset all stats (timesSeen/timesWrong/timesCorrect)?")) { App.questions.forEach(q=>{q.timesSeen=0; q.timesWrong=0; q.timesCorrect=0; saveQ(q)}); location.reload(); } });
+    bind('btnResetProgress', 'click', () => { if(confirm("Reset all stats (timesSeen/timesWrong/timesCorrect)?")) { App.questions.forEach(q=>{q.timesSeen=0; q.timesWrong=0; q.timesCorrect=0; q.lastChoice=undefined; saveQ(q)}); location.reload(); } });
     bind('btnFactoryReset', 'click', () => { if(confirm("WIPE DB?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); }});
-
+    
     bind('btnFcShuffle', 'click', buildFlashcardPool);
     bind('btnFcShow', 'click', () => { 
         const back = document.getElementById('fcBack');
+        const gradeBox = document.getElementById('fcGrading');
         if(back) back.classList.remove('hidden'); 
-        const grading = document.getElementById('fcGrading');
-        if (grading) grading.classList.remove('hidden');
+        if(gradeBox) gradeBox.classList.remove('hidden');
     });
     bind('btnFcAgain', 'click', () => nextFlashcard(false));
     bind('btnFcGood', 'click', () => nextFlashcard(true));
@@ -526,66 +528,20 @@ function setupEvents() {
     bind('btnCancelEdit', 'click', () => document.getElementById('editModal').classList.add('hidden'));
     bind('btnAddChoice', 'click', () => addEditChoice('', false));
     bind('themeToggle', 'click', () => document.body.classList.toggle('dark'));
-    bind('btnFocusMode', 'click', enterFocusMode);
-    bind('btnExitFocus', 'click', exitFocusMode);
 
     document.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
     document.querySelectorAll('.sortable').forEach(th => { th.addEventListener('click', () => sortTable(th.dataset.key)); });
-
+    
     bind('allPrevPage', 'click', () => { if(App.page>1){App.page--; renderTable();} });
     bind('allNextPage', 'click', () => { App.page++; renderTable(); });
 
     const note = document.getElementById('userNoteArea');
     if(note) note.addEventListener('input', debounce(saveNote, 800));
-
+    
     bind('allSelectAll', 'change', (e)=>toggleSelectAll(e.target));
 }
 
-function loadSettings() {
-    const t = localStorage.getItem('gh_token');
-    const r = localStorage.getItem('gh_repo');
-    const f = localStorage.getItem('gh_file');
-    if(t) safeSetVal('ghToken', t);
-    if(r) safeSetVal('ghRepo', r);
-    if(f) safeSetVal('ghFile', f);
-    if(t) safeSetText('syncStatus', "Cloud: Linked");
-}
-
-function refreshUI() {
-    const chSet = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-    const lists = document.querySelectorAll('.chapter-list');
-    lists.forEach(sel => {
-        const val = sel.value;
-        sel.innerHTML = '<option value="">All Chapters</option>';
-        chSet.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c; opt.textContent = c;
-            sel.appendChild(opt);
-        });
-        sel.value = val;
-    });
-
-    applyTableFilters();
-    refreshDashboard();
-}
-
-
-function enterFocusMode() {
-    document.body.classList.add('focus-mode');
-    const b1 = document.getElementById('btnFocusMode');
-    const b2 = document.getElementById('btnExitFocus');
-    if (b1) b1.classList.add('hidden');
-    if (b2) b2.classList.remove('hidden');
-}
-function exitFocusMode() {
-    document.body.classList.remove('focus-mode');
-    const b1 = document.getElementById('btnFocusMode');
-    const b2 = document.getElementById('btnExitFocus');
-    if (b1) b1.classList.remove('hidden');
-    if (b2) b2.classList.add('hidden');
-}
-
-// --- PRACTICE HELPERS ---
+// --- UTILS ---
 function saveQ(q) {
     const tx = db.transaction('questions','readwrite');
     tx.objectStore('questions').put(q);
@@ -615,6 +571,7 @@ function saveMaintenanceNote() {
         alert("Issue Mark Saved");
         document.getElementById('maintBox').classList.add('hidden');
         applyTableFilters();
+        renderSessionHistory();
     }
 }
 
@@ -653,545 +610,392 @@ async function handleImport() {
 
             const existingIds = new Set(App.questions.map(q=>q.id));
             const tx = db.transaction('questions','readwrite');
-            const store = tx.objectStore('questions');
-            let maxId = App.questions.reduce((m,q)=>Math.max(m,q.id||0),0);
-            const importedAt = Date.now();
-            json.forEach(item => {
-                if(!item.id || existingIds.has(item.id)) {
+            let maxId = Math.max(0, ...Array.from(existingIds));
+            const batchTs = nowTs();
+
+            json.forEach(raw => {
+                const q = {...raw};
+                // never replace existing question
+                if(!q.id || existingIds.has(q.id)) {
                     maxId += 1;
-                    item.id = maxId;
+                    q.id = maxId;
                 }
-                if(!item.choices || !item.choices.length) return;
-                item.status = item.status || 'none';
-                item.timesSeen = item.timesSeen || 0;
-                item.timesWrong = item.timesWrong || 0;
-                item.timesCorrect = item.timesCorrect || 0;
-                item.importedAt = importedAt;
-                if(Array.isArray(item.tags)) item.tags = item.tags.join(', ');
-                store.put(item);
-                App.questions.push(item);
+                existingIds.add(q.id);
+
+                if(!q.importedAt || q.importedAt === 0) q.importedAt = batchTs;
+                if(!q.status) q.status = 'none';
+                if(q.maintenance && !q.status) q.status = 'maintenance';
+                if(Array.isArray(q.tags)) q.tags = q.tags.join(', ');
+
+                delete q.lastChoice; // clean previous-session UI-only field
+                const total = (q.timesSeen || 0);
+                if(total === 0) {
+                    q.lastSeenAt = null;
+                    q.timesCorrect = q.timesCorrect || 0;
+                    q.timesWrong   = q.timesWrong   || 0;
+                }
+                tx.objectStore('questions').put(q);
             });
-            tx.oncomplete = () => {
-                showToast("Import complete");
-                refreshUI();
+            tx.oncomplete = async () => { 
+                await loadData(); 
+                normalizeQuestions();
+                refreshUI(); 
+                showToast('Imported Successfully'); 
             };
-        } catch(err) {
-            alert("Import failed: "+err.message);
-        }
+        } catch(err) { alert(err.message); }
     };
     r.readAsText(f);
 }
-
 function handleExport() {
-    const data = JSON.stringify(App.questions, null, 2);
-    const blob = new Blob([data], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
+    const enriched = App.questions.map(q => {
+        const total = (q.timesSeen || 0);
+        const correct = (q.timesCorrect || 0);
+        const successRate = total > 0 ? Math.round((correct/total)*100) : null;
+        const copy = { ...q, successRate };
+        delete copy.lastChoice; // do not export transient UI field
+        return copy;
+    });
+    const b = new Blob([JSON.stringify(enriched, null, 2)], {type:'application/json'});
+    const u = URL.createObjectURL(b);
     const a = document.createElement('a');
-    const stamp = new Date().toISOString().replace(/[:.]/g,'-');
-    a.href = url;
-    a.download = `mcq_export_${stamp}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    a.href=u; a.download='MCQ_Library_Full.json'; a.click();
 }
 
 // --- DUPLICATES ---
 function scanDuplicates() {
-    const seen = new Map();
-    const dup = [];
+    const map = new Map(); App.duplicates = [];
     App.questions.forEach(q => {
-        const key = q.text.trim().toLowerCase();
-        if(seen.has(key)) {
-            dup.push({ base: seen.get(key), dup: q });
-        } else {
-            seen.set(key, q);
-        }
+        const k = (q.text||"").substring(0,80).toLowerCase();
+        if(map.has(k)) App.duplicates.push(q); else map.set(k, q);
     });
-    App.duplicates = dup;
-    const out = document.getElementById('dupResult');
-    if(!dup.length) {
-        if(out) out.textContent = "No duplicates ✅";
-        const fixBtn = document.getElementById('btnFixDup');
-        if(fixBtn) fixBtn.classList.add('hidden');
-    } else {
-        if(out) out.textContent = `Found ${dup.length} duplicates`;
-        const fixBtn = document.getElementById('btnFixDup');
-        if(fixBtn) fixBtn.classList.remove('hidden');
-    }
+    safeSetText('dupResult', `${App.duplicates.length} Dups Found`);
+    if(App.duplicates.length > 0) document.getElementById('btnFixDup').classList.remove('hidden');
 }
-
-function fixDuplicates() {
-    if(!App.duplicates.length) return;
-    if(!confirm(`Auto-delete ${App.duplicates.length} duplicate questions (keeping the first copy)?`)) return;
-    const toDelete = new Set(App.duplicates.map(d=>d.dup.id));
+async function fixDuplicates() {
     const tx = db.transaction('questions','readwrite');
-    const store = tx.objectStore('questions');
-    toDelete.forEach(id => store.delete(id));
-
-    App.questions = App.questions.filter(q => !toDelete.has(q.id));
-    App.duplicates = [];
-    const fixBtn = document.getElementById('btnFixDup');
-    if(fixBtn) fixBtn.classList.add('hidden');
-    safeSetText('dupResult', "Duplicates removed");
-    refreshUI();
+    App.duplicates.forEach(q => tx.objectStore('questions').delete(q.id));
+    tx.oncomplete = async () => { await loadData(); scanDuplicates(); showToast('Fixed Duplicates'); };
+}
+async function execBulk(act) {
+    if(!confirm(`Bulk ${act}?`)) return;
+    const tx = db.transaction('questions', 'readwrite');
+    App.selectedIds.forEach(id => { if(act==='delete') tx.objectStore('questions').delete(id); });
+    tx.oncomplete = async () => { await loadData(); applyTableFilters(); showToast("Bulk Done"); };
 }
 
-// --- BULK ---
-function execBulk(action) {
-    if(!App.selectedIds.size) return alert("No questions selected");
-    if(action === 'delete') {
-        if(!confirm(`Delete ${App.selectedIds.size} questions? This cannot be undone.`)) return;
-        const tx = db.transaction('questions','readwrite');
-        const store = tx.objectStore('questions');
-        App.selectedIds.forEach(id => store.delete(id));
-        App.questions = App.questions.filter(q => !App.selectedIds.has(q.id));
-        App.selectedIds.clear();
-        refreshUI();
-        safeSetText('selCount', "0 Selected");
-    }
-}
-
-// --- RESET DETAILS (keep core stats, wipe metadata) ---
+// --- RESET DETAILS WITH BACKUP + UNDO ---
 function openResetDialog() {
-    if(!App.selectedIds.size) return alert("Select questions to reset details");
-    if(!confirm("Reset details (chapter/tags/status/notes/issue) for selected questions?\nStats (timesSeen/timesCorrect/etc.) will stay.")) return;
+    if(App.selectedIds.size === 0) {
+        if(!confirm("No questions selected.\nApply reset to ALL questions that match current filter?")) return;
+    }
+    const mode = prompt("Reset mode:\n1 = Last session\n2 = By chapter\n3 = Wrong questions\n4 = By tag\nEnter number:");
+    if(!mode) return;
+    let chapter = null, tag = null;
+    if(mode === '2') chapter = prompt("Chapter name (exact match):");
+    if(mode === '4') tag = prompt("Tag text (will match inside tags string):");
+    
+    const target = App.questions.filter(q => {
+        if(App.selectedIds.size>0 && !App.selectedIds.has(q.id)) return false;
+        if(mode === '1') {
+            if(!q.lastSeenAt) return false;
+            const d = new Date(q.lastSeenAt);
+            const today = new Date();
+            return d.toDateString() === today.toDateString();
+        }
+        if(mode === '2') return chapter && q.chapter === chapter;
+        if(mode === '3') return q.timesWrong && q.timesWrong > 0;
+        if(mode === '4') return tag && typeof q.tags === 'string' && q.tags.toLowerCase().includes(tag.toLowerCase());
+        return true;
+    });
+    if(target.length === 0) { alert("No matching questions found for this reset."); return; }
 
-    const backup = App.questions.filter(q => App.selectedIds.has(q.id)).map(q => ({...q}));
-    App.lastResetBackup = backup;
-    clearTimeout(App.resetTimer);
-    App.resetTimer = setTimeout(()=>{ App.lastResetBackup=null; }, 10*60*1000);
+    if(!confirm(`Reset details for ${target.length} questions?`)) return;
 
-    const tx = db.transaction('questions','readwrite');
-    const store = tx.objectStore('questions');
-    App.questions.forEach(q => {
-        if(App.selectedIds.has(q.id)) {
-            q.chapter = '';
-            q.tags = '';
+    App.lastResetBackup = JSON.parse(JSON.stringify(App.questions));
+    const undoBtn = document.getElementById('btnUndoReset');
+    if(undoBtn) undoBtn.classList.remove('hidden');
+    showToast("Reset will apply in 5 seconds. Click 'Undo Reset' to cancel.", 'warn');
+
+    if(App.resetTimer) clearTimeout(App.resetTimer);
+    App.resetTimer = setTimeout(() => {
+        target.forEach(q => {
+            q.timesSeen = 0;
+            q.timesWrong = 0;
+            q.timesCorrect = 0;
+            q.lastSeenAt = null;
+            // keep notes, but clear issue marks
             q.status = 'none';
             q.issueNote = '';
-            q.userNotes = '';
-            store.put(q);
-        }
-    });
-    tx.oncomplete = () => {
-        showToast("Details reset. You can undo within 10 minutes.");
-        const btnUndo = document.getElementById('btnUndoReset');
-        if(btnUndo) btnUndo.classList.remove('hidden');
-        refreshUI();
-    };
+            delete q.lastChoice;
+        });
+        const tx = db.transaction('questions','readwrite');
+        target.forEach(q => tx.objectStore('questions').put(q));
+        tx.oncomplete = async () => {
+            App.resetTimer = null;
+            if(undoBtn) undoBtn.classList.add('hidden');
+            await loadData();
+            normalizeQuestions();
+            applyTableFilters();
+            resetSessionState();
+            showToast("Reset applied");
+        };
+    }, 5000);
 }
-
 function undoReset() {
-    if(!App.lastResetBackup) return alert("No recent reset to undo");
+    if(!App.resetTimer || !App.lastResetBackup) return;
+    clearTimeout(App.resetTimer);
+    App.resetTimer = null;
+    const undoBtn = document.getElementById('btnUndoReset');
+    if(undoBtn) undoBtn.classList.add('hidden');
     const tx = db.transaction('questions','readwrite');
-    const store = tx.objectStore('questions');
-    App.lastResetBackup.forEach(orig => {
-        const idx = App.questions.findIndex(q => q.id === orig.id);
-        if(idx >= 0) App.questions[idx] = orig;
-        store.put(orig);
-    });
-    tx.oncomplete = () => {
-        showToast("Reset undone");
-        App.lastResetBackup = null;
-        const btnUndo = document.getElementById('btnUndoReset');
-        if(btnUndo) btnUndo.classList.add('hidden');
-        refreshUI();
+    App.lastResetBackup.forEach(q => tx.objectStore('questions').put(q));
+    tx.oncomplete = async () => {
+        await loadData();
+        normalizeQuestions();
+        applyTableFilters();
+        resetSessionState();
+        showToast("Reset cancelled", 'warn');
     };
 }
 
-// --- GITHUB BACKUP ---
+// --- CLOUD ---
+function loadSettings() {
+    const t = localStorage.getItem('gh_token');
+    if(t) {
+        safeSetVal('ghToken', t);
+        safeSetVal('ghRepo', localStorage.getItem('gh_repo') || '');
+        safeSetVal('ghFile', localStorage.getItem('gh_file') || 'mcq_backup');
+        const hist = localStorage.getItem('backup_history');
+        if(hist) {
+            try { App.backupHistory = JSON.parse(hist) || []; } catch(e){ App.backupHistory = []; }
+        }
+    }
+}
 function saveSettings() {
-    const t = document.getElementById('ghToken').value.trim();
-    const r = document.getElementById('ghRepo').value.trim();
-    const f = document.getElementById('ghFile').value.trim() || 'mcq_backup';
-    localStorage.setItem('gh_token', t);
-    localStorage.setItem('gh_repo', r);
-    localStorage.setItem('gh_file', f);
-    showToast("GitHub settings saved");
-    if(t) safeSetText('syncStatus', "Cloud: Linked");
+    localStorage.setItem('gh_token', document.getElementById('ghToken').value);
+    localStorage.setItem('gh_repo', document.getElementById('ghRepo').value);
+    localStorage.setItem('gh_file', document.getElementById('ghFile').value);
+    localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
+    alert("Settings Saved");
+}
+function b64(s) { return btoa(unescape(encodeURIComponent(s))); }
+function deb64(s) { return decodeURIComponent(escape(atob(s))); }
+
+function makeBackupFileName() {
+    const base = document.getElementById('ghFile').value || 'mcq_backup';
+    const d = new Date();
+    const pad = (n)=>String(n).padStart(2,'0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return `${base}_${stamp}.json`;
 }
 
 async function cloudUpload() {
-    const token = localStorage.getItem('gh_token');
-    const repo = localStorage.getItem('gh_repo');
-    const baseFile = localStorage.getItem('gh_file') || 'mcq_backup';
-    if(!token || !repo) return alert("Set GitHub token and repo first");
-
-    const url = `https://api.github.com/repos/${repo}/contents/${baseFile}_${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
-    const data = JSON.stringify(App.questions, null, 2);
-    const payload = {
-        message: `MCQ backup ${new Date().toISOString()}`,
-        content: btoa(unescape(encodeURIComponent(data)))
-    };
-    safeSetText('syncStatus', "Cloud: Uploading...");
+    const t = localStorage.getItem('gh_token') || document.getElementById('ghToken').value;
+    const r = localStorage.getItem('gh_repo') || document.getElementById('ghRepo').value;
+    if(!t || !r) return alert("Check Settings");
+    const f = makeBackupFileName();
     try {
-        const res = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+        const c = b64(JSON.stringify(App.questions));
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${f}`, {
+            method:'PUT',
+            headers:{Authorization:`token ${t}`, 'Content-Type':'application/json'},
+            body:JSON.stringify({message:'MCQ Backup', content:c})
         });
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        showToast("Backup uploaded to GitHub");
-        safeSetText('syncStatus', "Cloud: OK");
-        await loadBackupHistory();
-    } catch(err) {
-        console.error(err);
-        alert("Upload failed: "+err.message);
-        safeSetText('syncStatus', "Cloud: Error");
-    }
+        if(res.ok) {
+            App.backupHistory.unshift(f);
+            App.backupHistory = App.backupHistory.slice(0,10);
+            localStorage.setItem('backup_history', JSON.stringify(App.backupHistory));
+            loadBackupHistoryUI();
+            showToast('Uploaded ✅');
+        } else {
+            alert('Upload Error');
+        }
+    } catch(e) { alert(e.message); }
 }
-
 async function cloudDownloadLatest() {
-    const token = localStorage.getItem('gh_token');
-    const repo = localStorage.getItem('gh_repo');
-    const baseFile = localStorage.getItem('gh_file') || 'mcq_backup';
-    if(!token || !repo) return alert("Set GitHub token and repo first");
-
-    const url = `https://api.github.com/repos/${repo}/contents`;
-    safeSetText('syncStatus', "Cloud: Listing...");
-    try {
-        const res = await fetch(url, {
-            headers: { 'Authorization': `token ${token}` }
-        });
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        const files = await res.json();
-        const backups = files.filter(f => f.name.startsWith(baseFile+"_") && f.name.endsWith(".json"))
-            .sort((a,b)=> new Date(b.git_url || b.name) - new Date(a.git_url || a.name));
-        if(!backups.length) throw new Error("No backup files found");
-
-        const latest = backups[0];
-        if(!confirm(`Download and REPLACE local DB with backup:\n${latest.name}?`)) {
-            safeSetText('syncStatus', "Cloud: Cancelled");
-            return;
-        }
-
-        await downloadAndReplace(latest.download_url);
-        safeSetText('syncStatus', "Cloud: Restored");
-        showToast("DB replaced from latest backup");
-    } catch(err) {
-        console.error(err);
-        alert("Download failed: "+err.message);
-        safeSetText('syncStatus', "Cloud: Error");
-    }
+    if(App.backupHistory.length === 0) return alert("No backup history stored.");
+    const latest = App.backupHistory[0];
+    await cloudDownloadFile(latest);
 }
-
 async function cloudDownloadSelected() {
-    const select = document.getElementById('ghBackupList');
-    const url = select.value;
-    if(!url) return alert("Select a backup first");
-    if(!confirm("REPLACE local DB with this backup?")) return;
-    try {
-        await downloadAndReplace(url);
-        safeSetText('syncStatus', "Cloud: Restored");
-        showToast("DB replaced from selected backup");
-    } catch(err) {
-        console.error(err);
-        alert("Download failed: "+err.message);
-        safeSetText('syncStatus', "Cloud: Error");
-    }
+    const sel = document.getElementById('ghBackupList').value;
+    if(!sel) return alert("Select a backup first.");
+    await cloudDownloadFile(sel);
 }
-
-async function downloadAndReplace(downloadUrl) {
-    const res = await fetch(downloadUrl);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if(!Array.isArray(json)) throw new Error("Backup JSON must be an array");
-
-    await new Promise((resolve, reject) => {
+async function cloudDownloadFile(fileName) {
+    const t = localStorage.getItem('gh_token') || document.getElementById('ghToken').value;
+    const r = localStorage.getItem('gh_repo') || document.getElementById('ghRepo').value;
+    if(!t || !r) return alert("Check Settings");
+    try {
+        const res = await fetch(`https://api.github.com/repos/${r}/contents/${fileName}`, {headers:{Authorization:`token ${t}`}});
+        if(!res.ok) throw new Error('Failed');
+        const d = await res.json();
+        const decoded = JSON.parse(deb64(d.content));
         const tx = db.transaction('questions','readwrite');
-        const store = tx.objectStore('questions');
-        const clearReq = store.clear();
-        clearReq.onsuccess = () => {
-            json.forEach(item => {
-                if(!item.id || !item.choices || !item.choices.length) return;
-                store.put(item);
-            });
-        };
-        tx.oncomplete = () => resolve();
-        tx.onerror = (e) => reject(e.target.error);
-    });
-
-    await loadData();
-    normalizeQuestions();
-    refreshUI();
-}
-
-// --- BACKUP HISTORY LIST ---
-async function loadBackupHistory() {
-    const token = localStorage.getItem('gh_token');
-    const repo = localStorage.getItem('gh_repo');
-    const baseFile = localStorage.getItem('gh_file') || 'mcq_backup';
-    if(!token || !repo) return;
-
-    const url = `https://api.github.com/repos/${repo}/contents`;
-    try {
-        const res = await fetch(url, {
-            headers: { 'Authorization': `token ${token}` }
+        decoded.forEach(q => {
+            delete q.lastChoice;
+            tx.objectStore('questions').put(q);
         });
-        if(!res.ok) throw new Error(`HTTP ${res.status}`);
-        const files = await res.json();
-        const backups = files.filter(f => f.name.startsWith(baseFile+"_") && f.name.endsWith(".json"))
-            .sort((a,b) => (a.name < b.name ? 1 : -1));
-        App.backupHistory = backups;
-        loadBackupHistoryUI();
-    } catch(err) {
-        console.error('Backup history load failed', err);
-    }
+        tx.oncomplete = () => { loadData().then(()=>{ normalizeQuestions(); refreshUI(); resetSessionState(); showToast('Downloaded & Applied'); }); };
+    } catch(e) { alert(e.message); }
 }
-
 function loadBackupHistoryUI() {
-    const select = document.getElementById('ghBackupList');
-    if(!select) return;
-    select.innerHTML = '<option value="">Select older backup...</option>';
-    App.backupHistory.forEach(b => {
+    const sel = document.getElementById('ghBackupList');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select older backup...</option>';
+    App.backupHistory.forEach(name => {
         const opt = document.createElement('option');
-        opt.value = b.download_url;
-        opt.textContent = b.name;
-        select.appendChild(opt);
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
     });
 }
 
-// --- FLASHCARDS ---
-let flashPool = [];
-let flashIndex = -1;
-
+// Flashcards
+let fcPool = [], fcIdx = 0;
 function buildFlashcardPool() {
-    const mode = document.getElementById('fcSource') ? document.getElementById('fcSource').value : 'due';
-    flashPool = App.questions.filter(q => {
-        if(q.active === false) return false;
-        if(mode === 'due') {
-            return (q.timesSeen||0) > 0 && (q.timesWrong||0) > 0;
-        }
-        return true;
-    });
-    if(!flashPool.length) {
-        document.getElementById('fcFront').textContent = "No flashcards available";
-        document.getElementById('fcBack').textContent = "";
-        return;
+    fcPool = App.questions.filter(q => q.active !== false);
+    fcIdx = 0; renderFC();
+}
+function renderFC() {
+    const front = document.getElementById('fcFront');
+    const back = document.getElementById('fcBack');
+    const gradeBox = document.getElementById('fcGrading');
+    if(!front || !back) return;
+    if(fcPool.length===0) { 
+        front.textContent="Empty"; 
+        back.textContent=""; 
+        back.classList.add('hidden'); 
+        if(gradeBox) gradeBox.classList.add('hidden');
+        return; 
     }
-    shuffleArray(flashPool);
-    flashIndex = 0;
-    renderFlashcard();
+    const q = fcPool[fcIdx];
+    const cor = (q.choices||[]).find(c=>c.isCorrect);
+    front.textContent = q.text;
+    back.innerHTML = `<b>Answer:</b> ${cor?cor.text:'?'}`;
+    back.classList.add('hidden');
+    if(gradeBox) gradeBox.classList.add('hidden');
+}
+function nextFlashcard(good) { 
+    if(fcIdx < fcPool.length -1) fcIdx++; else fcIdx = 0; 
+    renderFC(); 
 }
 
-function renderFlashcard() {
-    if(!flashPool.length) return;
-    const q = flashPool[flashIndex];
-    document.getElementById('fcFront').textContent = q.text;
-    const correct = (q.choices||[]).find(c => c.isCorrect);
-    document.getElementById('fcBack').textContent = correct ? correct.text : '';
-    document.getElementById('fcBack').classList.add('hidden');
-    const grading = document.getElementById('fcGrading');
-    if(grading) grading.classList.add('hidden');
-}
-
-function nextFlashcard(success) {
-    if(success) {
-        const q = flashPool[flashIndex];
-        q.timesSeen = (q.timesSeen||0)+1;
-        q.timesCorrect = (q.timesCorrect||0)+1;
-        saveQ(q);
-    }
-    flashIndex = (flashIndex + 1) % flashPool.length;
-    renderFlashcard();
-}
-
-function shuffleArray(arr) {
-    for(let i=arr.length-1; i>0; i--){
-        const j = Math.floor(Math.random()*(i+1));
-        [arr[i],arr[j]]=[arr[j],arr[i]];
-    }
-}
-
-// --- EXAM MODE ---
-let examSession = {
-    active:false,
-    questions:[],
-    index:0,
-    answers:{},
-};
-
+// Exam
+let examSession = null;
 function startExam() {
-    const ch = document.getElementById('examChapterSelect').value;
-    const count = Math.max(1, parseInt(document.getElementById('examCount').value||'40',10));
-    let pool = App.questions.filter(q => q.choices && q.choices.length);
-    if(ch) pool = pool.filter(q => q.chapter === ch);
-    if(!pool.length) return alert("No questions for exam");
-
-    shuffleArray(pool);
-    examSession.active = true;
-    examSession.questions = pool.slice(0, count);
-    examSession.index = 0;
-    examSession.answers = {};
-
+    const count = parseInt(document.getElementById('examCount').value) || 40;
+    const pool = [...App.questions].sort(() => Math.random()-0.5).slice(0, count);
+    examSession = { qs: pool, answers: {}, index: 0 };
     document.getElementById('examInterface').classList.remove('hidden');
-    document.getElementById('examResults').classList.add('hidden');
     renderExamQ();
 }
-
 function renderExamQ() {
-    const q = examSession.questions[examSession.index];
-    const panel = document.getElementById('examQPanel');
-    if(!q || !panel) return;
-    let h = `<div style="margin-bottom:10px;"><strong>Q ${examSession.index+1}/${examSession.questions.length}</strong> [ID ${q.id}]</div>`;
-    h += `<div style="margin-bottom:10px;">${q.text}</div>`;
-    (q.choices||[]).forEach((c,i) => {
-        const key = `q${q.id}`;
-        const saved = examSession.answers[key];
-        const selCls = (saved === i) ? ' selected' : '';
-        h += `<div class="choice${selCls}" onclick="selectExamChoice(${i})">
-            <b>${String.fromCharCode(65+i)}.</b> ${c.text}
-        </div>`;
-    });
-    panel.innerHTML = h;
-    safeSetText('examProgress', examSession.index+1);
+    const q = examSession.qs[examSession.index];
+    safeSetText('examProgress', `${examSession.index+1}/${examSession.qs.length}`);
+    let h = `<div class="q-text">${q.text}</div>`;
+    (q.choices||[]).forEach((c, i) => h += `<label class="choice"><input type="radio" name="exAns" value="${i}"> ${c.text}</label>`);
+    document.getElementById('examQPanel').innerHTML = h;
 }
-
-window.selectExamChoice = function(i) {
-    const q = examSession.questions[examSession.index];
-    const key = `q${q.id}`;
-    examSession.answers[key] = i;
-    renderExamQ();
-};
-
-function examMove(step) {
-    const newIndex = examSession.index + step;
-    if(newIndex < 0 || newIndex >= examSession.questions.length) return;
-    examSession.index = newIndex;
-    renderExamQ();
+function examMove(dir) {
+    const sel = document.querySelector('input[name="exAns"]:checked');
+    if(sel) examSession.answers[examSession.qs[examSession.index].id] = parseInt(sel.value);
+    const next = examSession.index + dir;
+    if(next >= 0 && next < examSession.qs.length) { examSession.index = next; renderExamQ(); }
 }
-
 function finishExam() {
-    const total = examSession.questions.length;
+    examMove(0);
     let correct = 0;
-    examSession.questions.forEach(q => {
-        const key = `q${q.id}`;
-        const ans = examSession.answers[key];
-        if(typeof ans === 'number') {
-            const cIdx = q.choices.findIndex(c => c.isCorrect);
-            if(ans === cIdx) correct++;
-        }
+    examSession.qs.forEach(q => {
+       const ans = examSession.answers[q.id];
+       const cor = (q.choices||[]).findIndex(c=>c.isCorrect);
+       if(ans === cor) correct++;
     });
-    const score = Math.round((correct/total)*100);
-    safeSetText('examScore', `Score: ${correct}/${total} (${score}%)`);
+    document.getElementById('examInterface').classList.add('hidden');
     document.getElementById('examResults').classList.remove('hidden');
+    document.getElementById('examScore').innerHTML = `<h2>Score: ${correct} / ${examSession.qs.length}</h2>`;
 }
 
-// --- EDIT MODAL ---
-let editQ = null;
-
-window.openEdit = function(id) {
-    editQ = App.questions.find(q => q.id === id);
-    if(!editQ) return;
-    safeSetVal('editText', editQ.text || '');
-    safeSetVal('editChapter', editQ.chapter || '');
-    safeSetVal('editTags', editQ.tags || '');
-    const radios = document.querySelectorAll('input[name="editIssueType"]');
-    radios.forEach(r => { r.checked = (editQ.status||'none') === r.value; });
-    safeSetVal('editExplanation', editQ.explanation || '');
-    safeSetVal('editIssueNote', editQ.issueNote || '');
-
-    const list = document.getElementById('editChoicesList');
-    list.innerHTML = '';
-    (editQ.choices||[]).forEach((c,i) => addEditChoice(c.text, c.isCorrect, i));
-
+// Edit Logic
+window.openEdit = (id) => {
+    const q = App.questions.find(x=>x.id===id);
+    if(!q) return;
     document.getElementById('editModal').classList.remove('hidden');
-};
+    document.getElementById('editModal').dataset.id = id;
+    document.getElementById('editText').value = q.text || '';
+    document.getElementById('editChapter').value = q.chapter || '';
+    document.getElementById('editTags').value = q.tags || '';
+    document.getElementById('editExplanation').value = q.explanation || '';
+    document.getElementById('editIssueNote').value = q.issueNote || '';
 
-function addEditChoice(text, isCorrect, idxOverride) {
-    const list = document.getElementById('editChoicesList');
-    const idx = typeof idxOverride === 'number' ? idxOverride : list.children.length;
-    const row = document.createElement('div');
-    row.className = 'edit-choice-row';
-    row.innerHTML = `
-        <input class="std-input edit-choice-text" data-idx="${idx}" value="${text||''}" style="width:75%;">
-        <label style="font-size:0.8rem;">
-           <input type="radio" name="editCorrect" value="${idx}" ${isCorrect?'checked':''}> Correct
-        </label>
-        <button class="tiny-btn danger" type="button" onclick="removeEditChoice(${idx})">✕</button>
-    `;
-    list.appendChild(row);
-}
-
-window.removeEditChoice = function(idx) {
-    const list = document.getElementById('editChoicesList');
-    const rows = Array.from(list.children);
-    rows.forEach(r => {
-        const inp = r.querySelector('.edit-choice-text');
-        if(parseInt(inp.dataset.idx,10) === idx) {
-            r.remove();
-        }
+    const type = q.status || 'none';
+    document.querySelectorAll('input[name="editIssueType"]').forEach(r => {
+        r.checked = (r.value === type) || (type==='none' && r.value==='none');
     });
-};
 
+    const list = document.getElementById('editChoicesList'); 
+    list.innerHTML='';
+    (q.choices||[]).forEach(c => addEditChoice(c.text, c.isCorrect));
+};
+function addEditChoice(txt='', cor=false) {
+    const d=document.createElement('div'); d.className='edit-choice-row';
+    d.innerHTML=`<input class="std-input" style="flex:1" value="${txt}"><input type="radio" name="ec" ${cor?'checked':''}><button onclick="this.parentElement.remove()" class="tiny-btn" style="background:red">X</button>`;
+    document.getElementById('editChoicesList').appendChild(d);
+}
 function saveEditModal() {
-    if(!editQ) return;
-    editQ.text = document.getElementById('editText').value || editQ.text;
-    editQ.chapter = document.getElementById('editChapter').value || '';
-    editQ.tags = document.getElementById('editTags').value || '';
-    const radios = document.querySelectorAll('input[name="editIssueType"]');
+    const id = parseInt(document.getElementById('editModal').dataset.id);
+    const q = App.questions.find(x=>x.id===id);
+    q.text = document.getElementById('editText').value;
+    q.chapter = document.getElementById('editChapter').value;
+    q.tags = document.getElementById('editTags').value;
+    q.explanation = document.getElementById('editExplanation').value;
+    q.issueNote = document.getElementById('editIssueNote').value;
     let status = 'none';
-    radios.forEach(r => { if(r.checked) status = r.value; });
-    editQ.status = status;
-    editQ.explanation = document.getElementById('editExplanation').value || '';
-    editQ.issueNote = document.getElementById('editIssueNote').value || '';
-
-    const list = document.getElementById('editChoicesList');
-    const rows = Array.from(list.children);
-    const choices = [];
-    let correctIndex = -1;
-    const correctRadio = document.querySelector('input[name="editCorrect"]:checked');
-    if(correctRadio) correctIndex = parseInt(correctRadio.value,10);
-
-    rows.forEach((r,i) => {
-        const text = r.querySelector('.edit-choice-text').value.trim();
-        if(!text) return;
-        choices.push({ text, isCorrect: i === correctIndex });
+    document.querySelectorAll('input[name="editIssueType"]').forEach(r => { if(r.checked) status = r.value; });
+    q.status = status;
+    const ch = [];
+    document.querySelectorAll('.edit-choice-row').forEach(r => {
+        const txt = r.querySelector('input.std-input').value;
+        const isC = r.querySelector('input[type="radio"]').checked;
+        ch.push({ text:txt, isCorrect:isC });
     });
-    if(choices.length === 0) return alert("At least one choice is required");
-    if(correctIndex < 0 || correctIndex >= choices.length) {
-        return alert("Select which choice is correct");
-    }
-    editQ.choices = choices;
-    saveQ(editQ);
+    q.choices = ch;
+    saveQ(q);
     document.getElementById('editModal').classList.add('hidden');
-    editQ = null;
-    refreshUI();
+    applyTableFilters();
+    renderSessionHistory();
+    alert("Saved");
 }
 
-// --- DASHBOARD ---
-function refreshDashboard() {
+// SRS
+function handleSRS(grade) {
+    const q = App.currentQ;
+    let days = 1;
+    if(grade===4) days=7; if(grade===3) days=4; if(grade===2) days=2;
+    q.dueDate = nowTs() + (days * 24 * 60 * 60 * 1000);
+    saveQ(q);
+    loadNextQuestion(false);
+}
+
+// Dashboard
+function renderDashboard() {
     const total = App.questions.length;
-    const maint = App.questions.filter(q => q.status === 'maintenance' || q.status === 'error').length;
-    const mastered = App.questions.filter(q => (q.timesSeen||0) >= 3 && (q.timesWrong||0) === 0).length;
-    const mastery = total ? Math.round((mastered/total)*100) : 0;
-
+    const mastered = App.questions.filter(q => (q.timesCorrect||0) > 3).length;
+    const maint = App.questions.filter(q => q.status === 'maintenance').length;
     safeSetText('dashTotal', total);
+    safeSetText('dashMastery', Math.round((mastered/total)*100 || 0) + '%');
     safeSetText('dashMaint', maint);
-    safeSetText('dashMastery', mastery + "%");
-
-    const days = Math.max(1, (Date.now() - (App.user.createdAt || Date.now())) / (1000*60*60*24));
-    const velocity = (total / days).toFixed(1);
-    safeSetText('dashVelocity', velocity + "/day");
 }
-
-// --- TAB SWITCH ---
-function switchTab(name) {
-    document.querySelectorAll('.tab-button').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === name);
-    });
-    document.querySelectorAll('.tab-content').forEach(sec => {
-        sec.classList.toggle('active', sec.id === 'tab-'+name);
-    });
+function switchTab(id) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.getElementById(`tab-${id}`).classList.add('active');
+    document.querySelector(`.tab-button[data-tab="${id}"]`).classList.add('active');
+    if(id==='all') applyTableFilters();
+    if(id==='dashboard') renderDashboard();
 }
-
-// Force reload helper
-document.addEventListener('click', (e) => {
-    if(e.target && e.target.id === 'btnForceReload') {
-        location.reload(true);
-    }
-});
+function refreshUI() {
+    const chaps = [...new Set(App.questions.map(q=>q.chapter).filter(Boolean))].sort();
+    const h = '<option value="">All Chapters</option>' + chaps.map(c=>`<option value="${c}">${c}</option>`).join('');
+    document.querySelectorAll('.chapter-list').forEach(s => s.innerHTML = h);
+}
