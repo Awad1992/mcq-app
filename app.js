@@ -53,6 +53,10 @@ const chapterBox = document.getElementById('chapterBox');
 const chapterSelect = document.getElementById('chapterSelect');
 const prefSkipSolvedEl = document.getElementById('prefSkipSolved');
 
+const userNoteArea = document.getElementById('userNoteArea');
+const saveNoteStatusEl = document.getElementById('saveNoteStatus');
+const btnSaveNoteManual = document.getElementById('btnSaveNoteManual');
+
 // toast
 function toast(msg){
   const c = document.getElementById('toastContainer');
@@ -343,7 +347,50 @@ function renderQuestion(){
   });
   html+='</div>';
   questionPanel.innerHTML=html;
+  loadCurrentNoteIntoBox();
 }
+
+
+// notes per-question
+let noteSaveTimer = null;
+
+function loadCurrentNoteIntoBox(){
+  if(!userNoteArea) return;
+  if(!currentQuestion){ userNoteArea.value=''; return; }
+  userNoteArea.value = currentQuestion.note || '';
+  if(saveNoteStatusEl) saveNoteStatusEl.textContent = '';
+}
+
+async function saveCurrentNote(manual=false){
+  if(!userNoteArea || !currentQuestion || !db) return;
+  const noteText = (userNoteArea.value||'').trimEnd();
+  const qid = currentQuestion.id;
+  const tx = db.transaction('questions','readwrite');
+  const store = tx.objectStore('questions');
+  const req = store.get(qid);
+  req.onsuccess = e=>{
+    const q = e.target.result;
+    if(!q) return;
+    q.note = noteText;
+    store.put(q);
+    currentQuestion.note = noteText;
+  };
+  tx.oncomplete = ()=>{
+    if(saveNoteStatusEl){
+      saveNoteStatusEl.textContent = manual ? 'saved' : 'auto-saved';
+      setTimeout(()=>{ if(saveNoteStatusEl) saveNoteStatusEl.textContent=''; }, 1200);
+    }
+  };
+}
+
+function scheduleAutoSaveNote(){
+  if(noteSaveTimer) clearTimeout(noteSaveTimer);
+  noteSaveTimer = setTimeout(()=>saveCurrentNote(false), 800);
+}
+
+userNoteArea?.addEventListener('input', scheduleAutoSaveNote);
+userNoteArea?.addEventListener('blur', ()=>saveCurrentNote(false));
+btnSaveNoteManual?.addEventListener('click', ()=>saveCurrentNote(true));
 
 // history list
 async function updateHistoryList(){
@@ -565,7 +612,7 @@ function normalizeImportedQuestions(rawArr){
     if(!choices.length) choices=[{text:'Option A',isCorrect:true}];
 
     const obj={
-      text:baseText, chapter, source, explanation, choices, tags,
+      text:baseText, chapter, source, explanation, choices, tags, note: q.note||q.userNote||q.notes||'',
       timesSeen:q.timesSeen||0, timesCorrect:q.timesCorrect||0, timesWrong:q.timesWrong||0,
       lastSeenAt:q.lastSeenAt||null, createdAt:q.createdAt||new Date().toISOString(),
       flagged:!!q.flagged, maintenance:!!q.maintenance, active:q.active!==false,
@@ -616,6 +663,7 @@ async function exportQuestionsOnly(){
     timesSeen:q.timesSeen||0, timesCorrect:q.timesCorrect||0, timesWrong:q.timesWrong||0,
     lastSeenAt:q.lastSeenAt||null, createdAt:q.createdAt||null,
     tags:Array.isArray(q.tags)?q.tags:[], pinned:!!q.pinned,
+    note:q.note||'',
     imageUrl:q.imageUrl||'', imageData:q.imageData||'',
     srEase:q.srEase||2.5, srInterval:q.srInterval||0, srReps:q.srReps||0, dueAt:q.dueAt||null
   }));
