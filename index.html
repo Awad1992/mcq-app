@@ -98,6 +98,9 @@
         <!-- FEEDBACK -->
         <div id="feedbackPanel" class="feedback-panel hidden"></div>
 
+        <!-- RELATED -->
+        <div id="relatedBox" class="related-box muted small-label" style="margin-top:8px;"></div>
+
         <!-- NOTES -->
         <div class="notes-container">
           <label class="small-label">Notes 📝 <span id="saveNoteStatus"></span></label>
@@ -128,7 +131,14 @@
           <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
         </div>
 
-        <!-- SESSION SIDE -->
+        
+        <!-- SESSION SEQUENCE NAV -->
+        <div class="card side-card seq-card">
+          <div class="small-label">Session Sequence</div>
+          <div id="seqNav" class="seq-nav"></div>
+        </div>
+
+<!-- SESSION SIDE -->
         <div class="card side-card">
           <div class="small-label">Session Stats</div>
           <div id="sessionStats">0 Correct</div>
@@ -324,6 +334,7 @@
         <input id="ghFile" class="std-input" value="mcq_backup.json">
 
         <button id="btnSaveGh" class="primary-btn">Save</button>
+        <button id="btnApplyGh" class="btn">Apply</button>
 
         <hr>
 

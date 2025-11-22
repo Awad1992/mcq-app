@@ -429,7 +429,6 @@ async function submitAnswer(){
     lastResult=isCorrect;
     showFeedback(correctIdx, selectedIdx, q.explanation);
     updateStatsBar(); updateHistoryList(); refreshBackupLabels();
-    renderLocalBackupsTable();
   };
 }
 
@@ -620,6 +619,7 @@ async function exportFullBackup(){
   const exportedAt=backup.meta.exportedAt;
   saveMeta('lastBackupAt', exportedAt);
   refreshBackupLabels();
+  await addBackupToHistory('manual export');
   const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const safeTs=exportedAt.replace(/[:]/g,'-');
   const a=document.createElement('a');
@@ -1086,22 +1086,27 @@ function loadGitHubConfig(){
 function saveGitHubConfig(cfg){
   localStorage.setItem('mcq_github_config_v20', JSON.stringify(cfg));
 }
-function loadGitHubConfigIntoUI(){
-  const cfg=loadGitHubConfig();
-  const t=document.getElementById('ghToken');
-  const r=document.getElementById('ghRepo');
-  const f=document.getElementById('ghFile');
-  if(t) t.value=cfg.token;
-  if(r) r.value=cfg.repo;
-  if(f) f.value=cfg.filename;
+
+function loadGitHubConfigIntoUI() {
+  const cfg = loadGitHubConfig();
+  const t = document.getElementById('ghTokenInput') || document.getElementById('ghToken');
+  const r = document.getElementById('ghRepoInput') || document.getElementById('ghRepo');
+  const f = document.getElementById('ghFileInput') || document.getElementById('ghFile');
+  if (t) t.value = cfg.token;
+  if (r) r.value = cfg.repo;
+  if (f) f.value = cfg.filename;
 }
-function saveGitHubConfigFromUI(){
-  const token=document.getElementById('ghToken')?.value.trim()||'';
-  const repo=document.getElementById('ghRepo')?.value.trim()||'';
-  const filename=document.getElementById('ghFile')?.value.trim()||'mcq_backup.json';
-  saveGitHubConfig({token,repo,filename});
+function saveGitHubConfigFromUI() {
+  const tokenEl = document.getElementById('ghTokenInput') || document.getElementById('ghToken');
+  const repoEl  = document.getElementById('ghRepoInput')  || document.getElementById('ghRepo');
+  const fileEl  = document.getElementById('ghFileInput')  || document.getElementById('ghFile');
+  const token = tokenEl?.value.trim() || '';
+  const repo = repoEl?.value.trim() || 'Awad1992/mcq-data';
+  const filename = fileEl?.value.trim() || 'mcq_backup.json';
+  saveGitHubConfig({ token, repo, filename });
   refreshCloudInfo();
-  toast('GitHub settings saved.');
+  renderBackupsPage();
+  alert('GitHub settings saved.');
 }
 function refreshCloudInfo(){
   const cfg=loadGitHubConfig();
@@ -1744,3 +1749,134 @@ chapterSelect?.addEventListener('change',()=>{
     alert('Failed to open local database.');
   }
 })();
+// --- Backup history (local last 30) ---
+const BACKUP_HISTORY_KEY = 'backupHistory';
+
+async function addBackupToHistory(reason='auto') {
+  try {
+    const backup = await buildBackupObject();
+    backup.meta.reason = reason;
+    const arr = (await loadMeta(BACKUP_HISTORY_KEY)) || [];
+    const list = Array.isArray(arr) ? arr : [];
+    list.unshift({ ts: backup.meta.exportedAt, reason, backup });
+    const trimmed = list.slice(0, 30);
+    await saveMeta(BACKUP_HISTORY_KEY, trimmed);
+    return trimmed;
+  } catch (e) {
+    console.warn('addBackupToHistory failed', e);
+    return [];
+  }
+}
+
+async function getBackupHistory() {
+  const arr = await loadMeta(BACKUP_HISTORY_KEY);
+  return Array.isArray(arr) ? arr : [];
+}
+
+async function renderBackupsPage() {
+  const host = document.getElementById('questionsBackupsTable');
+  if (!host) return;
+  const list = await getBackupHistory();
+  if (!list.length) {
+    host.innerHTML = '<div class="muted tiny">No backups yet.</div>';
+    return;
+  }
+  const sel = document.getElementById('backupHistoryList');
+  if (sel) {
+    sel.innerHTML = list.map((b,i)=>`<option value="${i}">${i+1}. ${fmtTime(b.ts)} ${b.reason?('('+b.reason+')'):''}</option>`).join('');
+  }
+  host.innerHTML = list.map((b, i) => {
+    const t = fmtTime(b.ts);
+    return `<div class="backup-row">
+      <div><strong>${i+1}.</strong> ${t} ${b.reason?('• '+b.reason):''}</div>
+      <div class="backup-actions">
+        <button class="secondary-btn tiny backup-restore" data-idx="${i}">Restore</button>
+        <button class="ghost-btn tiny backup-download" data-idx="${i}">Download</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  host.querySelectorAll('.backup-restore').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.getAttribute('data-idx'),10);
+      const item = list[idx];
+      if (!item?.backup) return;
+      await importBackupObject(item.backup);
+      alert('Backup restored.');
+      startNewPracticeSession(true);
+      renderBackupsPage();
+      refreshBackupLabels();
+    });
+  });
+  host.querySelectorAll('.backup-download').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.getAttribute('data-idx'),10);
+      const item = list[idx];
+      if (!item?.backup) return;
+      const blob = new Blob([JSON.stringify(item.backup, null, 2)], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'mcq_backup_' + (item.ts||'').replace(/[:]/g,'-') + '.json';
+      a.click();
+    });
+  });
+}
+
+async function renderSessionsPage() {
+  const list = document.getElementById('sessionsList');
+  if (!list) return;
+  const sessions = await loadPracticeSessions();
+  if (!sessions.length) {
+    list.innerHTML = '<div class="muted tiny">No sessions yet.</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const created = fmtTime(s.createdAt);
+    return `<div class="session-item">
+      <div class="session-meta"><b>${created}</b> • Mode: ${s.mode} • Qs: ${s.count} • Answered: ${s.answered||0} • Correct: ${s.correct||0}</div>
+      <div class="session-actions">
+        <button class="primary-btn tiny" data-action="resume" data-id="${s.id}">Resume</button>
+        <button class="danger-btn tiny" data-action="delete" data-id="${s.id}">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-id');
+      const action = b.getAttribute('data-action');
+      if (!id) return;
+      if (action === 'resume') await resumePracticeSession(id);
+      if (action === 'delete') {
+        const arr = (await loadPracticeSessions()).filter(x => x.id !== id);
+        await savePracticeSessions(arr);
+        renderSessionsPage();
+      }
+    });
+  });
+}
+
+
+
+// --- Extra bindings for current HTML IDs ---
+document.getElementById('btnImportTrigger')?.addEventListener('click', () => document.getElementById('fileInput')?.click());
+document.getElementById('fileInput')?.addEventListener('change', handleImportSimple);
+document.getElementById('btnExportTrigger')?.addEventListener('click', exportQuestionsOnly);
+
+document.getElementById('btnBackupQuestionsNow')?.addEventListener('click', exportFullBackup);
+document.getElementById('btnHeaderBackup')?.addEventListener('click', exportFullBackup);
+
+document.getElementById('btnSaveGh')?.addEventListener('click', saveGitHubConfigFromUI);
+document.getElementById('btnApplyGh')?.addEventListener('click', () => { refreshCloudInfo(); renderBackupsPage(); });
+
+document.getElementById('btnCloudUpload')?.addEventListener('click', cloudUpload);
+document.getElementById('btnCloudDownload')?.addEventListener('click', cloudDownload);
+document.getElementById('btnRestoreBackup')?.addEventListener('click', async () => {
+  const sel = document.getElementById('backupHistoryList');
+  const idx = sel ? parseInt(sel.value,10) : NaN;
+  const list = await getBackupHistory();
+  if (!Number.isFinite(idx) || !list[idx]) return;
+  await importBackupObject(list[idx].backup);
+  alert('Backup restored.');
+  renderBackupsPage();
+  startNewPracticeSession(true);
+});

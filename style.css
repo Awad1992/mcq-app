@@ -49,17 +49,8 @@ body{
 
 .row-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .std-select,.std-input,.std-textarea{
-  background: var(--input-bg);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 10px;
-  outline: none;
-  font-size: 14px;
-}
-.std-select:focus,.std-input:focus,.std-textarea:focus{
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+  background:#0b1330; border:1px solid var(--line); color:var(--text);
+  padding:8px 10px; border-radius:10px; font-size:14px; outline:none;
 }
 .std-textarea{width:100%; resize:vertical}
 .chapter-list{min-width:160px}
@@ -179,21 +170,128 @@ body{
   background:#0b1330; color:var(--text); border:1px solid var(--line); padding:8px 10px; border-radius:10px; font-size:13px;
 }
 
-.theme-light{
-  --bg:#f5f7ff;
-  --bg2:#ffffff;
-  --card:#ffffff;
-  --card2:#f8faff;
-  --text:#0f172a;
-  --muted:#4e5a88;
-  --line:#d9def5;
-  --accent:#2563eb;
-  --input-bg:#e9f0ff;
+
+
+
+/* === Light theme input comfort === */
+.theme-light input[type="text"],
+.theme-light input[type="password"],
+.theme-light input[type="number"],
+.theme-light textarea,
+.theme-light select {
+  background: #eef2ff;
+  color: #0b1020;
+  border: 1px solid #cfd8ff;
+}
+.theme-light textarea::placeholder,
+.theme-light input::placeholder {
+  color: #6b7280;
 }
 
-/* Session navigator buttons */
-.session-nav{ display:flex; flex-wrap:wrap; gap:6px; }
-.session-q-btn{ min-width:36px; text-align:center; }
-.session-q-btn.current{ outline:2px solid var(--accent); }
-.session-q-btn.correct{ background: color-mix(in srgb, #22c55e 30%, var(--input-bg)); border-color:#22c55e; }
-.session-q-btn.wrong{ background: color-mix(in srgb, #ef4444 30%, var(--input-bg)); border-color:#ef4444; }
+/* === Sequence nav vertical (Session Questions) === */
+.seq-nav-vertical{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  max-height:420px;
+  overflow:auto;
+  padding:4px;
+}
+.seq-nav-vertical .seq-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  padding:6px 8px;
+  font-weight:700;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  cursor:pointer;
+}
+.seq-nav-vertical .seq-btn .seq-num{
+  min-width:28px;
+  text-align:center;
+  font-variant-numeric: tabular-nums;
+}
+.seq-nav-vertical .seq-btn.correct{
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 12%, var(--card-2));
+}
+.seq-nav-vertical .seq-btn.wrong{
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, var(--card-2));
+}
+.seq-nav-vertical .seq-btn.flagged .seq-flag{
+  font-size:12px;
+  opacity:0.9;
+}
+
+
+/* === Light theme (default) === */
+.theme-light{
+  --bg:#f5f7fb;
+  --panel:#ffffff;
+  --panel-2:#eef2f7;
+  --text:#0f172a;
+  --muted:#475569;
+  --accent:#2563eb;
+  --accent-2:#0ea5e9;
+  --danger:#dc2626;
+  --good:#16a34a;
+  --border:#d7dce6;
+  --chip:#e9edf5;
+  --chip-text:#0f172a;
+  --input:#ffffff;
+}
+.theme-light body,
+body.theme-light{
+  background:var(--bg);
+  color:var(--text);
+}
+.theme-light .card,
+body.theme-light .card{
+  background:var(--panel);
+  border-color:var(--border);
+  box-shadow:0 6px 18px rgba(15,23,42,0.06);
+}
+.theme-light .std-input,
+.theme-light .std-select,
+.theme-light .std-textarea,
+.theme-light .notes-textarea,
+body.theme-light .std-input,
+body.theme-light .std-select,
+body.theme-light .std-textarea,
+body.theme-light .notes-textarea{
+  background:var(--input);
+  color:var(--text);
+  border-color:var(--border);
+}
+.theme-light .question-panel,
+body.theme-light .question-panel{
+  background:var(--panel-2);
+  border-color:var(--border);
+}
+.theme-light .top-bar,
+body.theme-light .top-bar{
+  background:var(--panel);
+  border-color:var(--border);
+}
+.theme-light .chip,
+body.theme-light .chip{
+  background:var(--chip);
+  color:var(--chip-text);
+  border-color:var(--border);
+}
+.theme-light .tab-button,
+body.theme-light .tab-button{
+  background:transparent;
+  color:var(--text);
+}
+.theme-light .tab-button.active,
+body.theme-light .tab-button.active{
+  background:var(--panel);
+  border-color:var(--border);
+}
