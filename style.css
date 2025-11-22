@@ -49,7 +49,7 @@ body{
 
 .row-controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .std-select,.std-input,.std-textarea{
-  background:var(--input-bg, #0b1330); border:1px solid var(--line); color:var(--text);
+  background:#0b1330; border:1px solid var(--line); color:var(--text);
   padding:8px 10px; border-radius:10px; font-size:14px; outline:none;
 }
 .std-textarea{width:100%; resize:vertical}
@@ -74,7 +74,7 @@ body{
 .q-text{font-size:18px; font-weight:700; line-height:1.5}
 .tag-chapter{margin-top:6px; font-size:12px; color:var(--muted)}
 .choice{
-  display:block; padding:8px 10px; background:var(--choice-bg, var(--input-bg, #0b1330)); border:1px solid var(--line);
+  display:block; padding:8px 10px; background:#0b1330; border:1px solid var(--line);
   border-radius:10px; margin-top:6px; cursor:pointer;
 }
 .choice.correct{border-color:var(--ok); box-shadow:0 0 0 1px var(--ok) inset}
@@ -171,35 +171,6 @@ body{
 }
 
 .theme-light{
-  --bg:#f4f6fb;
-  --bg2:#e9eef7;
-  --card:#ffffff;
-  --card2:#f3f0ff;
-  --text:#111827;
-  --muted:#4b5563;
-  --line:#d7dbe6;
-  --accent:#2563eb;
-  --accent2:#1d4ed8;
-  --ok:#16a34a;
-  --bad:#dc2626;
-  --warn:#d97706;
-  --input-bg:#f7f5ff;
-  --choice-bg:#ffffff;
+  --bg:#f5f7ff; --bg2:#ffffff; --card:#ffffff; --card2:#f0f3ff;
+  --text:#10142b; --muted:#4e5a88; --line:#d9def5; --accent:#2563eb;
 }
-
-
-.seq-nav{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
-.seq-btn{ min-width:34px; height:34px; border-radius:8px; border:1px solid var(--line); background:var(--card2); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer;}
-.seq-btn.correct{ background:rgba(22,163,74,0.12); border-color:rgba(22,163,74,0.5);}
-.seq-btn.wrong{ background:rgba(220,38,38,0.12); border-color:rgba(220,38,38,0.5);}
-.seq-btn.flagged{ outline:2px solid var(--warn); }
-.seq-btn.active{ box-shadow:0 0 0 2px var(--accent); }
-
-.cloud-backups-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px;}
-.cloud-backup-row{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border:1px solid var(--line); background:var(--card); border-radius:8px;}
-
-.session-item{ display:flex; align-items:center; justify-content:space-between; padding:10px; border:1px solid var(--line); background:var(--card); border-radius:10px; margin-bottom:8px;}
-.session-meta{ color:var(--muted); font-size:12px;}
-.session-actions{ display:flex; gap:6px;}
-.session-actions .primary{ background:var(--accent); color:white; border:none; padding:6px 10px; border-radius:8px; cursor:pointer;}
-.session-actions .ghost{ background:transparent; color:var(--text); border:1px solid var(--line); padding:6px 10px; border-radius:8px; cursor:pointer;}

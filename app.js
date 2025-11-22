@@ -2,7 +2,7 @@
 // IndexedDB + SRS + Library + Flashcards + Exam + GitHub Backup
 
 const DB_NAME = 'mcqdb_ultra_v20';
-const DB_VERSION = 21;
+const DB_VERSION = 20;
 
 let db = null;
 
@@ -1115,130 +1115,46 @@ function refreshCloudInfo(){
   el.textContent='Cloud ready → Repo: '+cfg.repo+' · File: '+cfg.filename;
   syncStatus.textContent='Cloud: ready';
 }
-
-async function refreshCloudBackupsList() {
-  const cfg = loadGitHubConfig();
-  const listEl = document.getElementById('cloudBackupsList');
-  if (!listEl) return;
-  if (!cfg.token || !cfg.repo) {
-    listEl.innerHTML = '<div class="muted tiny">Cloud disabled.</div>';
-    return;
-  }
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) {
-    listEl.innerHTML = '<div class="muted tiny">Invalid repo.</div>';
-    return;
-  }
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/backups`;
-  try {
-    const res = await fetch(url, { headers: { Authorization: `token ${cfg.token}` } });
-    if (res.status === 404) {
-      listEl.innerHTML = '<div class="muted tiny">No backups folder yet.</div>';
-      return;
-    }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const items = await res.json();
-    const files = (items || []).filter(x => x && x.type === 'file' && (x.name || '').endsWith('.json'));
-    files.sort((a,b) => (b.name || '').localeCompare(a.name || ''));
-    const top = files.slice(0, 30);
-    if (!top.length) {
-      listEl.innerHTML = '<div class="muted tiny">No backups yet.</div>';
-      return;
-    }
-    listEl.innerHTML = top.map(f => {
-      const ts = (f.name || '').replace('mcq_backup_','').replace('.json','').replace(/-/g,':');
-      return `<div class="cloud-backup-row">
-        <div class="tiny">${f.name}</div>
-        <div>
-          <button class="pill-btn" data-action="restore" data-url="${f.download_url}">Restore</button>
-        </div>
-      </div>`;
-    }).join('');
-    listEl.querySelectorAll('button[data-action="restore"]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const dl = b.getAttribute('data-url');
-        if (!dl) return;
-        if (!confirm('Restore this backup from cloud?')) return;
-        try {
-          const r = await fetch(dl, { headers: { Authorization: `token ${cfg.token}` } });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          const data = await r.json();
-          await importBackupObject(data);
-          alert('Backup restored.');
-          startNewPracticeSession(true);
-          refreshBackupLabels();
-          renderSessionsPage();
-        } catch (e) {
-          alert('Restore failed: ' + e.message);
-        }
-      });
-    });
-  } catch (e) {
-    listEl.innerHTML = '<div class="muted tiny">Failed to load backups.</div>';
-  }
-}
-
 function encodeBase64(str){ return btoa(unescape(encodeURIComponent(str))); }
 function decodeBase64(str){ return decodeURIComponent(escape(atob(str))); }
 
+async function cloudUpload(){
+  const cfg=loadGitHubConfig();
+  if(!cfg.token || !cfg.repo){ toast('Set GitHub token + repo first.'); return; }
 
-async function cloudUpload() {
-  const cfg = loadGitHubConfig();
-  if (!cfg.token || !cfg.repo) { alert('Set GitHub token + repo in Settings first.'); return; }
+  const backup=await buildBackupObject();
+  const contentB64=encodeBase64(JSON.stringify(backup,null,2));
+  const [owner, repoName]=cfg.repo.split('/');
+  if(!owner || !repoName){ toast('Repo format must be owner/name.'); return; }
 
-  const backup = await buildBackupObject();
-  const contentB64 = encodeBase64(JSON.stringify(backup, null, 2));
-
-  const [owner, repoName] = cfg.repo.split('/');
-  if (!owner || !repoName) { alert('Repo format must be owner/name.'); return; }
-
-  const safeTs = backup.meta.exportedAt.replace(/[:]/g, '-');
-  const latestUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
-  const tsName = `backups/mcq_backup_${safeTs}.json`;
-  const tsUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(tsName)}`;
-
-  async function putFile(url, message, content, sha=null) {
-    const body = { message, content };
-    if (sha) body.sha = sha;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { Authorization: `token ${cfg.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    return res;
-  }
-
-  // upload timestamped (never overwrite)
-  const tsRes = await putFile(tsUrl, 'MCQ backup ' + backup.meta.exportedAt, contentB64);
-  if (!tsRes.ok && tsRes.status !== 422) { // 422 if same name exists
-    const txt = await tsRes.text();
-    alert('Upload failed: ' + tsRes.status + ' ' + txt);
-    return;
-  }
-
-  // update latest (overwrite)
-  let existingSha = null;
-  try {
-    const getRes = await fetch(latestUrl, { headers: { Authorization: `token ${cfg.token}` } });
-    if (getRes.status === 200) {
-      const info = await getRes.json();
-      existingSha = info.sha;
+  const url=`https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cfg.filename)}`;
+  let existingSha=null;
+  try{
+    const getRes=await fetch(url,{headers:{Authorization:`token ${cfg.token}`}});
+    if(getRes.status===200){
+      const info=await getRes.json();
+      existingSha=info.sha;
     }
-  } catch {}
+  }catch{}
 
-  const latestRes = await putFile(latestUrl, 'MCQ latest backup ' + backup.meta.exportedAt, contentB64, existingSha);
-  if (!latestRes.ok) {
-    const txt = await latestRes.text();
-    alert('Latest update failed: ' + latestRes.status + ' ' + txt);
+  const body={message:'MCQ backup '+new Date().toISOString(), content:contentB64};
+  if(existingSha) body.sha=existingSha;
+
+  const res=await fetch(url,{
+    method:'PUT',
+    headers:{Authorization:`token ${cfg.token}`,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const txt=await res.text();
+    toast('Upload failed: '+res.status);
+    console.error(txt);
     return;
   }
-
   saveMeta('lastBackupAt', backup.meta.exportedAt);
   refreshBackupLabels();
-  refreshCloudBackupsList();
-  alert('Backup uploaded to GitHub.');
+  toast('Backup uploaded to GitHub.');
 }
-
 
 async function cloudDownload(){
   const cfg=loadGitHubConfig();
@@ -1827,56 +1743,3 @@ chapterSelect?.addEventListener('change',()=>{
     alert('Failed to open local database.');
   }
 })();
-async function renderSessionsPage() {
-  const list = document.getElementById('sessionsPageList');
-  if (!list) return;
-  const sessions = await loadPracticeSessions();
-  if (!sessions.length) {
-    list.innerHTML = '<div class="muted tiny">No sessions yet.</div>';
-    return;
-  }
-  list.innerHTML = sessions.map(s => {
-    const created = new Date(s.createdAt).toLocaleString();
-    const meta = [
-      `Mode: ${s.mode}`,
-      `Questions: ${s.count}`,
-      `Answered: ${s.answered}`,
-      `Correct: ${s.correct}`,
-      `Created: ${created}`
-    ].join(' • ');
-    const ch = (s.filters?.chapters || []).slice(0,6).join(', ');
-    const filt = ch ? `Chapters: ${ch}${(s.filters.chapters||[]).length>6?'…':''}` : '';
-    return `<div class="session-item">
-      <div>
-        <div><b>${created}</b></div>
-        <div class="session-meta">${meta}</div>
-        ${filt ? `<div class="session-meta">${filt}</div>`:''}
-      </div>
-      <div class="session-actions">
-        <button class="primary" data-action="resume" data-id="${s.id}">Resume</button>
-        <button class="ghost" data-action="delete" data-id="${s.id}">Delete</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  list.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', async () => {
-      const id = b.getAttribute('data-id');
-      const action = b.getAttribute('data-action');
-      if (!id) return;
-      if (action === 'resume') {
-        await resumePracticeSession(id);
-        document.querySelector('.tab-button[data-tab="home"]')?.click();
-      } else if (action === 'delete') {
-        const arr = (await loadPracticeSessions()).filter(x => x.id !== id);
-        await savePracticeSessions(arr);
-        renderSessionsPage();
-      }
-    });
-  });
-}
-
-
-
-document.getElementById('btnSessionsNew')?.addEventListener('click', () => startNewPracticeSession(true));
-document.getElementById('btnSessionsRefresh')?.addEventListener('click', renderSessionsPage);
