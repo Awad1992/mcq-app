@@ -154,6 +154,9 @@
               <option value="notes">With Notes</option>
               <option value="wrong">Errors</option>
               <option value="flagged">Flagged</option>
+              <option value="duplicate">Duplicates</option>
+              <option value="weak">Weak</option>
+              <option value="inactive">Inactive</option>
             </select>
 
             <select id="allChapterSelect" class="std-select chapter-list"></select>
@@ -174,7 +177,7 @@
             <div class="spacer"></div>
 
             <div class="action-group">
-              <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
+              <label class="check-label"><input type="checkbox" id="allRangeMode"> Range Select</label>
               <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
               <input type="file" id="fileInput" accept=".json" class="hidden">
               <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
@@ -198,8 +201,8 @@
                 <th>Date</th>
                 <th>Question</th>
                 <th>Chapter</th>
-                <th>Notes</th>
-                <th>Issue</th>
+                <th>Tags</th>
+                <th>Stats</th>
                 <th>Status</th>
                 <th>Edit</th>
               </tr>
@@ -227,16 +230,28 @@
         <select id="fcSource" class="std-select">
           <option value="due">Due</option>
           <option value="all">All</option>
+          <option value="weak">Weak</option>
+          <option value="flagged">Flagged</option>
+          <option value="chapter">By Chapter</option>
+        </select>
+        <select id="fcChapterFilter" class="std-select chapter-list" style="display:none;"></select>
+        <select id="fcMode" class="std-select">
+          <option value="q-first">Q → A</option>
+          <option value="a-first">A → Q</option>
         </select>
 
         <button id="btnFcShuffle" class="primary-btn">Shuffle</button>
 
         <div id="fcCard" class="flashcard">
-          <div id="fcFront">Front</div>
-          <div id="fcBack" class="hidden">Back</div>
+          <div id="flashcardFront">Front</div>
+          <div id="flashcardBack" class="hidden">Back</div>
         </div>
 
-        <button id="btnFcShow" class="secondary-btn">Show</button>
+        <div class="btn-row">
+          <button id="btnFcShow" class="secondary-btn">Show</button>
+          <button id="btnFcNext" class="primary-btn">Next</button>
+        </div>
+
         <div id="fcGrading" class="hidden">
           <button id="btnFcAgain" class="danger-btn">Again</button>
           <button id="btnFcGood" class="primary-btn">Good</button>
@@ -249,22 +264,36 @@
       <div class="card">
         <h3>Exam Simulator</h3>
 
-        <select id="examChapterSelect" class="std-select chapter-list"></select>
+        <select id="examPool" class="std-select">
+          <option value="all">All</option>
+          <option value="weak">Weak</option>
+          <option value="flagged">Flagged</option>
+          <option value="chapter">By Chapter</option>
+        </select>
+        <select id="examChapterFilter" class="std-select chapter-list" style="display:none;"></select>
+
         <input type="number" id="examCount" class="std-input" value="40" style="width:70px;">
+        <input type="number" id="examMinutes" class="std-input" value="60" style="width:70px;">
         <button id="btnStartExam" class="primary-btn">Start</button>
 
-        <div id="examInterface" class="card hidden">
-          <div class="exam-header">Q <span id="examProgress"></span></div>
-          <div id="examQPanel" class="question-panel"></div>
+        <div id="examActiveCard" class="card hidden" style="margin-top:12px;">
+          <div class="exam-header">
+            Q <span id="examIndexLabel">1</span>/<span id="examTotalLabel">0</span>
+            <span style="margin-left:auto;">⏱ <span id="examTimerLabel">00:00</span></span>
+          </div>
+          <div id="examQuestionPanel" class="question-panel"></div>
 
-          <button id="btnExamNext" class="nav-btn">Next</button>
-          <button id="btnExamFinish" class="danger-btn">Finish</button>
+          <div class="btn-row">
+            <button id="btnExamPrev" class="nav-btn">Prev</button>
+            <button id="btnExamNext" class="nav-btn">Next</button>
+            <button id="btnExamFinish" class="danger-btn">Finish</button>
+          </div>
         </div>
 
-        <div id="examResults" class="card hidden">
+        <div id="examResultCard" class="card hidden" style="margin-top:12px;">
           <h3>Results</h3>
-          <div id="examScore"></div>
-          <button id="btnExamClose" class="pill-btn">Close</button>
+          <div id="examSummary"></div>
+          <div id="examDetails" style="margin-top:8px;"></div>
         </div>
       </div>
     </section>
@@ -273,11 +302,12 @@
     <section id="tab-dashboard" class="tab-content">
       <div class="card">
         <h2>Statistics</h2>
+        <div id="statsBar" class="stats-bar"></div>
+
         <div class="dashboard-grid">
-          <div class="dash-box"><h3>Total</h3><span id="dashTotal"></span></div>
-          <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint"></span></div>
-          <div class="dash-box"><h3>Mastery</h3><span id="dashMastery"></span></div>
-          <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity"></span></div>
+          <div class="dash-box"><h3>Overall</h3><div id="dashOverall"></div></div>
+          <div class="dash-box"><h3>Weak Chapters</h3><div id="dashWeakChapters"></div></div>
+          <div class="dash-box"><h3>Weekly</h3><div id="dashWeekly"></div></div>
         </div>
 
         <button id="btnRefreshStats" class="refresh-btn" style="margin-top:20px;">↻ Refresh</button>
@@ -300,15 +330,17 @@
         <button id="btnCloudUpload" class="secondary-btn">Upload</button>
         <button id="btnCloudDownload" class="secondary-btn">Download</button>
 
-        <div style="margin-top:20px;">
-          <label class="small-label">Restore History</label>
-          <select id="backupHistoryList" class="std-select"></select>
-          <button id="btnRestoreBackup" class="secondary-btn">Restore</button>
-        </div>
+        <div id="cloudInfo" class="muted tiny" style="margin-top:8px;"></div>
+        <div class="tiny muted" style="margin-top:8px;">Last activity: <span id="lastActivityLabel">–</span></div>
+        <div class="tiny muted">Last backup: <span id="lastBackupLabel">–</span></div>
       </div>
 
       <div class="card" style="margin-top:20px;">
         <h3>System</h3>
+        <select id="resetScope" class="std-select">
+          <option value="all">All</option>
+          <option value="wrong">Wrong only</option>
+        </select>
         <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
         <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
         <button id="btnForceReload" class="ghost-btn">Force Reload</button>
@@ -319,7 +351,9 @@
     <section id="tab-sessions" class="tab-content">
       <div class="card">
         <h3>Practice Sessions</h3>
-        <div id="sessionsList"></div>
+        <button id="btnNewSession" class="primary-btn">New Session</button>
+        <button id="btnSessions" class="secondary-btn">Show Sessions</button>
+        <div id="sessionsList" style="margin-top:12px;"></div>
       </div>
     </section>
 
@@ -329,6 +363,9 @@
         <h3>Question Backups</h3>
 
         <button id="btnBackupQuestionsNow" class="primary-btn">Backup Now</button>
+        <input type="file" id="backupFileInput" accept=".json" class="hidden">
+        <button id="btnBackupImport" class="secondary-btn">Import Backup</button>
+        <button id="btnBackupExport" class="secondary-btn">Export Backup</button>
 
         <div id="questionsBackupsTable" style="margin-top:20px;"></div>
       </div>
@@ -341,28 +378,54 @@
 <div id="editModal" class="modal hidden">
   <div class="modal-backdrop" id="editModalBackdrop"></div>
   <div class="modal-content">
-    <h3>Edit Question</h3>
+    <h3 id="editModalTitle">Edit Question</h3>
 
-    <textarea id="editText" class="std-textarea" rows="3"></textarea>
+    <textarea id="editText" class="std-textarea" rows="3" placeholder="Question text"></textarea>
 
     <div class="row-inputs">
       <input id="editChapter" class="std-input" placeholder="Chapter">
-      <input id="editTags" class="std-input" placeholder="Tags">
+      <input id="editTags" class="std-input" placeholder="Tags (comma separated)">
     </div>
 
     <label class="check-label warning-text">
       <input type="checkbox" id="editMaint"> Maintenance
     </label>
+    <label class="check-label warning-text">
+      <input type="checkbox" id="editFlagged"> Flagged
+    </label>
+    <label class="check-label warning-text">
+      <input type="checkbox" id="editPinned"> Pinned
+    </label>
+    <label class="check-label warning-text">
+      <input type="checkbox" id="editActive" checked> Active
+    </label>
 
-    <textarea id="editExplanation" class="std-textarea" rows="3"></textarea>
+    <textarea id="editExplanation" class="std-textarea" rows="3" placeholder="Explanation"></textarea>
+
+    <div class="small-label">Image</div>
+    <input id="editImageUrl" class="std-input" placeholder="Image URL">
+    <input id="editImageFile" type="file" accept="image/*" class="std-input">
+    <div id="editImagePreview" class="img-preview"></div>
 
     <div class="small-label">Choices</div>
-    <div id="editChoicesList"></div>
+    <div id="editChoices"></div>
     <button id="btnAddChoice" class="pill-btn small">+ Choice</button>
 
     <div class="modal-footer">
-      <button id="btnSaveEdit" class="primary-btn">Save</button>
-      <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
+      <button id="btnEditSave" class="primary-btn">Save</button>
+      <button id="btnEditCancel" class="secondary-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SESSIONS MODAL -->
+<div id="sessionsModal" class="modal hidden">
+  <div class="modal-backdrop" id="sessionsModalBackdrop"></div>
+  <div class="modal-content">
+    <h3>Sessions</h3>
+    <div id="sessionsModalList"></div>
+    <div class="modal-footer">
+      <button id="btnCloseSessions" class="secondary-btn">Close</button>
     </div>
   </div>
 </div>

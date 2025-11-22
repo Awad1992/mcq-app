@@ -1,9 +1,9 @@
 {
-  "name": "MCQ Study App Ultra-Pro",
-  "short_name": "MCQ UltraPro",
+  "name": "MCQ Ultra-Pro V20",
+  "short_name": "MCQ Ultra-Pro",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#ffffff",
+  "background_color": "#0b1020",
+  "theme_color": "#2563eb",
   "icons": []
 }
