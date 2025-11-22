@@ -1,9 +1,1 @@
-{
-  "name": "MCQ Ultra-Pro V20",
-  "short_name": "MCQ Ultra-Pro",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#0b1020",
-  "theme_color": "#2563eb",
-  "icons": []
-}
+{}
