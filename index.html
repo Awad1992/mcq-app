@@ -2,29 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro v18.0</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>MCQ Ultra-Pro V20</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <link rel="manifest" href="manifest.json?v=18.0.0">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
 </head>
-<body>
 
+<body>
 <div id="toastContainer" class="toast-container"></div>
 
 <div class="app" id="appRoot">
-  
+
+  <!-- TOP BAR -->
   <header class="top-bar">
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">v18.0</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">V20</span></h1>
         <div class="xp-wrapper">
-           <span id="userRank">Intern</span> • <span id="userXP">0</span> XP • 🔥 <span id="streakCount">0</span> Day Streak
+          <span id="userRank">Intern</span> • 
+          <span id="userXP">0</span> XP • 
+          🔥 <span id="streakCount">0</span>
         </div>
       </div>
     </div>
+
     <div class="chips">
       <span class="chip" id="dbStatus">DB: Init...</span>
       <span class="chip chip-sync" id="syncStatus">Cloud: Check</span>
@@ -33,6 +37,7 @@
     </div>
   </header>
 
+  <!-- NAV -->
   <nav class="tabs">
     <button class="tab-button active" data-tab="home">Practice</button>
     <button class="tab-button" data-tab="all">Library</button>
@@ -40,295 +45,325 @@
     <button class="tab-button" data-tab="exam">Exam</button>
     <button class="tab-button" data-tab="dashboard">Stats</button>
     <button class="tab-button" data-tab="settings">Settings</button>
+    <button class="tab-button" data-tab="sessions">Sessions</button>
+    <button class="tab-button" data-tab="backups">Question Backups</button>
   </nav>
 
+  <!-- MAIN -->
   <main class="tab-container">
 
-    <!-- 1. PRACTICE TAB -->
+    <!-- PRACTICE -->
     <section id="tab-home" class="tab-content active">
       <div class="card main-layout">
-        <div class="row">
-          <div class="col-main">
-            <!-- Controls -->
-            <div class="row-controls">
-              <select id="modeSelect" class="std-select">
-                <option value="due">🧠 Smart Review</option>
-                <option value="new">🆕 New Only</option>
-                <option value="wrong">❌ Mistakes</option>
-                <option value="maintain">🔧 Maintenance</option>
-                <option value="flagged">🚩 Flagged</option>
-                <option value="chapter">📂 By Chapter</option>
-                <option value="all">🔀 Random All</option>
-              </select>
-              <div id="chapterBox" style="display:none;">
-                  <select id="chapterSelect" class="std-select chapter-list">
-                      <option value="">All Chapters</option>
-                  </select>
-              </div>
-              <button id="btnRefreshPractice" class="refresh-btn">↻ Apply</button>
-              <label class="check-label">
-                 <input type="checkbox" id="prefSkipSolved" checked> Skip Mastered
-              </label>
-              <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
-            </div>
 
-            <!-- Question Info Bar -->
-            <div id="qInfoBar" class="info-bar hidden">
-                <span id="qInfoID"></span> • <span id="qInfoChapter"></span> • <span id="qInfoStats"></span> • <span id="qInfoDate"></span>
-            </div>
+        <div class="row-controls">
 
-            <div id="maintBox" class="maint-box hidden">
-               <strong style="color:var(--danger)">🔧 Maintenance Mode</strong>
-               <textarea id="maintNote" class="maint-input" placeholder="Describe error..."></textarea>
-               <button id="btnSaveMaint" class="tiny-btn">Save Report</button>
-            </div>
+          <select id="modeSelect" class="std-select">
+            <option value="due">🧠 Smart Review</option>
+            <option value="new">🆕 New Only</option>
+            <option value="wrong">❌ Mistakes</option>
+            <option value="maintain">🔧 Maintenance</option>
+            <option value="flagged">🚩 Flagged</option>
+            <option value="chapter">📂 By Chapter</option>
+            <option value="all">🔀 Random All</option>
+          </select>
 
-            <div id="questionPanel" class="question-panel">
-               <div class="muted" style="padding:20px; text-align:center;">Loading Engine...</div>
-            </div>
-
-            <div class="tools-row">
-               <div id="searchTools" class="search-tools"></div>
-               <button class="ghost-btn" id="btnFlag">Flag ⚐</button>
-               <button class="ghost-btn warning-text" id="btnMaintain">🔧 Report</button>
-            </div>
-
-            <div class="notes-container">
-              <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                 <label class="small-label">Notes 📝 <span id="saveNoteStatus"></span></label>
-                 <button id="btnSaveNoteManual" class="tiny-btn">💾 Save Note</button>
-              </div>
-              <textarea id="userNoteArea" class="notes-textarea" placeholder="Type notes here..."></textarea>
-            </div>
-
-            <div id="feedbackPanel" class="feedback-panel hidden"></div>
-
-            <div class="btn-row-main">
-              <button class="primary-btn large" id="btnSubmit">Submit</button>
-              <button class="primary-btn large hidden" id="btnNext">Next →</button>
-              <label class="check-label guess-box">
-                <input type="checkbox" id="guessCheck"> I'm Guessing
-              </label>
-            </div>
-
-            <div id="srsButtons" class="srs-row hidden">
-               <button class="srs-btn again" id="btnSrsAgain">Again</button>
-               <button class="srs-btn hard" id="btnSrsHard">Hard</button>
-               <button class="srs-btn good" id="btnSrsGood">Good</button>
-               <button class="srs-btn easy" id="btnSrsEasy">Easy</button>
-            </div>
-            
-            <div class="nav-row">
-               <button class="secondary-btn" id="btnPrev">← Previous</button>
-               <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
-            </div>
+          <div id="chapterBox" style="display:none;">
+            <select id="chapterSelect" class="std-select chapter-list"></select>
           </div>
-          
-          <div class="col-side">
-             <div class="card side-card">
-                <div class="small-label">Session</div>
-                <div id="sessionStats" class="stats-text">0 Correct</div>
-             </div>
-             <div class="card side-card">
-                <div class="small-label">Session Questions</div>
-                <div class="history-list" id="historyList"></div>
-             </div>
+
+          <button id="btnRefreshPractice" class="refresh-btn">↻ Apply</button>
+
+          <label class="check-label">
+            <input type="checkbox" id="prefSkipSolved"> Skip Mastered
+          </label>
+
+          <button id="btnFocusMode" class="pill-btn">🧘 Focus</button>
+        </div>
+
+        <div id="qInfoBar" class="info-bar hidden">
+          <span id="qInfoID"></span> • 
+          <span id="qInfoChapter"></span> •
+          <span id="qInfoStats"></span> •
+          <span id="qInfoDate"></span>
+        </div>
+
+        <!-- QUESTION PANEL -->
+        <div id="questionPanel" class="question-panel">
+          <div class="muted" style="text-align:center; padding:20px;">
+            Loading Engine…
           </div>
+        </div>
+
+        <!-- FEEDBACK -->
+        <div id="feedbackPanel" class="feedback-panel hidden"></div>
+
+        <!-- NOTES -->
+        <div class="notes-container">
+          <label class="small-label">Notes 📝 <span id="saveNoteStatus"></span></label>
+          <textarea id="userNoteArea" class="notes-textarea"></textarea>
+          <button id="btnSaveNoteManual" class="tiny-btn">💾 Save</button>
+        </div>
+
+        <!-- BUTTONS -->
+        <div class="btn-row-main">
+          <button id="btnSubmit" class="primary-btn large">Submit</button>
+          <button id="btnNext" class="primary-btn large hidden">Next →</button>
+          <label class="check-label guess-box">
+            <input type="checkbox" id="guessCheck"> I'm Guessing
+          </label>
+        </div>
+
+        <!-- SRS -->
+        <div id="srsButtons" class="srs-row hidden">
+          <button class="srs-btn again" id="btnSrsAgain">Again</button>
+          <button class="srs-btn hard" id="btnSrsHard">Hard</button>
+          <button class="srs-btn good" id="btnSrsGood">Good</button>
+          <button class="srs-btn easy" id="btnSrsEasy">Easy</button>
+        </div>
+
+        <!-- NAV -->
+        <div class="nav-row">
+          <button id="btnPrev" class="secondary-btn">← Previous</button>
+          <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
+        </div>
+
+        <!-- SESSION SIDE -->
+        <div class="card side-card">
+          <div class="small-label">Session Stats</div>
+          <div id="sessionStats">0 Correct</div>
+        </div>
+        <div class="card side-card">
+          <div class="small-label">Session Questions</div>
+          <div id="historyList" class="history-list"></div>
         </div>
       </div>
     </section>
 
-    <!-- 2. LIBRARY -->
+    <!-- LIBRARY -->
     <section id="tab-all" class="tab-content">
       <div class="card library-card">
-          
-          <div class="library-sticky-header">
-              <div class="filter-bar">
-                 <input id="allSearch" placeholder="Search..." class="std-input" style="flex:1;">
-                 <select id="allFilter" class="std-select">
-                   <option value="all">All</option>
-                   <option value="maintain">🔧 Maintenance</option>
-                   <option value="notes">With Notes</option>
-                   <option value="wrong">Errors</option>
-                   <option value="flagged">Flagged</option>
-                 </select>
-                 <select id="allChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
-                 
-                 <!-- Date Filters -->
-                 <input type="date" id="allDateFrom" class="std-input date-input" title="From Date">
-                 <input type="date" id="allDateTo" class="std-input date-input" title="To Date">
-                 
-                 <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
-              </div>
 
-              <!-- ALL ACTIONS MOVED HERE -->
-              <div class="row-controls action-area">
-                 <div class="action-group">
-                    <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
-                    <span id="dupResult" class="muted small-label" style="margin-left:5px;"></span>
-                    <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
-                 </div>
-                 <div class="spacer"></div>
-                 <div class="action-group">
-                    <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
-                    <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
-                    <input type="file" id="fileInput" accept=".json" class="hidden">
-                    <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
-                    <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
-                 </div>
-              </div>
-              
-              <!-- Drag Drop Zone Overlay (Hidden by default) -->
-              <div id="dropZone" class="drop-zone hidden">Drop JSON file here to Import</div>
+        <div class="library-sticky-header">
+
+          <div class="filter-bar">
+            <input id="allSearch" class="std-input" placeholder="Search…">
+            <select id="allFilter" class="std-select">
+              <option value="all">All</option>
+              <option value="maintain">Maintenance</option>
+              <option value="notes">With Notes</option>
+              <option value="wrong">Errors</option>
+              <option value="flagged">Flagged</option>
+            </select>
+
+            <select id="allChapterSelect" class="std-select chapter-list"></select>
+
+            <input type="date" id="allDateFrom" class="std-input date-input">
+            <input type="date" id="allDateTo" class="std-input date-input">
+
+            <button id="btnAllApply" class="refresh-btn">↻ Apply</button>
           </div>
 
-          <div class="table-wrapper">
-            <table class="q-table">
-              <thead>
-                <tr>
-                  <th width="40"><input type="checkbox" id="allSelectAll"></th>
-                  <th class="sortable" data-key="id" width="60">ID ↕</th>
-                  <th class="sortable" data-key="importedAt" width="90">Date ↕</th>
-                  <th class="sortable" data-key="text" width="40%">Question ↕</th>
-                  <th class="sortable" data-key="chapter" width="15%">Chapter ↕</th>
-                  <th width="10%">Notes</th>
-                  <th width="10%">Issue</th>
-                  <th width="60">Status</th>
-                  <th width="50">Edit</th>
-                </tr>
-              </thead>
-              <tbody id="allTableBody"></tbody>
-            </table>
+          <div class="action-area">
+            <div class="action-group">
+              <button id="btnScanDup" class="pill-btn">🔍 Check Duplicates</button>
+              <span id="dupResult" class="muted small-label"></span>
+              <button id="btnFixDup" class="danger-btn small hidden">Auto-Fix</button>
+            </div>
+
+            <div class="spacer"></div>
+
+            <div class="action-group">
+              <button id="btnRangeMode" class="pill-btn">✨ Range Select</button>
+              <button id="btnBulkDelete" class="danger-btn">Delete Selected</button>
+              <input type="file" id="fileInput" accept=".json" class="hidden">
+              <button id="btnImportTrigger" class="secondary-btn">📥 Import</button>
+              <button id="btnExportTrigger" class="secondary-btn">💾 Export</button>
+            </div>
           </div>
-          
-          <div class="all-footer">
-             <span id="selCount">0 Selected</span>
-             <div class="pagination">
-                <button id="allPrevPage" class="nav-btn">Prev</button>
-                <span id="allPageInfo">1</span>
-                <button id="allNextPage" class="nav-btn">Next</button>
-             </div>
+
+          <div id="dropZone" class="drop-zone hidden">
+            Drop JSON here
           </div>
+
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-wrapper">
+          <table class="q-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="allSelectAll"></th>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Question</th>
+                <th>Chapter</th>
+                <th>Notes</th>
+                <th>Issue</th>
+                <th>Status</th>
+                <th>Edit</th>
+              </tr>
+            </thead>
+            <tbody id="allTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="all-footer">
+          <span id="selCount">0 Selected</span>
+          <div class="pagination">
+            <button id="allPrevPage" class="nav-btn">Prev</button>
+            <span id="allPageInfo">1</span>
+            <button id="allNextPage" class="nav-btn">Next</button>
+          </div>
+        </div>
+
       </div>
     </section>
 
-    <!-- 3. FLASHCARDS -->
+    <!-- FLASHCARDS -->
     <section id="tab-flashcards" class="tab-content">
-       <div class="card center-layout">
-          <h3>Flashcards</h3>
-          <div class="row-controls" style="justify-content:center;">
-             <select id="fcSource" class="std-select"><option value="due">Due</option><option value="all">All</option></select>
-             <button id="btnFcShuffle" class="primary-btn">Shuffle</button>
-          </div>
-          <div id="fcCard" class="flashcard">
-             <div id="fcFront">Click Shuffle</div>
-             <div id="fcBack" class="hidden"></div>
-          </div>
-          <div class="fc-actions">
-             <button id="btnFcShow" class="secondary-btn">Show Answer</button>
-             <div id="fcGrading" class="hidden">
-                <button id="btnFcAgain" class="danger-btn">Again</button>
-                <button id="btnFcGood" class="primary-btn">Good</button>
-             </div>
-          </div>
-       </div>
+      <div class="card center-layout">
+        <h3>Flashcards</h3>
+        <select id="fcSource" class="std-select">
+          <option value="due">Due</option>
+          <option value="all">All</option>
+        </select>
+
+        <button id="btnFcShuffle" class="primary-btn">Shuffle</button>
+
+        <div id="fcCard" class="flashcard">
+          <div id="fcFront">Front</div>
+          <div id="fcBack" class="hidden">Back</div>
+        </div>
+
+        <button id="btnFcShow" class="secondary-btn">Show</button>
+        <div id="fcGrading" class="hidden">
+          <button id="btnFcAgain" class="danger-btn">Again</button>
+          <button id="btnFcGood" class="primary-btn">Good</button>
+        </div>
+      </div>
     </section>
 
-    <!-- 4. EXAM -->
+    <!-- EXAM -->
     <section id="tab-exam" class="tab-content">
-       <div class="card">
-          <h2>Exam Simulator</h2>
-          <div class="row-controls">
-             <select id="examChapterSelect" class="std-select chapter-list"><option value="">All Chapters</option></select>
-             <input id="examCount" type="number" value="40" class="std-input" style="width:70px">
-             <button id="btnStartExam" class="primary-btn">Start Exam</button>
-          </div>
-       </div>
-       <div id="examInterface" class="card hidden">
-           <div class="exam-header">Q <span id="examProgress">1</span></div>
-           <div id="examQPanel" class="question-panel"></div>
-           <div class="btn-row-main">
-              <button id="btnExamNext" class="nav-btn">Next</button>
-              <button id="btnExamFinish" class="danger-btn">Finish</button>
-           </div>
-       </div>
-       <div id="examResults" class="card hidden">
+      <div class="card">
+        <h3>Exam Simulator</h3>
+
+        <select id="examChapterSelect" class="std-select chapter-list"></select>
+        <input type="number" id="examCount" class="std-input" value="40" style="width:70px;">
+        <button id="btnStartExam" class="primary-btn">Start</button>
+
+        <div id="examInterface" class="card hidden">
+          <div class="exam-header">Q <span id="examProgress"></span></div>
+          <div id="examQPanel" class="question-panel"></div>
+
+          <button id="btnExamNext" class="nav-btn">Next</button>
+          <button id="btnExamFinish" class="danger-btn">Finish</button>
+        </div>
+
+        <div id="examResults" class="card hidden">
           <h3>Results</h3>
           <div id="examScore"></div>
           <button id="btnExamClose" class="pill-btn">Close</button>
-       </div>
+        </div>
+      </div>
     </section>
 
-    <!-- 5. DASHBOARD -->
+    <!-- DASHBOARD -->
     <section id="tab-dashboard" class="tab-content">
-       <div class="card">
-          <h2>Statistics</h2>
-          <div class="dashboard-grid">
-             <div class="dash-box"><h3>Total</h3><span id="dashTotal" class="dash-val">0</span></div>
-             <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint" class="dash-val warning">0</span></div>
-             <div class="dash-box"><h3>Mastery</h3><span id="dashMastery" class="dash-val">0%</span></div>
-             <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity" class="dash-val">0/day</span></div>
-          </div>
-          <div style="margin-top:20px; text-align:center;">
-             <button id="btnRefreshStats" class="refresh-btn">↻ Refresh Stats</button>
-          </div>
-       </div>
+      <div class="card">
+        <h2>Statistics</h2>
+        <div class="dashboard-grid">
+          <div class="dash-box"><h3>Total</h3><span id="dashTotal"></span></div>
+          <div class="dash-box"><h3>Maintenance</h3><span id="dashMaint"></span></div>
+          <div class="dash-box"><h3>Mastery</h3><span id="dashMastery"></span></div>
+          <div class="dash-box"><h3>Velocity</h3><span id="dashVelocity"></span></div>
+        </div>
+
+        <button id="btnRefreshStats" class="refresh-btn" style="margin-top:20px;">↻ Refresh</button>
+      </div>
     </section>
 
-    <!-- 6. SETTINGS -->
+    <!-- SETTINGS -->
     <section id="tab-settings" class="tab-content">
-       <div class="card">
-          <h3>GitHub Config</h3>
-          <input id="ghToken" placeholder="Token" class="std-input" style="width:100%; margin-bottom:10px;">
-          <input id="ghRepo" placeholder="User/Repo" class="std-input" style="width:100%; margin-bottom:10px;">
-          <input id="ghFile" value="mcq_backup.json" class="std-input" style="width:100%; margin-bottom:10px;">
-          
-          <button id="btnSaveGh" class="primary-btn">Save Settings</button>
-          <hr>
-          <button id="btnCloudUpload" class="secondary-btn">Force Upload</button>
-          <button id="btnCloudDownload" class="secondary-btn">Force Download</button>
-          
-           <!-- Backup History -->
-          <div style="margin-top:15px;">
-              <label class="small-label">Restore History</label>
-              <select id="backupHistoryList" class="std-select" style="width:100%; margin-bottom:5px;">
-                 <option value="">No backups available</option>
-              </select>
-              <button id="btnRestoreBackup" class="secondary-btn">Restore Selected</button>
-          </div>
-       </div>
-       <div class="card" style="margin-top:20px;">
-          <h3>System</h3>
-          <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
-          <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
-          <button id="btnForceReload" class="ghost-btn">Force Reload</button>
-       </div>
+      <div class="card">
+        <h3>GitHub Config</h3>
+
+        <input id="ghToken" class="std-input" placeholder="Token">
+        <input id="ghRepo" class="std-input" placeholder="User/Repo">
+        <input id="ghFile" class="std-input" value="mcq_backup.json">
+
+        <button id="btnSaveGh" class="primary-btn">Save</button>
+
+        <hr>
+
+        <button id="btnCloudUpload" class="secondary-btn">Upload</button>
+        <button id="btnCloudDownload" class="secondary-btn">Download</button>
+
+        <div style="margin-top:20px;">
+          <label class="small-label">Restore History</label>
+          <select id="backupHistoryList" class="std-select"></select>
+          <button id="btnRestoreBackup" class="secondary-btn">Restore</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h3>System</h3>
+        <button id="btnResetProgress" class="danger-btn">Reset Stats</button>
+        <button id="btnFactoryReset" class="danger-btn">Factory Reset</button>
+        <button id="btnForceReload" class="ghost-btn">Force Reload</button>
+      </div>
+    </section>
+
+    <!-- SESSIONS -->
+    <section id="tab-sessions" class="tab-content">
+      <div class="card">
+        <h3>Practice Sessions</h3>
+        <div id="sessionsList"></div>
+      </div>
+    </section>
+
+    <!-- QUESTION BACKUPS PAGE -->
+    <section id="tab-backups" class="tab-content">
+      <div class="card">
+        <h3>Question Backups</h3>
+
+        <button id="btnBackupQuestionsNow" class="primary-btn">Backup Now</button>
+
+        <div id="questionsBackupsTable" style="margin-top:20px;"></div>
+      </div>
     </section>
 
   </main>
 </div>
 
-<!-- Edit Modal -->
+<!-- EDIT MODAL -->
 <div id="editModal" class="modal hidden">
   <div class="modal-backdrop" id="editModalBackdrop"></div>
   <div class="modal-content">
-     <h3>Edit Question</h3>
-     <textarea id="editText" class="std-textarea" rows="3"></textarea>
-     <div class="row-inputs">
-       <input id="editChapter" class="std-input" placeholder="Chapter">
-       <input id="editTags" class="std-input" placeholder="Tags">
-     </div>
-     <label class="check-label warning-text"><input type="checkbox" id="editMaint"> 🔧 Maintenance</label>
-     <textarea id="editExplanation" class="std-textarea" rows="3" placeholder="Explanation"></textarea>
-     
-     <div class="small-label">Choices:</div>
-     <div id="editChoicesList"></div>
-     <button id="btnAddChoice" class="pill-btn small" style="margin-top:5px;">+ Choice</button>
-     
-     <div class="modal-footer">
-        <button id="btnSaveEdit" class="primary-btn">Save</button>
-        <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
-     </div>
+    <h3>Edit Question</h3>
+
+    <textarea id="editText" class="std-textarea" rows="3"></textarea>
+
+    <div class="row-inputs">
+      <input id="editChapter" class="std-input" placeholder="Chapter">
+      <input id="editTags" class="std-input" placeholder="Tags">
+    </div>
+
+    <label class="check-label warning-text">
+      <input type="checkbox" id="editMaint"> Maintenance
+    </label>
+
+    <textarea id="editExplanation" class="std-textarea" rows="3"></textarea>
+
+    <div class="small-label">Choices</div>
+    <div id="editChoicesList"></div>
+    <button id="btnAddChoice" class="pill-btn small">+ Choice</button>
+
+    <div class="modal-footer">
+      <button id="btnSaveEdit" class="primary-btn">Save</button>
+      <button id="btnCancelEdit" class="secondary-btn">Cancel</button>
+    </div>
   </div>
 </div>
 
