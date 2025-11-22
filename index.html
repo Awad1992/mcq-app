@@ -56,6 +56,8 @@
     <section id="tab-home" class="tab-content active">
       <div class="card practice-layout">
 
+        <div class="practice-spacer"></div>
+
         <div class="practice-main">
 
         <div class="row-controls">
@@ -110,7 +112,7 @@
         <!-- BUTTONS -->
         <div class="btn-row-main">
           <button id="btnSubmit" class="primary-btn large">Submit</button>
-          <button id="btnNext" class="primary-btn large hidden">Next →</button>
+          <button id="btnNext" class="primary-btn large">Next →</button>
           <label class="check-label guess-box">
             <input type="checkbox" id="guessCheck"> I'm Guessing
           </label>
@@ -134,6 +136,11 @@
 
         <div class="practice-side">
         <!-- SESSION SIDE -->
+
+        <div class="card side-card">
+          <div class="small-label">Session Navigator</div>
+          <div id="sessionNav" class="session-nav"></div>
+        </div>
         <div class="card side-card">
           <div class="small-label">Session Stats</div>
           <div id="sessionStats">0 Correct</div>

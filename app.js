@@ -273,10 +273,43 @@ async function buildPracticePool(){
   return filtered;
 }
 
+
+function renderSessionNavigator(){
+  const navEl=document.getElementById('sessionNav');
+  if(!navEl || !practiceSession || !Array.isArray(practiceSession.questionIds)) return;
+  const ids=practiceSession.questionIds;
+  let html='';
+  for(let i=0;i<ids.length;i++){
+    const num=i+1;
+    const cls=['nav-num'];
+    if(i===practiceSession.index) cls.push('active');
+    if(practiceSession.answeredMap && practiceSession.answeredMap[ids[i]]) cls.push('done');
+    html+=`<div class="${cls.join(' ')}" data-idx="${i}">${num}</div>`;
+  }
+  navEl.innerHTML=html||'<div class="muted tiny">No session.</div>';
+  navEl.querySelectorAll('.nav-num').forEach(n=>{
+    n.addEventListener('click', async ()=>{
+      const i=parseInt(n.getAttribute('data-idx'),10);
+      if(isNaN(i)) return;
+      practiceSession.index=i;
+      const q=await getQuestionById(practiceSession.questionIds[i]);
+      if(!q) return;
+      currentQuestion=q; lastResult=null; lastSelectedIndex=null;
+      if(feedbackPanel) feedbackPanel.innerHTML='';
+      renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator(); renderSessionNavigator();
+    });
+  });
+}
+
+async function ensurePracticeSession(){
+  if(!practiceSession || !practiceSession.questionIds?.length){
+    await startNewPracticeSession(true);
+  }
+}
 async function startNewPracticeSession(autoStartFirst=true){
   const pool=await buildPracticePool();
   if(!pool.length){
-    practiceSession=null; currentQuestion=null; renderQuestion(); return;
+    practiceSession=null; currentQuestion=null; renderQuestion(); renderSessionNavigator(); return;
   }
   const ids=pool.map(q=>q.id);
   practiceSession={ id:makeSessionId(), createdAt:new Date().toISOString(), mode:currentMode,
@@ -427,8 +460,10 @@ async function submitAnswer(){
   tx.oncomplete=async ()=>{
     currentQuestion=q;
     lastResult=isCorrect;
+    if(practiceSession){ practiceSession.answeredMap[q.id]=true; if(isCorrect) practiceSession.correctCount=(practiceSession.correctCount||0)+1; document.getElementById("sessionStats")&&(document.getElementById("sessionStats").textContent=`${practiceSession.correctCount} Correct`); }
+
     showFeedback(correctIdx, selectedIdx, q.explanation);
-    updateStatsBar(); updateHistoryList(); refreshBackupLabels();
+    updateStatsBar(); updateHistoryList(); refreshBackupLabels(); renderSessionNavigator();
   };
 }
 
@@ -467,27 +502,29 @@ function showFeedback(correctIdx, selectedIdx, explanation){
 
 // go prev / next within pool
 async function loadNextQuestion(){
-  const pool=await buildPracticePool();
-  if(!pool.length){ currentQuestion=null; renderQuestion(); return; }
-
-  // if using session order, step forward
-  let idx=pool.findIndex(x=>x.id===currentQuestion?.id);
-  idx = (idx<0)?0:Math.min(idx+1,pool.length-1);
-  currentQuestion=pool[idx];
+  await ensurePracticeSession();
+  const ids=practiceSession.questionIds||[];
+  if(!ids.length){ currentQuestion=null; renderQuestion(); renderSessionNavigator(); return; }
+  practiceSession.index=Math.min(practiceSession.index+1, ids.length-1);
+  const q=await getQuestionById(ids[practiceSession.index]);
+  if(!q){ currentQuestion=null; renderQuestion(); renderSessionNavigator(); return; }
+  currentQuestion=q;
   lastResult=null; lastSelectedIndex=null;
   if(feedbackPanel) feedbackPanel.innerHTML='';
-  renderQuestion(); updateStatsBar(); updateHistoryList();
+  renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
 }
 
 async function goPreviousQuestion(){
-  const pool=await buildPracticePool();
-  if(!pool.length) return;
-  let idx=pool.findIndex(x=>x.id===currentQuestion?.id);
-  idx = (idx<=0)?0:idx-1;
-  currentQuestion=pool[idx];
+  await ensurePracticeSession();
+  const ids=practiceSession.questionIds||[];
+  if(!ids.length) return;
+  practiceSession.index=Math.max(practiceSession.index-1, 0);
+  const q=await getQuestionById(ids[practiceSession.index]);
+  if(!q) return;
+  currentQuestion=q;
   lastResult=null; lastSelectedIndex=null;
   if(feedbackPanel) feedbackPanel.innerHTML='';
-  renderQuestion(); updateStatsBar(); updateHistoryList();
+  renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
 }
 
 // import/export normalize
