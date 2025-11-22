@@ -37,6 +37,8 @@ let examTimerId = null;
 
 // practice sessions
 let practiceSession = null;
+let practiceNavPage = 1;
+const PRACTICE_NAV_PAGE_SIZE = 50;
 const PRACTICE_SESSIONS_KEY = 'practiceSessions';
 
 // cached chapters
@@ -273,54 +275,22 @@ async function buildPracticePool(){
   return filtered;
 }
 
-
-function renderSessionNavigator(){
-  const navEl=document.getElementById('sessionNav');
-  if(!navEl || !practiceSession || !Array.isArray(practiceSession.questionIds)) return;
-  const ids=practiceSession.questionIds;
-  let html='';
-  for(let i=0;i<ids.length;i++){
-    const num=i+1;
-    const cls=['nav-num'];
-    if(i===practiceSession.index) cls.push('active');
-    if(practiceSession.answeredMap && practiceSession.answeredMap[ids[i]]) cls.push('done');
-    html+=`<div class="${cls.join(' ')}" data-idx="${i}">${num}</div>`;
-  }
-  navEl.innerHTML=html||'<div class="muted tiny">No session.</div>';
-  navEl.querySelectorAll('.nav-num').forEach(n=>{
-    n.addEventListener('click', async ()=>{
-      const i=parseInt(n.getAttribute('data-idx'),10);
-      if(isNaN(i)) return;
-      practiceSession.index=i;
-      const q=await getQuestionById(practiceSession.questionIds[i]);
-      if(!q) return;
-      currentQuestion=q; lastResult=null; lastSelectedIndex=null;
-      if(feedbackPanel) feedbackPanel.innerHTML='';
-      renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator(); renderSessionNavigator();
-    });
-  });
-}
-
-async function ensurePracticeSession(){
-  if(!practiceSession || !practiceSession.questionIds?.length){
-    await startNewPracticeSession(true);
-  }
-}
 async function startNewPracticeSession(autoStartFirst=true){
   const pool=await buildPracticePool();
   if(!pool.length){
-    practiceSession=null; currentQuestion=null; renderQuestion(); renderSessionNavigator(); return;
+    practiceSession=null; currentQuestion=null; renderQuestion(); return;
   }
   const ids=pool.map(q=>q.id);
   practiceSession={ id:makeSessionId(), createdAt:new Date().toISOString(), mode:currentMode,
     questionIds:ids, index:0, answeredMap:{}, correctCount:0 };
+  practiceNavPage = 1;
   await savePracticeSessions((await loadPracticeSessions()).slice(0,50));
 
   if(autoStartFirst){
     currentQuestion=pool[0];
     lastResult=null; lastSelectedIndex=null;
     if(feedbackPanel) feedbackPanel.innerHTML='';
-    renderQuestion(); updateStatsBar(); updateHistoryList();
+    renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
   }
 }
 
@@ -460,10 +430,14 @@ async function submitAnswer(){
   tx.oncomplete=async ()=>{
     currentQuestion=q;
     lastResult=isCorrect;
-    if(practiceSession){ practiceSession.answeredMap[q.id]=true; if(isCorrect) practiceSession.correctCount=(practiceSession.correctCount||0)+1; document.getElementById("sessionStats")&&(document.getElementById("sessionStats").textContent=`${practiceSession.correctCount} Correct`); }
-
+    if(practiceSession && currentMode===practiceSession.mode){
+      practiceSession.answeredMap[q.id]={isCorrect:!!isCorrect, at:now};
+      if(isCorrect) practiceSession.correctCount=(practiceSession.correctCount||0)+1;
+      await persistPracticeSession();
+      renderSessionNavigator();
+    }
     showFeedback(correctIdx, selectedIdx, q.explanation);
-    updateStatsBar(); updateHistoryList(); refreshBackupLabels(); renderSessionNavigator();
+    updateStatsBar(); updateHistoryList(); refreshBackupLabels();
   };
 }
 
@@ -501,31 +475,53 @@ function showFeedback(correctIdx, selectedIdx, explanation){
 }
 
 // go prev / next within pool
+
 async function loadNextQuestion(){
-  await ensurePracticeSession();
-  const ids=practiceSession.questionIds||[];
-  if(!ids.length){ currentQuestion=null; renderQuestion(); renderSessionNavigator(); return; }
-  practiceSession.index=Math.min(practiceSession.index+1, ids.length-1);
-  const q=await getQuestionById(ids[practiceSession.index]);
-  if(!q){ currentQuestion=null; renderQuestion(); renderSessionNavigator(); return; }
-  currentQuestion=q;
+  if(practiceSession && practiceSession.questionIds?.length){
+    const ids=practiceSession.questionIds;
+    practiceSession.index=Math.min((practiceSession.index||0)+1, ids.length-1);
+    const q=await getQuestionById(ids[practiceSession.index]);
+    if(!q) return;
+    currentQuestion=q; lastResult=null; lastSelectedIndex=null;
+    if(feedbackPanel) feedbackPanel.innerHTML='';
+    renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
+    await persistPracticeSession();
+    return;
+  }
+  const pool=await buildPracticePool();
+  if(!pool.length){ currentQuestion=null; renderQuestion(); return; }
+  let idx=pool.findIndex(x=>x.id===currentQuestion?.id);
+  idx = (idx<0)?0:Math.min(idx+1,pool.length-1);
+  currentQuestion=pool[idx];
   lastResult=null; lastSelectedIndex=null;
   if(feedbackPanel) feedbackPanel.innerHTML='';
-  renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
+  renderQuestion(); updateStatsBar(); updateHistoryList();
 }
 
+
+
 async function goPreviousQuestion(){
-  await ensurePracticeSession();
-  const ids=practiceSession.questionIds||[];
-  if(!ids.length) return;
-  practiceSession.index=Math.max(practiceSession.index-1, 0);
-  const q=await getQuestionById(ids[practiceSession.index]);
-  if(!q) return;
-  currentQuestion=q;
+  if(practiceSession && practiceSession.questionIds?.length){
+    const ids=practiceSession.questionIds;
+    practiceSession.index=Math.max((practiceSession.index||0)-1, 0);
+    const q=await getQuestionById(ids[practiceSession.index]);
+    if(!q) return;
+    currentQuestion=q; lastResult=null; lastSelectedIndex=null;
+    if(feedbackPanel) feedbackPanel.innerHTML='';
+    renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
+    await persistPracticeSession();
+    return;
+  }
+  const pool=await buildPracticePool();
+  if(!pool.length) return;
+  let idx=pool.findIndex(x=>x.id===currentQuestion?.id);
+  idx = (idx<=0)?0:idx-1;
+  currentQuestion=pool[idx];
   lastResult=null; lastSelectedIndex=null;
   if(feedbackPanel) feedbackPanel.innerHTML='';
-  renderQuestion(); updateStatsBar(); updateHistoryList(); renderSessionNavigator();
+  renderQuestion(); updateStatsBar(); updateHistoryList();
 }
+
 
 // import/export normalize
 function normalizeImportedQuestions(rawArr){
@@ -1588,36 +1584,63 @@ async function resetProgress(scope){
 }
 
 // local backups list
+const GLOBAL_BACKUPS_KEY='mcq_local_backups_global_v23';
+
+function loadGlobalBackups(){
+  try{ const raw=localStorage.getItem(GLOBAL_BACKUPS_KEY); return raw?JSON.parse(raw):[]; }catch{ return []; }
+}
+function saveGlobalBackups(arr){ try{ localStorage.setItem(GLOBAL_BACKUPS_KEY, JSON.stringify(arr||[])); }catch{} }
+
+
 async function renderLocalBackupsTable(){
   const el=document.getElementById('questionsBackupsTable');
   if(!el) return;
-  const arr=await loadMeta('localBackupsV20') || [];
-  if(!Array.isArray(arr) || !arr.length){
+
+  const metaArr=await loadMeta('localBackupsV20') || [];
+  const globalArr=loadGlobalBackups() || [];
+
+  const seen=new Set();
+  const arr=[...globalArr, ...metaArr]
+    .filter(b=>b && b.exportedAt && b.data)
+    .sort((a,b)=>(b.exportedAt||'').localeCompare(a.exportedAt||''))
+    .filter(b=>{ if(seen.has(b.exportedAt)) return false; seen.add(b.exportedAt); return true; });
+
+  if(!arr.length){
     el.innerHTML='<div class="muted tiny">No local backups yet.</div>';
     return;
   }
-  el.innerHTML=arr.map((b,i)=>{
-    return `<div class="history-item">
-      <div><strong>${fmtTime(b.exportedAt)}</strong> · ${b.totalQuestions} Q</div>
+
+  el.innerHTML=arr.map((b,i)=>`
+    <div class="history-item">
+      <div><strong>${fmtTime(b.exportedAt)}</strong> · ${b.totalQuestions||0} Q</div>
       <div class="btn-row" style="margin-top:6px;">
         <button class="secondary-btn tiny-btn" data-act="restore" data-idx="${i}">Restore</button>
         <button class="danger-btn tiny-btn" data-act="delete" data-idx="${i}">Delete</button>
       </div>
-    </div>`;
-  }).join('');
+    </div>
+  `).join('');
+
   el.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const act=btn.getAttribute('data-act');
       const idx=parseInt(btn.getAttribute('data-idx'),10);
-      const list=await loadMeta('localBackupsV20') || [];
-      if(!list[idx]) return;
+      const entry=arr[idx];
+      if(!entry) return;
+
       if(act==='restore'){
-        await importBackupObject(list[idx].data);
+        await importBackupObject(entry.data);
         toast('Local backup restored.');
-        refreshChapterOptions(); startNewPracticeSession(true); reloadAllQuestionsTable(); buildFlashcardPool(); refreshBackupLabels();
+        refreshChapterOptions();
+        startNewPracticeSession(true);
+        reloadAllQuestionsTable();
+        buildFlashcardPool();
+        refreshBackupLabels();
       }else if(act==='delete'){
-        list.splice(idx,1);
-        saveMeta('localBackupsV20', list);
+        const metaOnly=await loadMeta('localBackupsV20') || [];
+        const globalOnly=loadGlobalBackups() || [];
+        const filt = x => x.exportedAt!==entry.exportedAt;
+        saveMeta('localBackupsV20', metaOnly.filter(filt));
+        saveGlobalBackups(globalOnly.filter(filt));
         renderLocalBackupsTable();
       }
     });
@@ -1626,9 +1649,16 @@ async function renderLocalBackupsTable(){
 
 async function backupNowLocal(){
   const backup=await buildBackupObject();
-  const list=await loadMeta('localBackupsV20') || [];
-  list.unshift({exportedAt:backup.meta.exportedAt, totalQuestions:backup.meta.totalQuestions, data:backup});
-  saveMeta('localBackupsV20', list.slice(0,25));
+  const entry={exportedAt:backup.meta.exportedAt, totalQuestions:backup.meta.totalQuestions, data:backup};
+
+  const metaList=await loadMeta('localBackupsV20') || [];
+  metaList.unshift(entry);
+  saveMeta('localBackupsV20', metaList.slice(0,25));
+
+  const globalList=loadGlobalBackups() || [];
+  globalList.unshift(entry);
+  saveGlobalBackups(globalList.slice(0,25));
+
   toast('Local backup saved.');
   renderLocalBackupsTable();
 }
@@ -1758,10 +1788,19 @@ chapterSelect?.addEventListener('change',()=>{
   startNewPracticeSession(true);
 });
 
+
+async function migrateBackupsToGlobal(){
+  const global=loadGlobalBackups();
+  if(global.length) return;
+  const metaArr=await loadMeta('localBackupsV20') || [];
+  if(metaArr.length){ saveGlobalBackups(metaArr.slice(0,25)); }
+}
+
 // boot
 (async function boot(){
   try{
     await openDB();
+    await migrateBackupsToGlobal();
     document.getElementById('dbStatus').textContent='DB: Ready';
     loadTheme();
     refreshBackupLabels();

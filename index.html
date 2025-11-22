@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>MCQ Ultra-Pro V23.2</title>
+  <title>MCQ Ultra-Pro V20</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#2563eb">
   <link rel="manifest" href="manifest.json">
@@ -20,7 +20,7 @@
     <div class="brand-area">
       <div class="logo">💎</div>
       <div>
-        <h1>MCQ Ultra-Pro <span class="ver">V23.2</span></h1>
+        <h1>MCQ Ultra-Pro <span class="ver">V20</span></h1>
         <div class="xp-wrapper">
           <span id="userRank">Intern</span> • 
           <span id="userXP">0</span> XP • 
@@ -54,11 +54,7 @@
 
     <!-- PRACTICE -->
     <section id="tab-home" class="tab-content active">
-      <div class="card practice-layout">
-
-        <div class="practice-spacer"></div>
-
-        <div class="practice-main">
+      <div class="card main-layout">
 
         <div class="row-controls">
 
@@ -112,7 +108,7 @@
         <!-- BUTTONS -->
         <div class="btn-row-main">
           <button id="btnSubmit" class="primary-btn large">Submit</button>
-          <button id="btnNext" class="primary-btn large">Next →</button>
+          <button id="btnNext" class="primary-btn large hidden">Next →</button>
           <label class="check-label guess-box">
             <input type="checkbox" id="guessCheck"> I'm Guessing
           </label>
@@ -132,25 +128,16 @@
           <button id="btnExitFocus" class="danger-btn hidden" style="margin-left:auto;">Exit Focus</button>
         </div>
 
-        </div>
-
-        <div class="practice-side">
         <!-- SESSION SIDE -->
-
-        <div class="card side-card">
-          <div class="small-label">Session Navigator</div>
-          <div id="sessionNav" class="session-nav"></div>
-        </div>
         <div class="card side-card">
           <div class="small-label">Session Stats</div>
           <div id="sessionStats">0 Correct</div>
         </div>
         <div class="card side-card">
-          <div class="small-label">Session Questions</div>
-          <div id="historyList" class="history-list"></div>
+          <div class="small-label">Session Navigator</div>
+          <div id="historyList" class="history-list session-nav"></div>
+          <div id="sessionNavPager" class="session-nav-pager"></div>
         </div>
-        </div>
-
       </div>
     </section>
 
